@@ -1,0 +1,276 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Pasaje Altos">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <link rel="icon" href="img/favicon.ico">
+  <title>Ingresar · Pasaje de los Altos</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js?v=8"></script>
+
+  <script>
+    (function () {
+      if (typeof window.PLACEHOLDER_IMG === 'undefined') {
+        window.PLACEHOLDER_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#f3f4f6"/><text x="50%" y="50%" text-anchor="middle" dy=".35em" fill="#9ca3af" font-family="sans-serif" font-size="20">Sin imagen</text></svg>'
+        );
+      }
+      if (typeof window.cleanPhone === 'undefined') {
+        window.cleanPhone = function (raw) { return String(raw || '').replace(/\D/g, ''); };
+      }
+    })();
+  </script>
+
+  <script src="js/theme-loader.js?v=9"></script>
+  <script src="js/liquid-glass.js?v=4"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    body.auth-bg {
+      background: radial-gradient(1200px 600px at 20% 10%, #1e3a8a 0%, #1e40af 40%, #065f46 100%);
+      background-attachment: fixed;
+      min-height: 100vh;
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.92);
+      backdrop-filter: blur(18px) saturate(160%);
+      -webkit-backdrop-filter: blur(18px) saturate(160%);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 0 24px 60px -12px rgba(15, 23, 42, 0.35);
+    }
+    .pw-toggle { cursor: pointer; color: #6b7280; transition: color .15s ease; }
+    .pw-toggle:hover { color: #111827; }
+    #message { transition: opacity .2s ease; }
+    #message.hidden { opacity: 0; }
+  </style>
+</head>
+<body class="auth-bg flex items-center justify-center p-4">
+
+  <div class="glass-card w-full max-w-md rounded-2xl p-6 sm:p-8">
+
+    <div class="text-center mb-6">
+      <a href="index.html" class="inline-flex items-center gap-2 justify-center">
+        <img class="theme-logo hidden w-10 h-10 rounded-full object-cover bg-white/40" src="" alt="logo">
+        <span class="theme-title text-2xl font-extrabold text-blue-900">
+          Pasaje de los <span class="text-emerald-500">Altos</span>
+        </span>
+      </a>
+      <h1 class="text-lg font-bold text-gray-800 mt-3">Panel Multirrol</h1>
+      <p id="loginSubtitle" class="text-sm text-gray-500 mt-1">Ingresa para gestionar tu cuenta de Pasaje de los Altos.</p>
+    </div>
+
+    <div id="redirectBanner" class="hidden mb-4 rounded-2xl bg-teal-50 border border-teal-200 p-3 flex items-start gap-2.5">
+      <span class="text-xl flex-shrink-0">🛵</span>
+      <div class="flex-1 min-w-0">
+        <p class="text-[11px] font-black text-teal-900 uppercase tracking-wide">Retoma tu solicitud Express</p>
+        <p class="text-[11px] text-teal-800 mt-0.5 leading-snug">
+          Inicia sesión y volverás automáticamente al portal de Pasaje Express con tu borrador intacto.
+        </p>
+      </div>
+    </div>
+
+    <form id="loginForm" class="space-y-4" autocomplete="on">
+      <div>
+        <label for="email" class="block text-sm font-medium text-gray-700">Correo electrónico</label>
+        <input type="email" id="email" required autocomplete="email"
+          placeholder="tucorreo@ejemplo.com"
+          class="w-full border border-gray-300 p-2.5 rounded-lg mt-1 focus:ring-2 focus:ring-emerald-500 outline-none bg-white/90">
+      </div>
+
+      <div>
+        <label for="password" class="block text-sm font-medium text-gray-700">Contraseña</label>
+        <div class="relative mt-1">
+          <input type="password" id="password" required minlength="6" autocomplete="current-password"
+            placeholder="Tu contraseña"
+            class="w-full border border-gray-300 p-2.5 pr-11 rounded-lg focus:ring-2 focus:ring-emerald-500 outline-none bg-white/90">
+          <button type="button" id="togglePw" aria-label="Mostrar contraseña"
+            class="pw-toggle absolute inset-y-0 right-0 pr-3 flex items-center text-lg">
+            <span id="togglePwIcon">👁️</span>
+          </button>
+        </div>
+      </div>
+
+      <div id="message" class="hidden text-sm text-center p-3 rounded-lg"></div>
+
+      <button type="submit" id="submitBtn"
+        class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg transition disabled:opacity-60 disabled:cursor-not-allowed shadow">
+        Ingresar
+      </button>
+    </form>
+
+    <div class="mt-6 pt-6 border-t border-gray-200/70 text-center space-y-3">
+      <p class="text-sm text-gray-600">
+        ¿Eres un usuario nuevo?
+        <a id="registerLink" href="registro.html" class="text-emerald-600 font-semibold hover:underline">Regístrate aquí</a>
+      </p>
+      <a id="backLink" href="index.html" class="block text-xs text-gray-500 hover:text-blue-900">
+        ← Volver al catálogo principal
+      </a>
+    </div>
+  </div>
+
+  <script>
+    // ============================================================
+    // 1) CAPTURAR redirect desde URL con sessionStorage como respaldo
+    // ============================================================
+    const urlParams = new URLSearchParams(window.location.search);
+    const urlRedirect = urlParams.get('redirect') || '';
+
+    // Si viene en URL, persistir; si no, leer de sessionStorage
+    let redirectTo = urlRedirect;
+    if (urlRedirect) {
+      try { sessionStorage.setItem('pasaje_login_redirect', urlRedirect); } catch (e) {}
+    } else {
+      try { redirectTo = sessionStorage.getItem('pasaje_login_redirect') || ''; } catch (e) { redirectTo = ''; }
+    }
+
+    console.log('[Login] redirect destino:', redirectTo);
+
+    const isExpressRedirect = redirectTo.includes('delivery.html');
+
+    // Personalizar copy si viene de Pasaje Express
+    if (isExpressRedirect) {
+      document.getElementById('loginSubtitle').textContent =
+        'Accede para solicitar tu piloto en Xela.';
+      document.getElementById('redirectBanner').classList.remove('hidden');
+
+      const regLink = document.getElementById('registerLink');
+      if (regLink) regLink.href = `registro.html?redirect=${encodeURIComponent(redirectTo)}`;
+
+      const backLink = document.getElementById('backLink');
+      if (backLink) {
+        backLink.href = redirectTo;
+        backLink.textContent = '← Volver a Pasaje Express';
+      }
+    }
+
+    // ============================================================
+    // 2) Si ya hay sesión activa → aplicar redirect INMEDIATO
+    // ============================================================
+    (async function checkExistingSession() {
+      try {
+        if (typeof _supabase === 'undefined') return;
+        const { data: { session } } = await _supabase.auth.getSession();
+        if (!session) return;
+
+        // Limpiar redirect guardado tras consumirlo
+        if (redirectTo) {
+          try { sessionStorage.removeItem('pasaje_login_redirect'); } catch (e) {}
+          window.location.replace(redirectTo);
+          return;
+        }
+
+        // Si no hay redirect, routing estándar
+        if (typeof routeUserToDashboard === 'function') {
+          await routeUserToDashboard(session.user.id);
+        } else {
+          window.location.replace('dashboard/dashboard.html');
+        }
+      } catch (e) {
+        console.warn('[Login Session Check]', e);
+      }
+    })();
+
+    // ============================================================
+    // 3) Elementos de UI
+    // ============================================================
+    const form = document.getElementById('loginForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const msgEl = document.getElementById('message');
+    const pwInput = document.getElementById('password');
+    const pwToggle = document.getElementById('togglePw');
+    const pwIcon = document.getElementById('togglePwIcon');
+
+    pwToggle.addEventListener('click', () => {
+      const showing = pwInput.type === 'text';
+      pwInput.type = showing ? 'password' : 'text';
+      pwIcon.textContent = showing ? '👁️' : '🙈';
+    });
+
+    function showMessage(text, type) {
+      const colors = {
+        error:   'bg-red-50 text-red-700 border border-red-200',
+        success: 'bg-emerald-50 text-emerald-700 border border-emerald-200',
+        info:    'bg-blue-50 text-blue-700 border border-blue-200'
+      };
+      msgEl.textContent = text;
+      msgEl.className = 'text-sm text-center p-3 rounded-lg ' + (colors[type] || colors.info);
+      msgEl.classList.remove('hidden');
+    }
+
+    function hideMessage() { msgEl.classList.add('hidden'); }
+
+    function friendlyError(err) {
+      const m = ((err && err.message) || '').toLowerCase();
+      if (m.includes('invalid login') || m.includes('invalid credentials'))
+        return 'Correo o contraseña incorrectos.';
+      return (err && err.message) || 'Error inesperado.';
+    }
+
+    // ============================================================
+    // 4) Submit con redirect garantizado
+    // ============================================================
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideMessage();
+
+      const email    = document.getElementById('email').value.trim();
+      const password = pwInput.value;
+
+      if (!email || !password) {
+        showMessage('Completa correo y contraseña.', 'error');
+        return;
+      }
+
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Verificando...';
+
+      try {
+        const { data, error } = await _supabase.auth.signInWithPassword({ email, password });
+        if (error) throw error;
+
+        showMessage('¡Bienvenido! Redirigiendo...', 'success');
+
+        // ⚠️ CRÍTICO: capturar el destino AHORA, antes de cualquier timeout
+        const finalRedirect = redirectTo || '';
+
+        setTimeout(() => {
+          // Caso 1: Hay redirect específico → ir DIRECTO
+          if (finalRedirect) {
+            try { sessionStorage.removeItem('pasaje_login_redirect'); } catch (e) {}
+            window.location.href = finalRedirect;
+            return;
+          }
+
+          // Caso 2: Sin redirect → routing por roles
+          if (typeof routeUserToDashboard === 'function') {
+            routeUserToDashboard(data.user.id).catch(() => {
+              window.location.href = 'index.html';
+            });
+          } else {
+            window.location.href = 'dashboard/dashboard.html';
+          }
+        }, 500);
+
+      } catch (err) {
+        console.error('[Login Error]', err);
+        showMessage(friendlyError(err), 'error');
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Ingresar';
+      }
+    });
+  </script>
+</body>
+</html>

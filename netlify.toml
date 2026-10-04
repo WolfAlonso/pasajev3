@@ -1,0 +1,133 @@
+# =============================================================
+# netlify.toml — Configuración de despliegue Pasaje de los Altos
+# =============================================================
+
+[build]
+  publish = "."
+  command = ""
+
+# -------------------------------------------------------------
+# Redirects / SPA fallbacks
+# -------------------------------------------------------------
+[[redirects]]
+  from   = "/dashboard/dashboard-delivery.html"
+  to     = "/delivery/dashboard/index.html"
+  status = 301
+  force  = false
+
+[[redirects]]
+  from   = "/dashboard/dashboard-inmuebles.html"
+  to     = "/inmuebles/dashboard/index.html"
+  status = 301
+  force  = false
+
+[[redirects]]
+  from   = "/delivery.html"
+  to     = "/delivery/index.html"
+  status = 301
+  force  = false
+
+# SPA fallback (solo para rutas no encontradas dentro de /delivery y /inmuebles)
+[[redirects]]
+  from   = "/delivery/*"
+  to     = "/delivery/index.html"
+  status = 200
+
+[[redirects]]
+  from   = "/inmuebles/*"
+  to     = "/inmuebles/index.html"
+  status = 200
+
+# -------------------------------------------------------------
+# Headers de seguridad globales
+# -------------------------------------------------------------
+[[headers]]
+  for = "/*"
+  [headers.values]
+    X-Frame-Options           = "SAMEORIGIN"
+    X-Content-Type-Options    = "nosniff"
+    Referrer-Policy           = "strict-origin-when-cross-origin"
+    Permissions-Policy        = "geolocation=(self), camera=(), microphone=()"
+    Strict-Transport-Security = "max-age=31536000; includeSubDomains; preload"
+    X-XSS-Protection          = "1; mode=block"
+
+# -------------------------------------------------------------
+# Cache: HTML / JS / CSS → sin caché (el SW maneja la estrategia)
+# -------------------------------------------------------------
+[[headers]]
+  for = "/*.html"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/js/*.js"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/*.css"
+  [headers.values]
+    Cache-Control = "public, max-age=0, must-revalidate"
+
+[[headers]]
+  for = "/sw.js"
+  [headers.values]
+    Cache-Control  = "public, max-age=0, must-revalidate"
+    Service-Worker-Allowed = "/"
+
+[[headers]]
+  for = "/manifest.json"
+  [headers.values]
+    Cache-Control = "public, max-age=3600"
+    Content-Type  = "application/manifest+json"
+
+# -------------------------------------------------------------
+# Cache largo para imágenes e íconos
+# -------------------------------------------------------------
+[[headers]]
+  for = "/img/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.png"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.jpg"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.jpeg"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.webp"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.svg"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/*.ico"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+# -------------------------------------------------------------
+# Denegar acceso a archivos de configuración / metadata
+# -------------------------------------------------------------
+[[headers]]
+  for = "/netlify.toml"
+  [headers.values]
+    X-Robots-Tag = "noindex, nofollow"
+
+[[headers]]
+  for = "/*.txt"
+  [headers.values]
+    X-Robots-Tag = "noindex"

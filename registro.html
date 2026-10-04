@@ -1,0 +1,598 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <link rel="icon" href="img/favicon.ico">
+  <title>Registro Unificado · Pasaje de los Altos</title>
+
+  <!-- Tailwind CSS -->
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <!-- Supabase SDK & Config -->
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js?v=5"></script>
+  <script src="js/theme-loader.js?v=2"></script>
+
+  <!-- Fuentes -->
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    input:focus, select:focus, textarea:focus { outline: none; }
+
+    /* Estilos de Liquid Glass Preservados */
+    .glass-container {
+      background: rgba(255, 255, 255, 0.88);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(255, 255, 255, 0.5);
+      box-shadow: 0 20px 40px rgba(0, 0, 0, 0.15);
+    }
+    .glass-card {
+      background: rgba(255, 255, 255, 0.65);
+      backdrop-filter: blur(10px);
+      -webkit-backdrop-filter: blur(10px);
+      border: 1px solid rgba(255, 255, 255, 0.35);
+      transition: all 0.2s ease;
+    }
+    .role-card-selected {
+      background: rgba(236, 253, 245, 0.95) !important;
+      border: 2px solid #059669 !important;
+      box-shadow: 0 10px 25px -5px rgba(5, 150, 105, 0.25) !important;
+    }
+  </style>
+</head>
+<body class="bg-gradient-to-br from-blue-950 via-blue-900 to-emerald-800 min-h-screen py-8 px-4 flex items-center justify-center">
+
+  <div class="w-full max-w-2xl glass-container rounded-3xl p-6 sm:p-10 transition-all duration-300">
+
+    <!-- Encabezado de la Marca -->
+    <div class="text-center mb-8">
+      <a href="index.html" class="inline-block text-3xl font-extrabold text-blue-950 tracking-tight hover:opacity-90 transition">
+        Pasaje de los <span class="text-emerald-600">Altos</span>
+      </a>
+      <h1 class="text-2xl font-black text-gray-800 mt-2">¿Cómo deseas empezar?</h1>
+      <p class="text-xs sm:text-sm text-gray-600 mt-1 font-medium">Elige tu tipo de perfil y forma parte de la red comercial de Quetzaltenango.</p>
+    </div>
+
+    <!-- Indicador de Pasos (Wizard Stepper) -->
+    <div class="flex items-center justify-center mb-8 gap-3 sm:gap-6">
+      <div id="stepBadge1" class="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-md transition-all">
+        <span class="w-5 h-5 rounded-full bg-white text-emerald-700 flex items-center justify-center text-[11px] font-black">1</span>
+        <span>Perfil y Cuenta</span>
+      </div>
+      <div class="h-0.5 w-8 bg-gray-300 rounded"></div>
+      <div id="stepBadge2" class="flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-gray-200 text-gray-500 transition-all">
+        <span class="w-5 h-5 rounded-full bg-gray-400 text-white flex items-center justify-center text-[11px] font-black">2</span>
+        <span id="step2BadgeTitle">Detalles del Perfil</span>
+      </div>
+    </div>
+
+    <!-- Formulario Principal -->
+    <form id="registroForm" novalidate>
+
+      <!-- PASO 1: SELECTOR DE ROL Y DATOS DE ACCESO -->
+      <div id="step1" class="space-y-6">
+
+        <!-- SELECTOR VISUAL INTERACTIVO MULTIRROL -->
+        <div>
+          <label class="block text-xs font-extrabold text-gray-700 uppercase tracking-wider mb-3">
+            🎯 Selecciona tu Perfil Principal *
+          </label>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3" id="roleSelectorGrid">
+            
+            <!-- Opción 1: Comercio -->
+            <div data-role="merchant" class="role-card glass-card role-card-selected p-4 rounded-2xl cursor-pointer flex items-start gap-3">
+              <span class="text-3xl flex-shrink-0">🏪</span>
+              <div>
+                <h3 class="font-extrabold text-sm text-gray-900">Tengo una Tienda / Negocio</h3>
+                <p class="text-[11px] text-gray-600 mt-0.5 leading-snug">Vende productos, gestiona pedidos e inventario en Xela.</p>
+              </div>
+            </div>
+
+            <!-- Opción 2: Repartidor -->
+            <div data-role="delivery" class="role-card glass-card p-4 rounded-2xl cursor-pointer flex items-start gap-3">
+              <span class="text-3xl flex-shrink-0">🛵</span>
+              <div>
+                <h3 class="font-extrabold text-sm text-gray-900">Quiero ser Repartidor</h3>
+                <p class="text-[11px] text-gray-600 mt-0.5 leading-snug">Realiza carreras y entregas locales de Pasaje Delivery.</p>
+              </div>
+            </div>
+
+            <!-- Opción 3: Inmuebles -->
+            <div data-role="real_estate" class="role-card glass-card p-4 rounded-2xl cursor-pointer flex items-start gap-3">
+              <span class="text-3xl flex-shrink-0">🏠</span>
+              <div>
+                <h3 class="font-extrabold text-sm text-gray-900">Publicar Inmuebles</h3>
+                <p class="text-[11px] text-gray-600 mt-0.5 leading-snug">Publica casas, cuartos o locales en alquiler y venta.</p>
+              </div>
+            </div>
+
+            <!-- Opción 4: Cliente -->
+            <div data-role="customer" class="role-card glass-card p-4 rounded-2xl cursor-pointer flex items-start gap-3">
+              <span class="text-3xl flex-shrink-0">👤</span>
+              <div>
+                <h3 class="font-extrabold text-sm text-gray-900">Soy Comprador / Cliente</h3>
+                <p class="text-[11px] text-gray-600 mt-0.5 leading-snug">Guarda comercios favoritos, inmuebles y direcciones.</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- DATOS PERSONALES -->
+        <fieldset class="border border-gray-200/80 rounded-2xl p-5 bg-white/70 shadow-sm space-y-4">
+          <legend class="px-3 text-xs font-black text-blue-800 uppercase tracking-wider bg-white/90 rounded-full border border-blue-100 py-0.5">
+            👤 Datos Personales
+          </legend>
+
+          <div>
+            <label for="ownerFullName" class="block text-xs font-bold text-gray-700 uppercase mb-1">Nombre completo *</label>
+            <input type="text" id="ownerFullName" required placeholder="Ej. María Isabel López Pérez"
+              class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition">
+          </div>
+
+          <div>
+            <label for="phonePersonal" class="block text-xs font-bold text-gray-700 uppercase mb-1">Teléfono / WhatsApp personal *</label>
+            <input type="tel" id="phonePersonal" required placeholder="Ej. 55551234"
+              class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition">
+            <p class="text-[11px] text-gray-500 mt-1">🔒 Para coordinaciones de cuenta y notificaciones.</p>
+          </div>
+        </fieldset>
+
+        <!-- CREDENCIALES -->
+        <fieldset class="border border-gray-200/80 rounded-2xl p-5 bg-white/70 shadow-sm space-y-4">
+          <legend class="px-3 text-xs font-black text-blue-800 uppercase tracking-wider bg-white/90 rounded-full border border-blue-100 py-0.5">
+            🔑 Credenciales de Acceso
+          </legend>
+
+          <div>
+            <label for="email" class="block text-xs font-bold text-gray-700 uppercase mb-1">Correo electrónico *</label>
+            <input type="email" id="email" required autocomplete="email" placeholder="usuario@ejemplo.com"
+              class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="password" class="block text-xs font-bold text-gray-700 uppercase mb-1">Contraseña *</label>
+              <input type="password" id="password" required minlength="6" autocomplete="new-password" placeholder="Mínimo 6 caracteres"
+                class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition">
+            </div>
+            <div>
+              <label for="passwordConfirm" class="block text-xs font-bold text-gray-700 uppercase mb-1">Confirmar Contraseña *</label>
+              <input type="password" id="passwordConfirm" required minlength="6" autocomplete="new-password" placeholder="Repite la contraseña"
+                class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition">
+            </div>
+          </div>
+        </fieldset>
+
+        <button type="button" id="nextStepBtn"
+          class="w-full bg-blue-900 hover:bg-blue-950 text-white font-bold py-3.5 rounded-xl transition shadow-lg flex items-center justify-center gap-2">
+          <span>Continuar al siguiente paso</span>
+          <span>→</span>
+        </button>
+      </div>
+
+      <!-- PASO 2: CAMPOS DINÁMICOS SEGÚN EL ROL -->
+      <div id="step2" class="space-y-5 hidden">
+        
+        <!-- SECCIÓN TIENDA / COMERCIO -->
+        <fieldset id="fieldsMerchant" class="border border-gray-200/80 rounded-2xl p-5 bg-white/70 shadow-sm space-y-4">
+          <legend class="px-3 text-xs font-black text-emerald-800 uppercase tracking-wider bg-white/90 rounded-full border border-emerald-100 py-0.5">
+            🏪 Perfil Público del Comercio
+          </legend>
+
+          <div>
+            <label for="storeName" class="block text-xs font-bold text-gray-700 uppercase mb-1">Nombre Comercial del Negocio *</label>
+            <input type="text" id="storeName" placeholder="Ej. Panadería San Rafael"
+              class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition">
+            
+            <div class="mt-2 flex items-center justify-between flex-wrap gap-2 text-xs">
+              <p class="text-gray-500">
+                🔗 Enlace de tu tienda: <span class="font-mono text-emerald-700 font-bold" id="slugPreview">pasaje.gt/tienda/mi-tienda</span>
+              </p>
+              <span id="nameStatus" class="hidden text-xs font-bold"></span>
+            </div>
+          </div>
+
+          <div>
+            <label for="storeWhatsapp" class="block text-xs font-bold text-gray-700 uppercase mb-1">WhatsApp de Pedidos *</label>
+            <input type="tel" id="storeWhatsapp" placeholder="Ej. 50255551234"
+              class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition">
+          </div>
+
+          <div>
+            <label for="mainCategory" class="block text-xs font-bold text-gray-700 uppercase mb-1">Categoría Principal *</label>
+            <select id="mainCategory"
+              class="w-full border border-gray-300 p-3 rounded-xl text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition">
+              <option value="">Cargando categorías...</option>
+            </select>
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label for="storeZone" class="block text-xs font-bold text-gray-700 uppercase mb-1">Zona de Quetzaltenango *</label>
+              <select id="storeZone"
+                class="w-full border border-gray-300 p-3 rounded-xl text-sm bg-white focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition font-medium">
+                <option value="Zona 1">Zona 1 (Centro Histórico)</option>
+                <option value="Zona 2">Zona 2</option>
+                <option value="Zona 3">Zona 3 (Terminal / Comercial)</option>
+                <option value="Zona 4">Zona 4</option>
+                <option value="Zona 5">Zona 5</option>
+                <option value="Zona 6">Zona 6</option>
+                <option value="Zona 7">Zona 7</option>
+                <option value="Zona 8">Zona 8</option>
+                <option value="Zona 9">Zona 9</option>
+                <option value="Zona 10">Zona 10</option>
+                <option value="Zona 11">Zona 11</option>
+                <option value="Interurbano">Interurbano / Alrededores</option>
+              </select>
+            </div>
+
+            <div class="flex items-center pt-2 sm:pt-6">
+              <label class="inline-flex items-center gap-3 cursor-pointer p-3 bg-emerald-50/60 border border-emerald-200 rounded-xl w-full">
+                <input type="checkbox" id="hasPhysicalStore" checked class="w-5 h-5 accent-emerald-600 rounded">
+                <span class="text-xs font-bold text-emerald-950">📍 Cuento con Local Físico</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label for="address" class="block text-xs font-bold text-gray-700 uppercase mb-1">Dirección o Referencia Comercial *</label>
+            <input type="text" id="address" placeholder="Ej. 14 Avenida 4-12, Zona 1"
+              class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 bg-white transition">
+          </div>
+        </fieldset>
+
+        <!-- SECCIÓN REPARTIDOR / DELIVERY -->
+        <fieldset id="fieldsDelivery" class="border border-gray-200/80 rounded-2xl p-5 bg-white/70 shadow-sm space-y-4 hidden">
+          <legend class="px-3 text-xs font-black text-emerald-800 uppercase tracking-wider bg-white/90 rounded-full border border-emerald-100 py-0.5">
+            🛵 Datos de Repartidor Delivery
+          </legend>
+
+          <div>
+            <label for="driverVehicle" class="block text-xs font-bold text-gray-700 uppercase mb-1">Vehículo Principal de Trabajo *</label>
+            <select id="driverVehicle" class="w-full border border-gray-300 p-3 rounded-xl text-sm bg-white focus:ring-2 focus:ring-emerald-500">
+              <option value="Motocicleta">🛵 Motocicleta</option>
+              <option value="Bicicleta">🚲 Bicicleta</option>
+              <option value="Carro / Panel">Automóvil / Panel</option>
+              <option value="Peatonal">🚶 Peatonal / Centro Histórico</option>
+            </select>
+          </div>
+
+          <div>
+            <label for="driverZone" class="block text-xs font-bold text-gray-700 uppercase mb-1">Zona Cobertura Principal en Xela *</label>
+            <select id="driverZone" class="w-full border border-gray-300 p-3 rounded-xl text-sm bg-white focus:ring-2 focus:ring-emerald-500">
+              <option value="Todas las Zonas">Todas las Zonas de Xela</option>
+              <option value="Zona 1 y 3">Zona 1 y Zona 3</option>
+              <option value="Periférico">Periférico y Zonas Altas</option>
+            </select>
+          </div>
+        </fieldset>
+
+        <!-- SECCIÓN INMUEBLES -->
+        <fieldset id="fieldsRealEstate" class="border border-gray-200/80 rounded-2xl p-5 bg-white/70 shadow-sm space-y-4 hidden">
+          <legend class="px-3 text-xs font-black text-indigo-800 uppercase tracking-wider bg-white/90 rounded-full border border-indigo-100 py-0.5">
+            🏠 Perfil Inmobiliario
+          </legend>
+
+          <div>
+            <label for="agencyName" class="block text-xs font-bold text-gray-700 uppercase mb-1">Nombre de Agencia o Propietario *</label>
+            <input type="text" id="agencyName" placeholder="Ej. Bienes Raíces Los Altos / Propietario Directo"
+              class="w-full border border-gray-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-indigo-500 bg-white">
+          </div>
+        </fieldset>
+
+        <!-- SECCIÓN CLIENTE -->
+        <fieldset id="fieldsCustomer" class="border border-gray-200/80 rounded-2xl p-5 bg-white/70 shadow-sm space-y-4 hidden">
+          <legend class="px-3 text-xs font-black text-blue-800 uppercase tracking-wider bg-white/90 rounded-full border border-blue-100 py-0.5">
+            👤 Perfil de Comprador
+          </legend>
+          <p class="text-xs text-gray-600 leading-relaxed">
+            Tu cuenta te permitirá guardar productos e inmuebles favoritos y gestionar tus pedidos por WhatsApp directamente.
+          </p>
+        </fieldset>
+
+        <!-- Mensajes de Alerta -->
+        <div id="message" class="hidden text-sm text-center p-3.5 rounded-xl transition"></div>
+
+        <div class="flex gap-3">
+          <button type="button" id="prevStepBtn"
+            class="w-1/3 bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold py-3.5 rounded-xl transition text-sm">
+            ← Regresar
+          </button>
+          
+          <button type="submit" id="submitBtn"
+            class="w-2/3 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3.5 rounded-xl transition shadow-lg flex items-center justify-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed">
+            <span id="btnSpinner" class="hidden">
+              <svg class="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
+              </svg>
+            </span>
+            <span id="btnText">Crear Mi Cuenta</span>
+          </button>
+        </div>
+      </div>
+
+    </form>
+
+    <!-- Footer -->
+    <div class="mt-8 pt-6 border-t border-gray-200/60 text-center space-y-2">
+      <p class="text-sm text-gray-600">
+        ¿Ya posees una cuenta registrada?
+        <a href="login.html" class="text-emerald-700 font-extrabold hover:underline">Inicia sesión aquí</a>
+      </p>
+      <a href="index.html" class="inline-block text-xs text-gray-500 hover:text-blue-900 transition">
+        ← Regresar al catálogo principal
+      </a>
+    </div>
+
+  </div>
+
+  <script>
+    let selectedRole = 'merchant'; // 'merchant' | 'delivery' | 'real_estate' | 'customer'
+    let categories = [];
+    let isStoreNameUnique = true;
+    let nameCheckTimeout = null;
+
+    const step1 = document.getElementById('step1');
+    const step2 = document.getElementById('step2');
+    const stepBadge1 = document.getElementById('stepBadge1');
+    const stepBadge2 = document.getElementById('stepBadge2');
+    const nextStepBtn = document.getElementById('nextStepBtn');
+    const prevStepBtn = document.getElementById('prevStepBtn');
+
+    const form = document.getElementById('registroForm');
+    const submitBtn = document.getElementById('submitBtn');
+    const btnSpinner = document.getElementById('btnSpinner');
+    const btnText = document.getElementById('btnText');
+    const msgEl = document.getElementById('message');
+
+    const storeNameInput = document.getElementById('storeName');
+    const slugPreview = document.getElementById('slugPreview');
+    const nameStatus = document.getElementById('nameStatus');
+
+    // CONTROL DEL SELECTOR VISUAL DE ROL
+    document.querySelectorAll('#roleSelectorGrid [data-role]').forEach(card => {
+      card.addEventListener('click', () => {
+        document.querySelectorAll('#roleSelectorGrid [data-role]').forEach(c => c.classList.remove('role-card-selected'));
+        card.classList.add('role-card-selected');
+        selectedRole = card.dataset.role;
+
+        // Adaptar visibilidad de secciones en Paso 2
+        document.getElementById('fieldsMerchant').classList.toggle('hidden', selectedRole !== 'merchant');
+        document.getElementById('fieldsDelivery').classList.toggle('hidden', selectedRole !== 'delivery');
+        document.getElementById('fieldsRealEstate').classList.toggle('hidden', selectedRole !== 'real_estate');
+        document.getElementById('fieldsCustomer').classList.toggle('hidden', selectedRole !== 'customer');
+      });
+    });
+
+    function slugify(text) {
+      return (text || '')
+        .toString()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .toLowerCase()
+        .trim()
+        .replace(/[^a-z0-9 -]/g, '')
+        .replace(/\s+/g, '-')
+        .replace(/-+/g, '-');
+    }
+
+    function showMessage(text, type) {
+      const colors = {
+        error:   'bg-red-50 text-red-700 border border-red-200 font-semibold',
+        success: 'bg-emerald-50 text-emerald-800 border border-emerald-200 font-bold',
+        info:    'bg-blue-50 text-blue-800 border border-blue-200'
+      };
+      msgEl.textContent = text;
+      msgEl.className = 'text-sm text-center p-3.5 rounded-xl transition ' + (colors[type] || colors.info);
+      msgEl.classList.remove('hidden');
+    }
+
+    function hideMessage() { msgEl.classList.add('hidden'); }
+
+    function friendlyError(err) {
+      const m = (err?.message || '').toLowerCase();
+      if (m.includes('already registered') || m.includes('user already'))
+        return 'Este correo electrónico ya está registrado. Intenta iniciar sesión.';
+      if (m.includes('password'))
+        return 'La contraseña debe tener al menos 6 caracteres.';
+      return err?.message || 'Ocurrió un error inesperado.';
+    }
+
+    async function loadCategories() {
+      const select = document.getElementById('mainCategory');
+      try {
+        const { data, error } = await _supabase.from('categories').select('id, name, icon').order('sort_order');
+        if (error) throw error;
+        categories = data || [];
+        select.innerHTML = '<option value="">Selecciona una categoría...</option>' +
+          categories.map(c => `<option value="${c.id}">${c.icon || '📦'} ${c.name}</option>`).join('');
+      } catch (err) {
+        select.innerHTML = '<option value="">Error al cargar categorías</option>';
+      }
+    }
+
+    async function checkStoreUniqueness(name) {
+      const candidateSlug = slugify(name);
+      if (!candidateSlug) { nameStatus.classList.add('hidden'); return; }
+
+      nameStatus.textContent = 'Verificando disponibilidad...';
+      nameStatus.className = 'text-xs font-bold text-gray-400';
+      nameStatus.classList.remove('hidden');
+
+      try {
+        const { data } = await _supabase
+          .from('stores')
+          .select('id')
+          .or(`name.ilike.${name.trim()},slug.eq.${candidateSlug}`)
+          .maybeSingle();
+
+        if (data) {
+          isStoreNameUnique = false;
+          nameStatus.textContent = '⚠️ Este nombre de negocio ya está ocupado.';
+          nameStatus.className = 'text-xs font-bold text-red-600';
+        } else {
+          isStoreNameUnique = true;
+          nameStatus.textContent = '✓ Nombre disponible';
+          nameStatus.className = 'text-xs font-bold text-emerald-600';
+        }
+      } catch (err) {
+        nameStatus.classList.add('hidden');
+      }
+    }
+
+    storeNameInput.addEventListener('input', (e) => {
+      const val = e.target.value;
+      const slug = slugify(val) || 'mi-tienda';
+      slugPreview.textContent = `pasaje.gt/tienda/${slug}`;
+
+      clearTimeout(nameCheckTimeout);
+      if (val.trim().length >= 3) {
+        nameCheckTimeout = setTimeout(() => checkStoreUniqueness(val), 400);
+      } else {
+        nameStatus.classList.add('hidden');
+        isStoreNameUnique = true;
+      }
+    });
+
+    nextStepBtn.addEventListener('click', () => {
+      hideMessage();
+      const ownerFullName = document.getElementById('ownerFullName').value.trim();
+      const phonePersonal = cleanPhone(document.getElementById('phonePersonal').value);
+      const email = document.getElementById('email').value.trim();
+      const password = document.getElementById('password').value;
+      const passwordConfirm = document.getElementById('passwordConfirm').value;
+
+      if (!ownerFullName) { alert('Ingresa tu nombre completo.'); return; }
+      if (phonePersonal.length < 8) { alert('Ingresa un teléfono personal válido (mínimo 8 dígitos).'); return; }
+      if (!email || !email.includes('@')) { alert('Ingresa un correo electrónico válido.'); return; }
+      if (password.length < 6) { alert('La contraseña debe contener al menos 6 caracteres.'); return; }
+      if (password !== passwordConfirm) { alert('Las contraseñas no coinciden.'); return; }
+
+      step1.classList.add('hidden');
+      step2.classList.remove('hidden');
+
+      stepBadge1.className = 'flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-gray-200 text-gray-600 transition-all';
+      stepBadge1.querySelector('span').className = 'w-5 h-5 rounded-full bg-gray-400 text-white flex items-center justify-center text-[11px] font-black';
+
+      stepBadge2.className = 'flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-md transition-all';
+      stepBadge2.querySelector('span').className = 'w-5 h-5 rounded-full bg-white text-emerald-700 flex items-center justify-center text-[11px] font-black';
+    });
+
+    prevStepBtn.addEventListener('click', () => {
+      hideMessage();
+      step2.classList.add('hidden');
+      step1.classList.remove('hidden');
+
+      stepBadge2.className = 'flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-gray-200 text-gray-500 transition-all';
+      stepBadge2.querySelector('span').className = 'w-5 h-5 rounded-full bg-gray-400 text-white flex items-center justify-center text-[11px] font-black';
+
+      stepBadge1.className = 'flex items-center gap-2 px-4 py-2 rounded-full text-xs font-bold bg-emerald-600 text-white shadow-md transition-all';
+      stepBadge1.querySelector('span').className = 'w-5 h-5 rounded-full bg-white text-emerald-700 flex items-center justify-center text-[11px] font-black';
+    });
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      hideMessage();
+
+      const ownerFullName  = document.getElementById('ownerFullName').value.trim();
+      const phonePersonal  = cleanPhone(document.getElementById('phonePersonal').value);
+      const email          = document.getElementById('email').value.trim();
+      const password       = document.getElementById('password').value;
+
+      if (selectedRole === 'merchant') {
+        const storeName = document.getElementById('storeName').value.trim();
+        if (!storeName) { showMessage('Ingresa el nombre de tu negocio.', 'error'); return; }
+        if (!isStoreNameUnique) { showMessage('El nombre de tienda ya existe.', 'error'); return; }
+      }
+
+      submitBtn.disabled = true;
+      btnSpinner.classList.remove('hidden');
+      btnText.textContent = 'Creando cuenta...';
+
+      try {
+        // 1. Crear usuario en Auth
+        const { data: signupData, error: signupError } = await _supabase.auth.signUp({
+          email, password, options: { data: { full_name: ownerFullName, phone: phonePersonal } }
+        });
+
+        if (signupError) throw signupError;
+        const userId = signupData.user?.id;
+        if (!userId) throw new Error('No se pudo obtener el ID del usuario.');
+
+        // 2. Crear Perfil en user_profiles
+        await _supabase.from('user_profiles').upsert([{
+          user_id: userId, display_name: ownerFullName, phone: phonePersonal, updated_at: new Date().toISOString()
+        }], { onConflict: 'user_id' });
+
+        // 3. Crear Roles en user_roles
+        const rolePayload = {
+          user_id: userId,
+          is_merchant: selectedRole === 'merchant',
+          is_delivery: selectedRole === 'delivery',
+          is_real_estate: selectedRole === 'real_estate'
+        };
+        await _supabase.from('user_roles').upsert([rolePayload], { onConflict: 'user_id' });
+
+        // 4. Datos específicos por Rol
+        if (selectedRole === 'merchant') {
+          const storeName = document.getElementById('storeName').value.trim();
+          const storeWhatsapp = cleanPhone(document.getElementById('storeWhatsapp').value) || phonePersonal;
+          const mainCategoryId = parseInt(document.getElementById('mainCategory').value, 10) || null;
+          const storeZone = document.getElementById('storeZone').value;
+          const address = document.getElementById('address').value.trim();
+
+          await _supabase.from('stores').insert([{
+            user_id: userId, name: storeName, slug: slugify(storeName), whatsapp: storeWhatsapp,
+            main_category_id: mainCategoryId, zone: storeZone, address: address, owner_full_name: ownerFullName,
+            phone_personal: phonePersonal, is_active: true
+          }]);
+        } else if (selectedRole === 'delivery') {
+          const vehicle = document.getElementById('driverVehicle').value;
+          const zone = document.getElementById('driverZone').value;
+
+          await _supabase.from('delivery_drivers').insert([{
+            user_id: userId, full_name: ownerFullName, phone: phonePersonal, vehicle_type: vehicle,
+            zone: zone, status: 'active', is_active: true
+          }]);
+        }
+
+        // 5. Guardar Modo Preferido y Redirigir
+        localStorage.setItem('pasajeDashMode', selectedRole);
+        showMessage('🎉 ¡Registro completado exitosamente! Redirigiendo...', 'success');
+
+        setTimeout(() => {
+          if (typeof routeUserToDashboard === 'function') {
+            routeUserToDashboard(userId);
+          } else {
+            if (selectedRole === 'delivery') window.location.replace('dashboard/dashboard-delivery.html');
+            else if (selectedRole === 'real_estate') window.location.replace('dashboard/dashboard-inmuebles.html');
+            else if (selectedRole === 'merchant') window.location.replace('dashboard/dashboard-productos.html');
+            else window.location.replace('index.html');
+          }
+        }, 1200);
+
+      } catch (err) {
+        console.error('[Registro Error]', err);
+        showMessage(friendlyError(err), 'error');
+        submitBtn.disabled = false;
+        btnSpinner.classList.add('hidden');
+        btnText.textContent = 'Crear Mi Cuenta';
+      }
+    });
+
+    redirectIfAuthenticated();
+    loadCategories();
+  </script>
+</body>
+</html>

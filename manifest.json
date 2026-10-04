@@ -1,0 +1,74 @@
+{
+  "name": "Pasaje de los Altos",
+  "short_name": "Pasaje Xela",
+  "description": "Marketplace local de Quetzaltenango: catálogo, delivery express e inmuebles.",
+  "start_url": "/index.html",
+  "scope": "/",
+  "id": "/",
+  "display": "standalone",
+  "display_override": ["standalone", "minimal-ui"],
+  "orientation": "portrait-primary",
+  "background_color": "#0f172a",
+  "theme_color": "#0f172a",
+  "lang": "es-GT",
+  "dir": "ltr",
+  "categories": ["shopping", "business", "lifestyle", "navigation"],
+  "prefer_related_applications": false,
+  "icons": [
+    {
+      "src": "img/icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "img/icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any"
+    },
+    {
+      "src": "img/icon-maskable.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "maskable"
+    }
+  ],
+  "shortcuts": [
+    {
+      "name": "Explorar catálogo",
+      "short_name": "Catálogo",
+      "description": "Ver todos los productos disponibles",
+      "url": "/index.html",
+      "icons": [{ "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Pasaje Express",
+      "short_name": "Express",
+      "description": "Pedir un mandadito o viaje",
+      "url": "/delivery/index.html",
+      "icons": [{ "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Pasaje Inmuebles",
+      "short_name": "Inmuebles",
+      "description": "Buscar propiedades en Xela",
+      "url": "/inmuebles/index.html",
+      "icons": [{ "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Mi panel",
+      "short_name": "Panel",
+      "description": "Gestionar mi tienda y productos",
+      "url": "/dashboard/dashboard.html",
+      "icons": [{ "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    },
+    {
+      "name": "Ingresar",
+      "short_name": "Ingresar",
+      "description": "Iniciar sesión",
+      "url": "/login.html",
+      "icons": [{ "src": "img/icon-192.png", "sizes": "192x192", "type": "image/png" }]
+    }
+  ]
+}

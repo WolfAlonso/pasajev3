@@ -1,0 +1,245 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Contacto · Pasaje de los Altos</title>
+  <meta name="title" content="Contacto · Pasaje de los Altos">
+  <meta name="description" content="Contacta al equipo de Pasaje de los Altos: soporte, sugerencias, reportes y colaboraciones.">
+  <meta name="theme-color" content="#1e3a8a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <link rel="icon" href="img/favicon.ico">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js"></script>
+  <script src="js/theme-loader.js?v=2"></script>
+  <script src="js/public-sidebar.js?v=1"></script>
+  <script src="js/liquid-glass.js?v=1"></script>
+  <script src="js/footer.js"></script>
+  <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-50 min-h-screen flex flex-col">
+
+  <header class="bg-blue-900 text-white shadow-lg sticky top-0 z-20">
+    <div class="max-w-6xl mx-auto px-4 py-4 flex justify-between items-center gap-3">
+      <a href="index.html" class="text-xl sm:text-2xl font-extrabold">
+        Pasaje de los <span class="text-emerald-400">Altos</span>
+      </a>
+      <a href="index.html"
+         class="text-xs sm:text-sm bg-blue-800 hover:bg-blue-700 px-3 py-1.5 rounded-lg font-semibold transition">
+        ← Al catálogo
+      </a>
+    </div>
+  </header>
+
+  <main class="max-w-4xl mx-auto px-4 py-10 w-full flex-1">
+
+    <!-- Hero -->
+    <section class="text-center mb-10">
+      <div class="text-5xl mb-3">✉️</div>
+      <h1 class="text-3xl sm:text-4xl font-extrabold text-gray-800">
+        Contáctanos
+      </h1>
+      <p class="text-gray-600 mt-3 max-w-2xl mx-auto">
+        ¿Tienes una duda, sugerencia o problema? Cuéntanos. Leemos cada mensaje y
+        respondemos lo antes posible.
+      </p>
+    </section>
+
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-6">
+
+      <!-- Formulario -->
+      <div class="lg:col-span-2">
+        <div class="bg-white rounded-2xl shadow-sm border p-6 sm:p-8">
+
+          <form id="contactForm" class="space-y-4">
+
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Tu nombre *</label>
+                <input type="text" id="cName" required placeholder="Ej. Ana Pérez"
+                  class="w-full border border-gray-300 p-2.5 rounded-lg mt-1 focus:ring-2 focus:ring-emerald-500 outline-none">
+              </div>
+
+              <div>
+                <label class="block text-sm font-medium text-gray-700">Tu correo *</label>
+                <input type="email" id="cEmail" required placeholder="tucorreo@ejemplo.com"
+                  class="w-full border border-gray-300 p-2.5 rounded-lg mt-1 focus:ring-2 focus:ring-emerald-500 outline-none">
+              </div>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Motivo *</label>
+              <select id="cReason" required
+                class="w-full border border-gray-300 p-2.5 rounded-lg mt-1 bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
+                <option value="">Selecciona un motivo...</option>
+                <option value="soporte">🆘 Soporte técnico</option>
+                <option value="sugerencia">💡 Sugerencia o idea</option>
+                <option value="reporte">🚨 Reporte de problema</option>
+                <option value="colaboracion">🤝 Colaboración o alianza</option>
+                <option value="prensa">📰 Prensa o difusión</option>
+                <option value="otro">💬 Otro</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Asunto</label>
+              <input type="text" id="cSubject" placeholder="Resumen breve de tu mensaje"
+                class="w-full border border-gray-300 p-2.5 rounded-lg mt-1 focus:ring-2 focus:ring-emerald-500 outline-none">
+            </div>
+
+            <div>
+              <label class="block text-sm font-medium text-gray-700">Mensaje *</label>
+              <textarea id="cMessage" rows="6" required placeholder="Cuéntanos en qué podemos ayudarte..."
+                class="w-full border border-gray-300 p-2.5 rounded-lg mt-1 focus:ring-2 focus:ring-emerald-500 outline-none"></textarea>
+              <p class="text-xs text-gray-400 mt-1">Incluye el máximo de detalle posible para poder ayudarte mejor.</p>
+            </div>
+
+            <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+              <label class="inline-flex items-start gap-2 cursor-pointer">
+                <input type="checkbox" id="cPrivacy" required class="mt-0.5 accent-emerald-600">
+                <span class="text-xs text-blue-800 leading-snug">
+                  Acepto que mis datos sean usados para responder esta consulta,
+                  según lo descrito en los
+                  <a href="terminos.html" class="font-semibold underline">términos de uso</a>.
+                </span>
+              </label>
+            </div>
+
+            <div class="flex justify-end">
+              <button type="submit" id="cSubmitBtn"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-6 py-3 rounded-lg transition disabled:opacity-60">
+                Enviar mensaje
+              </button>
+            </div>
+          </form>
+
+        </div>
+      </div>
+
+      <!-- Info lateral -->
+      <div class="space-y-4">
+
+        <div class="bg-white rounded-2xl shadow-sm border p-5">
+          <div class="text-2xl mb-2">📍</div>
+          <h3 class="font-bold text-gray-800 mb-1">Ubicación</h3>
+          <p class="text-sm text-gray-600">
+            Quetzaltenango, Guatemala<br>
+            <span class="text-xs text-gray-400">Atendemos de forma digital</span>
+          </p>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border p-5">
+          <div class="text-2xl mb-2">🕐</div>
+          <h3 class="font-bold text-gray-800 mb-1">Horario</h3>
+          <p class="text-sm text-gray-600">
+            Lunes a viernes<br>
+            <span class="text-xs text-gray-400">9:00 am – 6:00 pm</span>
+          </p>
+        </div>
+
+        <div class="bg-white rounded-2xl shadow-sm border p-5">
+          <div class="text-2xl mb-2">🎧</div>
+          <h3 class="font-bold text-gray-800 mb-1">Soporte</h3>
+          <p class="text-sm text-gray-600 mb-3">
+            ¿Problema con un pedido? Escríbele directamente al vendedor por WhatsApp.
+            Si no responde, <a href="#form" class="text-emerald-600 hover:underline font-semibold">repórtalo</a>.
+          </p>
+        </div>
+
+        <div class="bg-gradient-to-br from-blue-900 to-emerald-700 text-white rounded-2xl shadow-md p-5">
+          <div class="text-2xl mb-2">🚀</div>
+          <h3 class="font-bold mb-2">¿Nuevo emprendedor?</h3>
+          <p class="text-sm text-blue-100 mb-4">
+            Crea tu tienda gratis y empieza a vender hoy.
+          </p>
+          <a href="registro.html"
+             class="block text-center bg-white hover:bg-gray-100 text-blue-900 font-bold px-4 py-2.5 rounded-lg transition">
+            Registrarme
+          </a>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <div id="pasajeFooter"></div>
+
+  <!-- Toast -->
+  <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] bg-emerald-600 text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-2xl max-w-[90vw] text-center transition-opacity duration-300"></div>
+
+  <script>
+    const form = document.getElementById('contactForm');
+    const submitBtn = document.getElementById('cSubmitBtn');
+
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      submitBtn.disabled = true;
+      submitBtn.textContent = 'Enviando...';
+
+      try {
+        const name = document.getElementById('cName').value.trim();
+        const email = document.getElementById('cEmail').value.trim();
+        const reason = document.getElementById('cReason').value;
+        const subject = document.getElementById('cSubject').value.trim() || null;
+        const message = document.getElementById('cMessage').value.trim();
+
+        if (!name)    throw new Error('Ingresa tu nombre.');
+        if (!email)   throw new Error('Ingresa tu correo.');
+        if (!reason)  throw new Error('Selecciona un motivo.');
+        if (!message) throw new Error('Escribe tu mensaje.');
+
+        const payload = {
+          name,
+          email,
+          reason,
+          subject,
+          message,
+          source_page: 'contacto.html',
+          created_at: new Date().toISOString(),
+        };
+
+        // Intentar guardar en Supabase (best-effort).
+        // Si la tabla 'contact_messages' no existe aún, no bloquea la UX.
+        try {
+          if (window._supabase) {
+            await _supabase.from('contact_messages').insert([payload]);
+          }
+        } catch (err) {
+          console.warn('[Contacto] No se pudo guardar en Supabase:', err);
+        }
+
+        form.reset();
+        showToast('¡Gracias! Tu mensaje fue enviado. Te responderemos pronto.', 'ok');
+      } catch (err) {
+        console.error(err);
+        showToast(err.message || 'No se pudo enviar el mensaje.', 'err');
+      } finally {
+        submitBtn.disabled = false;
+        submitBtn.textContent = 'Enviar mensaje';
+      }
+    });
+
+    function showToast(msg, type) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.remove('bg-emerald-600', 'bg-red-600');
+      t.classList.add(type === 'err' ? 'bg-red-600' : 'bg-emerald-600');
+      t.classList.remove('hidden');
+      requestAnimationFrame(() => { t.style.opacity = '1'; });
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => {
+        t.style.opacity = '0';
+        setTimeout(() => t.classList.add('hidden'), 300);
+      }, 3200);
+    }
+  </script>
+</body>
+</html>

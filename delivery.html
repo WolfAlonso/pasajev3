@@ -1,0 +1,16 @@
+<!DOCTYPE html>
+<html>
+<head>
+  <meta charset="UTF-8">
+  <meta http-equiv="refresh" content="0; url=delivery/index.html">
+  <title>Redirigiendo...</title>
+  <script>
+    // Preservar query string si existe
+    const qs = window.location.search;
+    window.location.replace('delivery/index.html' + qs);
+  </script>
+</head>
+<body>
+  <p>Redirigiendo a <a href="delivery/index.html">Pasaje Express</a>...</p>
+</body>
+</html>
