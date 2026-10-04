@@ -3,9 +3,9 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title class="theme-title">Pasaje de los Altos · Mercado Local</title>
-  <meta name="title" content="Pasaje de los Altos · Mercado Local">
-  <meta name="description" content="Directorio comercial local. Descubre productos de emprendedores de tu comunidad y contáctalos por WhatsApp.">
+  <title class="theme-title">Pasaje de los Altos · La Super-App de Xela</title>
+  <meta name="title" content="Pasaje de los Altos · La Super-App de Xela">
+  <meta name="description" content="El ecosistema digital de Quetzaltenango: marketplace local, delivery y ride, e inmuebles. Todo en un solo lugar.">
   <meta name="theme-color" content="#1e3a8a">
   <meta name="mobile-web-app-capable" content="yes">
   <meta name="apple-mobile-web-app-capable" content="yes">
@@ -20,8 +20,9 @@
   <link rel="preconnect" href="https://fonts.googleapis.com">
   <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
   <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <script src="js/supabase.js?v=4"></script>
+  <script src="js/supabase.js?v=9"></script>
 
   <script>
     (function () {
@@ -33,69 +34,135 @@
       if (typeof window.cleanPhone === 'undefined') {
         window.cleanPhone = function (raw) { return String(raw || '').replace(/\D/g, ''); };
       }
-      if (typeof window.heartSVG === 'undefined') {
-        window.heartSVG = function (filled) {
-          var fill = filled ? 'currentColor' : 'none';
-          return '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="' + fill + '" stroke="' + (filled ? '#ef4444' : 'currentColor') + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
-        };
-      }
-      if (typeof window.Favorites === 'undefined') {
-        var _favs = [];
-        try { _favs = JSON.parse(localStorage.getItem('pasaje_favorites') || '[]'); } catch (e) { _favs = []; }
-        function persistFavs() { try { localStorage.setItem('pasaje_favorites', JSON.stringify(_favs)); } catch (e) {} }
-        window.Favorites = {
-          getAll: function () { return _favs.slice(); },
-          has: function (id) { return _favs.indexOf(String(id)) >= 0; },
-          count: function () { return _favs.length; },
-          add: function (id) { var s = String(id); if (_favs.indexOf(s) < 0) { _favs.push(s); persistFavs(); } },
-          remove: function (id) { _favs = _favs.filter(function (x) { return x !== String(id); }); persistFavs(); },
-          toggle: function (id) {
-            var s = String(id); var i = _favs.indexOf(s);
-            if (i >= 0) { _favs.splice(i, 1); persistFavs(); return false; }
-            _favs.push(s); persistFavs(); return true;
-          }
-        };
-      }
     })();
   </script>
 
-  <script src="js/theme-loader.js?v=9"></script>
-  <script src="js/cart.js?v=9"></script>
-  <script src="js/footer.js?v=4"></script>
-  <script src="js/categories-render.js?v=5"></script>
-  <script src="js/stores-render.js?v=8"></script>
-  <script src="js/public-sidebar.js?v=8"></script>
-  <script src="js/liquid-glass.js?v=4"></script>
-  <script src="js/audio-alerts.js?v=1"></script>
-  <script src="js/services/products-service.js?v=5"></script>
-  <script src="js/ui/product-card.js?v=6"></script>
+  <script src="js/theme-loader.js?v=10"></script>
+  <script src="js/cart.js?v=10"></script>
+  <script src="js/footer.js?v=6"></script>
+  <script src="js/public-sidebar.js?v=9"></script>
+  <script src="js/liquid-glass.js?v=6"></script>
+  <script src="js/audio-alerts.js?v=2"></script>
 
   <style>
-    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; }
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: #f8fafc;
+      color: #0f172a;
+      min-height: 100vh;
+    }
+
     .no-scrollbar::-webkit-scrollbar { display: none; }
     .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
-    .product-card { cursor: pointer; }
-    .product-card .no-click { cursor: default; }
-    .fav-btn, .modal-fav-btn { color: #94a3b8; transition: color .15s ease; }
-    .fav-btn:hover, .modal-fav-btn:hover { color: #ef4444; }
-    .fav-btn.fav-active, .modal-fav-btn.fav-active { color: #ef4444 !important; }
+
+    /* ---- Banner Carousel ---- */
+    .banner-slide {
+      position: absolute;
+      inset: 0;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.7s ease-in-out;
+    }
+    .banner-slide.is-active {
+      opacity: 1;
+      pointer-events: auto;
+    }
+    .banner-dot {
+      width: 10px;
+      height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.5);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .banner-dot.is-active {
+      width: 28px;
+      background: #fff;
+    }
+    .banner-fallback {
+      background: linear-gradient(135deg, #1e1b4b 0%, #312e81 50%, #0ea5e9 100%);
+    }
+
+    /* ---- Module Cards ---- */
+    .module-card {
+      position: relative;
+      overflow: hidden;
+      transition: transform .28s cubic-bezier(.2,.7,.2,1), box-shadow .28s ease;
+    }
+    .module-card::before {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(135deg, rgba(255,255,255,.06), rgba(255,255,255,0));
+      opacity: 0;
+      transition: opacity .25s ease;
+      pointer-events: none;
+    }
+    .module-card:hover {
+      transform: translateY(-6px);
+      box-shadow: 0 28px 60px -20px rgba(15, 23, 42, 0.35);
+    }
+    .module-card:hover::before {
+      opacity: 1;
+    }
+    .module-icon {
+      transition: transform .3s cubic-bezier(.2,.9,.3,1.4);
+    }
+    .module-card:hover .module-icon {
+      transform: scale(1.15) rotate(-3deg);
+    }
+
+    /* ---- CTA role buttons ---- */
+    .role-btn {
+      transition: all .2s ease;
+      position: relative;
+      overflow: hidden;
+    }
+    .role-btn:hover {
+      transform: translateY(-2px);
+      box-shadow: 0 14px 30px -10px rgba(15, 23, 42, 0.35);
+    }
+    .role-btn::after {
+      content: '';
+      position: absolute;
+      inset: 0;
+      background: linear-gradient(120deg, transparent 30%, rgba(255,255,255,.25) 50%, transparent 70%);
+      transform: translateX(-120%);
+      transition: transform .6s ease;
+      pointer-events: none;
+    }
+    .role-btn:hover::after {
+      transform: translateX(120%);
+    }
+
+    /* ---- Feature pills ---- */
+    .feature-pill {
+      background: rgba(15, 23, 42, 0.04);
+      border: 1px solid rgba(15, 23, 42, 0.06);
+      transition: all .18s ease;
+    }
+    .feature-pill:hover {
+      background: rgba(79, 70, 229, 0.08);
+      border-color: rgba(79, 70, 229, 0.25);
+      color: #4f46e5;
+    }
+
     input::placeholder, textarea::placeholder { color: #94a3b8 !important; opacity: 1; }
   </style>
 </head>
 <body class="bg-slate-100 min-h-screen flex flex-col text-slate-800">
 
-  <!-- CONTENEDOR DEL SIDEBAR PÚBLICO -->
+  <!-- SIDEBAR PÚBLICO -->
   <div id="publicSidebar"></div>
 
   <header class="glass-header text-white shadow-lg sticky top-0 z-40 border-b border-white/10 theme-header">
-    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
       <div class="flex items-center gap-3 min-w-0">
-        <!-- BOTÓN MÓVIL (Oculto automáticamente en escritorio gracias a CSS) -->
         <button id="sidebarToggleBtn" type="button"
           class="bg-white/10 hover:bg-white/20 p-2 rounded-xl transition flex items-center justify-center border border-white/15 text-white lg:hidden"
           title="Menú" aria-label="Abrir menú">
           <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
-            <line x1="3" y1="6"  x2="21" y2="6"></line>
+            <line x1="3" y1="6" x2="21" y2="6"></line>
             <line x1="3" y1="12" x2="21" y2="12"></line>
             <line x1="3" y1="18" x2="21" y2="18"></line>
           </svg>
@@ -108,1125 +175,686 @@
       </div>
 
       <div class="flex items-center gap-2">
-
-<!-- Añadir en la barra superior de index.html dentro de div.flex.items-center.gap-2 -->
-<a href="inmuebles.html" class="bg-indigo-600/90 hover:bg-indigo-700 text-white font-bold text-xs px-3 py-2 rounded-xl border border-indigo-300/30 flex items-center gap-1.5 transition shadow-sm" title="Pasaje Inmuebles">
-  <span>🏠</span>
-  <span class="hidden sm:inline">Inmuebles</span>
-</a>
-
-        <a href="ofertas.html" class="bg-rose-500/90 hover:bg-rose-600 text-white font-bold text-xs px-3 py-2 rounded-xl border border-rose-300/30 flex items-center gap-1.5 transition shadow-sm" title="Ofertas Relámpago">
-          <span>🔥</span>
-          <span class="hidden sm:inline">Ofertas</span>
-        </a>
-
-        <a href="categorias.html" class="bg-white/10 hover:bg-white/20 text-white font-bold text-xs px-3 py-2 rounded-xl border border-white/15 flex items-center gap-1.5 transition shadow-sm" title="Categorías">
-          <span>🏷️</span>
-          <span class="hidden sm:inline">Categorías</span>
-        </a>
-
         <button type="button" onclick="if(window.PasajeCart) window.PasajeCart.openDrawer();"
-           class="relative bg-white/10 hover:bg-white/20 p-2 rounded-xl transition border border-white/15 text-white flex items-center justify-center" title="Carrito">
+          class="relative bg-white/10 hover:bg-white/20 p-2 rounded-xl transition border border-white/15 text-white flex items-center justify-center" title="Carrito">
           🛒
           <span class="cart-count-badge hidden absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow">0</span>
         </button>
 
-        <a id="favBtn" href="favoritos.html"
-           class="relative bg-white/10 hover:bg-white/20 p-2 rounded-xl transition border border-white/15 text-white" title="Mis favoritos">
-          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
-          <span id="favCount" class="hidden absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow">0</span>
-        </a>
-        <a id="ctaBtn" href="login.html"
-           class="bg-emerald-500 hover:bg-emerald-600 text-white px-3.5 sm:px-4 py-2 rounded-xl font-bold text-xs sm:text-sm transition shadow">
+        <a href="login.html"
+          class="bg-emerald-500 hover:bg-emerald-600 text-white px-3.5 sm:px-4 py-2 rounded-xl font-bold text-xs sm:text-sm transition shadow">
           + Vender
         </a>
       </div>
     </div>
   </header>
 
-  <main class="max-w-6xl mx-auto px-4 py-6 w-full flex-1">
+  <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-1 space-y-10">
 
-    <!-- CARRUSEL HERO DE BANNERS PUBLICITARIOS -->
-    <section id="heroBannerCarousel" class="mb-8 hidden glass-container rounded-3xl p-2 sm:p-3 relative overflow-hidden group shadow-xl">
-      <div id="bannerSlidesTrack" class="relative w-full aspect-[21/9] sm:aspect-[24/8] md:aspect-[3/1] rounded-2xl overflow-hidden bg-slate-900 shadow-inner"></div>
+    <!-- ================================================================
+         HERO + CARRUSEL DE BANNERS GLOBALES
+         ================================================================ -->
+    <section class="glass-container rounded-3xl p-4 sm:p-6 relative overflow-hidden shadow-xl">
 
-      <button id="bannerPrevBtn" type="button" aria-label="Anterior"
-        class="absolute left-4 top-1/2 -translate-y-1/2 z-20 bg-white/80 hover:bg-white text-slate-900 w-10 h-10 rounded-full shadow-lg backdrop-blur flex items-center justify-center font-extrabold text-xl opacity-0 group-hover:opacity-100 transition duration-300 hover:scale-110 active:scale-95">
-        ‹
-      </button>
-      <button id="bannerNextBtn" type="button" aria-label="Siguiente"
-        class="absolute right-4 top-1/2 -translate-y-1/2 z-20 bg-white/80 hover:bg-white text-slate-900 w-10 h-10 rounded-full shadow-lg backdrop-blur flex items-center justify-center font-extrabold text-xl opacity-0 group-hover:opacity-100 transition duration-300 hover:scale-110 active:scale-95">
-        ›
-      </button>
-
-      <div id="bannerDots" class="absolute bottom-4 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1 rounded-full bg-black/40 backdrop-blur border border-white/20"></div>
-    </section>
-
-    <!-- SECCIÓN DE OFERTAS RELÁMPAGO (VISTA PREVIA: 4 PRODUCTOS ALEATORIOS) -->
-    <section id="flashSalesSection" class="mb-8 hidden bg-gradient-to-r from-rose-600 via-red-500 to-amber-500 rounded-3xl p-5 sm:p-6 text-white shadow-xl relative overflow-hidden">
-      <div class="absolute -right-10 -bottom-10 text-white/10 text-9xl font-black pointer-events-none select-none">⚡</div>
-      
-      <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 mb-4 relative z-10">
-        <div class="flex items-center gap-2">
-          <span class="text-2xl animate-bounce">🔥</span>
-          <div>
-            <h2 class="text-lg sm:text-xl font-black tracking-tight">Ofertas Relámpago</h2>
-            <p class="text-xs text-white/90 font-medium">¡Últimos descuentos en comercios de Xela!</p>
+      <!-- Carousel -->
+      <div id="heroBannerCarousel" class="relative w-full aspect-[21/9] sm:aspect-[24/8] md:aspect-[3/1] rounded-2xl overflow-hidden bg-slate-900 shadow-inner">
+        <div class="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-700 to-blue-600 text-white">
+          <div class="text-center px-6">
+            <div class="w-8 h-8 mx-auto mb-3 border-3 border-white/30 border-t-white rounded-full animate-spin" style="border-width:3px;"></div>
+            <p class="text-xs font-semibold text-white/90">Cargando promociones…</p>
           </div>
         </div>
-        
-        <div class="flex items-center gap-2">
-          <div id="flashTimerGlobal" class="bg-black/30 backdrop-blur-md px-3 py-1.5 rounded-xl flex items-center gap-1.5 border border-white/20 text-xs font-black">
-            <span>⚡ Termina:</span>
-            <span id="globalCountdown" class="font-mono text-amber-300">00:00:00</span>
-          </div>
+
+        <button type="button" id="bannerPrevBtn" aria-label="Anterior"
+          class="hidden absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-white/85 hover:bg-white text-slate-900 w-10 h-10 rounded-full shadow-lg backdrop-blur flex items-center justify-center font-extrabold text-xl transition duration-300 hover:scale-110 active:scale-95">
+          ‹
+        </button>
+        <button type="button" id="bannerNextBtn" aria-label="Siguiente"
+          class="hidden absolute right-3 top-1/2 -translate-y-1/2 z-20 bg-white/85 hover:bg-white text-slate-900 w-10 h-10 rounded-full shadow-lg backdrop-blur flex items-center justify-center font-extrabold text-xl transition duration-300 hover:scale-110 active:scale-95">
+          ›
+        </button>
+
+        <div id="bannerDots" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur border border-white/20"></div>
+      </div>
+
+      <!-- Texto Hero -->
+      <div class="relative z-10 mt-6 text-center max-w-3xl mx-auto">
+        <span class="inline-flex items-center gap-1.5 text-[11px] font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full uppercase tracking-wide mb-3">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          La Super-App de Quetzaltenango
+        </span>
+        <h1 class="text-3xl sm:text-4xl md:text-5xl font-black tracking-tight text-slate-900 leading-tight mb-3">
+          Todo Xela en un <span class="text-indigo-600">solo lugar</span>
+        </h1>
+        <p class="text-sm sm:text-base text-slate-600 font-medium max-w-2xl mx-auto leading-relaxed">
+          Compra local, recibe a domicilio y encuentra tu próximo hogar.
+          Tres ecosistemas conectados en una sola plataforma pensada para emprendedores y vecinos.
+        </p>
+
+        <!-- Feature pills -->
+        <div class="flex flex-wrap items-center justify-center gap-2 mt-5">
+          <span class="feature-pill text-[11px] font-bold text-slate-600 px-3 py-1.5 rounded-full">🛍️ Marketplace local</span>
+          <span class="feature-pill text-[11px] font-bold text-slate-600 px-3 py-1.5 rounded-full">🛵 Delivery en minutos</span>
+          <span class="feature-pill text-[11px] font-bold text-slate-600 px-3 py-1.5 rounded-full">🚘 Ride Xela</span>
+          <span class="feature-pill text-[11px] font-bold text-slate-600 px-3 py-1.5 rounded-full">🏠 Inmuebles verificados</span>
+        </div>
+      </div>
+    </section>
+
+    <!-- ================================================================
+         GRID DE 3 MÓDULOS
+         ================================================================ -->
+    <section>
+      <div class="flex items-end justify-between flex-wrap gap-3 mb-5">
+        <div>
+          <h2 class="text-2xl sm:text-3xl font-black tracking-tight text-slate-900">
+            Elige tu módulo
+          </h2>
+          <p class="text-xs sm:text-sm text-slate-500 font-medium mt-1">
+            Cada módulo tiene su propio catálogo, filtros y sistema de pedidos.
+          </p>
         </div>
       </div>
 
-      <div id="flashSalesList" class="flex gap-4 overflow-x-auto pb-2 no-scrollbar snap-x snap-mandatory relative z-10"></div>
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
 
-      <div class="mt-4 pt-3 border-t border-white/20 flex flex-col sm:flex-row items-center justify-between gap-3 relative z-10">
-        <div class="flex items-center gap-2 text-xs font-semibold text-rose-100 text-center sm:text-left">
-          <span>🏷️</span>
-          <span>¿Buscas más descuentos? Explora el catálogo completo con filtros por sector.</span>
-        </div>
-        <a href="ofertas.html" class="w-full sm:w-auto bg-white hover:bg-rose-50 text-rose-600 font-extrabold text-xs px-5 py-2.5 rounded-2xl shadow-lg hover:shadow-xl transition-all transform hover:-translate-y-0.5 flex items-center justify-center gap-2 whitespace-nowrap">
-          <span>🔥 Ver todas las ofertas</span>
-          <span>→</span>
+        <!-- Módulo Tiendas -->
+        <a href="tiendas/productos.html"
+           class="module-card group block bg-white rounded-3xl border border-slate-200/80 shadow-md overflow-hidden">
+          <div class="relative h-40 bg-gradient-to-br from-indigo-600 via-blue-600 to-indigo-800 overflow-hidden">
+            <div class="absolute inset-0 opacity-25"
+                 style="background-image:radial-gradient(circle at 20% 20%, white 0%, transparent 40%), radial-gradient(circle at 80% 60%, white 0%, transparent 45%);"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="module-icon text-7xl drop-shadow-lg">🛍️</span>
+            </div>
+            <span class="absolute top-3 right-3 bg-white/20 backdrop-blur text-white text-[10px] font-black px-2.5 py-1 rounded-full border border-white/30 uppercase tracking-wider">
+              Marketplace
+            </span>
+          </div>
+
+          <div class="p-5 space-y-3">
+            <div>
+              <h3 class="text-lg font-black text-slate-900">Pasaje Tiendas</h3>
+              <p class="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
+                Descubre productos de emprendedores locales de Xela. Filtra por categoría, tienda, precio y ordena a tu gusto.
+              </p>
+            </div>
+
+            <ul class="space-y-1.5 text-[12px] text-slate-600 font-medium">
+              <li class="flex items-center gap-2">
+                <span class="w-1 h-1 rounded-full bg-indigo-500"></span>
+                Búsqueda en vivo con filtros inteligentes
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="w-1 h-1 rounded-full bg-indigo-500"></span>
+                Pedidos directos al buzón del comercio
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="w-1 h-1 rounded-full bg-indigo-500"></span>
+                Ofertas relámpago y variantes (color / talla)
+              </li>
+            </ul>
+
+            <div class="pt-2 flex items-center justify-between">
+              <span class="text-[11px] font-black text-indigo-600 uppercase tracking-wider">
+                Explorar catálogo
+              </span>
+              <span class="text-indigo-600 font-black text-lg group-hover:translate-x-1 transition-transform">→</span>
+            </div>
+          </div>
         </a>
-      </div>
-    </section>
 
-    <!-- PRODUCTOS DESTACADOS -->
-    <section id="featuredSection" class="mb-8 hidden">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-base sm:text-lg font-extrabold text-slate-800 flex items-center gap-2">
-          <span class="text-amber-500">⭐</span> Productos Destacados
-        </h2>
-      </div>
-      <div id="featuredList" class="flex gap-4 overflow-x-auto pb-3 no-scrollbar snap-x snap-mandatory"></div>
-    </section>
-
-    <!-- BUSCADOR Y FILTROS -->
-    <section id="searchSection" class="mb-8 glass-container p-5 sm:p-6 rounded-3xl relative z-30">
-      <h2 class="module-title text-2xl sm:text-3xl font-black tracking-tight mb-1">Encuentra emprendimientos locales</h2>
-      <p class="module-body text-xs sm:text-sm mb-4 font-medium">Explora productos locales en Quetzaltenango y realiza tus pedidos directamente por WhatsApp.</p>
-      
-      <div class="relative z-30">
-        <div class="relative flex-1">
-          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 z-10">
-            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
-            </svg>
+        <!-- Módulo Express / Ride -->
+        <a href="delivery/index.html"
+           class="module-card group block bg-white rounded-3xl border border-slate-200/80 shadow-md overflow-hidden">
+          <div class="relative h-40 bg-gradient-to-br from-emerald-500 via-teal-600 to-emerald-800 overflow-hidden">
+            <div class="absolute inset-0 opacity-25"
+                 style="background-image:radial-gradient(circle at 30% 30%, white 0%, transparent 40%), radial-gradient(circle at 70% 70%, white 0%, transparent 45%);"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="module-icon text-7xl drop-shadow-lg">🛵</span>
+            </div>
+            <span class="absolute top-3 right-3 bg-white/20 backdrop-blur text-white text-[10px] font-black px-2.5 py-1 rounded-full border border-white/30 uppercase tracking-wider">
+              Express & Ride
+            </span>
           </div>
 
-          <input id="searchInput" type="text" placeholder="Buscar producto por nombre..." autocomplete="off"
-            class="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-xs sm:text-sm font-semibold text-slate-800 bg-white shadow-sm transition">
+          <div class="p-5 space-y-3">
+            <div>
+              <h3 class="text-lg font-black text-slate-900">Pasaje Express & Ride</h3>
+              <p class="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
+                Envíos express y carreras de ride en toda Xela. Publica, negocia y rastrea en tiempo real.
+              </p>
+            </div>
 
-          <button id="clearSearchBtn" type="button"
-            class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition z-10" title="Limpiar búsqueda">
-            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
-            </svg>
-          </button>
-        </div>
+            <ul class="space-y-1.5 text-[12px] text-slate-600 font-medium">
+              <li class="flex items-center gap-2">
+                <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
+                Carreras por convocatoria abierta o directa
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
+                PIN de seguridad de recolección y entrega
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="w-1 h-1 rounded-full bg-emerald-500"></span>
+                Chat en vivo con el piloto asignado
+              </li>
+            </ul>
 
-        <div id="predictiveResults"
-          class="hidden absolute left-0 right-0 top-full mt-2 bg-white/95 backdrop-blur-md border border-slate-200/80 rounded-2xl shadow-2xl z-50 overflow-hidden divide-y divide-slate-100 max-h-96 overflow-y-auto">
-        </div>
-      </div>
-
-      <div class="flex flex-wrap items-center justify-between gap-3 mt-4 pt-3 border-t border-slate-200/60">
-        <div class="flex items-center gap-2 flex-wrap">
-          <span class="text-xs font-bold text-slate-600 flex items-center gap-1">Precio:</span>
-          <div class="flex items-center gap-1.5">
-            <input id="minPriceInput" type="number" min="0" step="1" placeholder="Q Mín"
-              class="w-20 sm:w-24 px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 bg-white outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm">
-            <span class="text-slate-400 font-bold text-xs">-</span>
-            <input id="maxPriceInput" type="number" min="0" step="1" placeholder="Q Máx"
-              class="w-20 sm:w-24 px-3 py-2 border border-slate-200 rounded-xl text-xs font-semibold text-slate-800 bg-white outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm">
-            <button id="clearPriceBtn" type="button" title="Limpiar rango"
-              class="hidden text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-2.5 py-2 rounded-xl transition">✕</button>
+            <div class="pt-2 flex items-center justify-between">
+              <span class="text-[11px] font-black text-emerald-600 uppercase tracking-wider">
+                Pedir un envío
+              </span>
+              <span class="text-emerald-600 font-black text-lg group-hover:translate-x-1 transition-transform">→</span>
+            </div>
           </div>
-        </div>
-
-        <div class="flex items-center gap-2">
-          <label for="sortSelect" class="text-xs font-bold text-slate-600">Orden:</label>
-          <select id="sortSelect"
-            class="border border-slate-200 rounded-xl px-3 py-2 bg-white text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer shadow-sm">
-            <option value="recent">🕒 Más recientes</option>
-            <option value="popular">❤️ Más populares</option>
-            <option value="price-asc">💲 Menor precio</option>
-            <option value="price-desc">💰 Mayor precio</option>
-          </select>
-        </div>
-      </div>
-    </section>
-
-    <!-- SECCIÓN DE TIENDAS DESTACADAS (10 ALEATORIAS + VER MÁS) -->
-    <section id="storesSection" class="mb-8 relative z-10">
-      <div class="flex items-center justify-between mb-3">
-        <h2 class="text-base sm:text-lg font-extrabold text-slate-800 flex items-center gap-2">
-          <span class="text-emerald-500">🏪</span> Tiendas Destacadas
-        </h2>
-        <a href="tiendas.html" class="text-xs font-bold text-emerald-600 hover:text-emerald-700 hover:underline flex items-center gap-1 transition">
-          <span>Ver todas las tiendas</span>
-          <span>→</span>
         </a>
-      </div>
-      
-      <div id="storesCarousel" class="flex gap-4 overflow-x-auto pb-3 no-scrollbar snap-x snap-mandatory">
-        <div class="p-4 text-xs text-slate-400 font-medium">Cargando comercios locales...</div>
+
+        <!-- Módulo Inmuebles -->
+        <a href="inmuebles/index.html"
+           class="module-card group block bg-white rounded-3xl border border-slate-200/80 shadow-md overflow-hidden">
+          <div class="relative h-40 bg-gradient-to-br from-amber-500 via-orange-500 to-rose-600 overflow-hidden">
+            <div class="absolute inset-0 opacity-25"
+                 style="background-image:radial-gradient(circle at 25% 35%, white 0%, transparent 40%), radial-gradient(circle at 75% 65%, white 0%, transparent 45%);"></div>
+            <div class="absolute inset-0 flex items-center justify-center">
+              <span class="module-icon text-7xl drop-shadow-lg">🏠</span>
+            </div>
+            <span class="absolute top-3 right-3 bg-white/20 backdrop-blur text-white text-[10px] font-black px-2.5 py-1 rounded-full border border-white/30 uppercase tracking-wider">
+              Inmuebles
+            </span>
+          </div>
+
+          <div class="p-5 space-y-3">
+            <div>
+              <h3 class="text-lg font-black text-slate-900">Pasaje Inmuebles</h3>
+              <p class="text-xs text-slate-500 font-medium mt-1 leading-relaxed">
+                Casas, apartamentos, habitaciones y locales en alquiler, venta o usufructo en Xela.
+              </p>
+            </div>
+
+            <ul class="space-y-1.5 text-[12px] text-slate-600 font-medium">
+              <li class="flex items-center gap-2">
+                <span class="w-1 h-1 rounded-full bg-amber-500"></span>
+                Ficha completa con galería y mapa
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="w-1 h-1 rounded-full bg-amber-500"></span>
+                Contacto directo por WhatsApp o formulario
+              </li>
+              <li class="flex items-center gap-2">
+                <span class="w-1 h-1 rounded-full bg-amber-500"></span>
+                Filtros por zona, precio y tipo
+              </li>
+            </ul>
+
+            <div class="pt-2 flex items-center justify-between">
+              <span class="text-[11px] font-black text-amber-600 uppercase tracking-wider">
+                Ver inmuebles
+              </span>
+              <span class="text-amber-600 font-black text-lg group-hover:translate-x-1 transition-transform">→</span>
+            </div>
+          </div>
+        </a>
+
       </div>
     </section>
 
-    <!-- CATEGORÍAS Y GRILLA PRINCIPAL DE PRODUCTOS -->
-    <div id="categoryFilters" class="flex gap-2 overflow-x-auto pb-2 mb-6 no-scrollbar snap-x relative z-10"></div>
+    <!-- ================================================================
+         SÚMATE A LA RED (Registros segmentados)
+         ================================================================ -->
+    <section class="glass-container rounded-3xl p-6 sm:p-8 relative overflow-hidden">
+      <div class="absolute -right-16 -top-16 text-slate-900/5 text-[12rem] font-black pointer-events-none select-none leading-none">+</div>
 
-    <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 relative z-10">
-      <p class="col-span-full text-center text-slate-500 py-12 text-sm font-semibold">Cargando catálogo local...</p>
-    </div>
+      <div class="relative z-10 max-w-3xl mx-auto text-center mb-6">
+        <span class="inline-flex items-center gap-1.5 text-[11px] font-bold bg-indigo-100 text-indigo-800 px-3 py-1 rounded-full uppercase tracking-wide mb-3">
+          <span>✨</span>
+          Súmate a la Red
+        </span>
+        <h2 class="text-2xl sm:text-3xl font-black tracking-tight text-slate-900 mb-2">
+          Tres formas de crecer con nosotros
+        </h2>
+        <p class="text-sm text-slate-600 font-medium">
+          Elige tu perfil y empieza gratis. No necesitas tarjeta de crédito, solo ganas de emprender.
+        </p>
+      </div>
+
+      <div class="grid grid-cols-1 md:grid-cols-3 gap-4 max-w-4xl mx-auto relative z-10">
+
+        <a href="registro.html?role=merchant"
+           class="role-btn block bg-gradient-to-br from-indigo-600 to-blue-700 text-white rounded-2xl p-5 shadow-lg">
+          <div class="text-3xl mb-2">🏪</div>
+          <h3 class="font-black text-sm uppercase tracking-wider mb-1">Vende productos</h3>
+          <p class="text-[11px] text-white/85 leading-relaxed mb-3">
+            Crea tu tienda, sube tu catálogo y recibe pedidos al instante.
+          </p>
+          <span class="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wider bg-white/15 px-2.5 py-1 rounded-lg border border-white/25">
+            Registrar tienda →
+          </span>
+        </a>
+
+        <a href="registro.html?role=delivery"
+           class="role-btn block bg-gradient-to-br from-emerald-600 to-teal-700 text-white rounded-2xl p-5 shadow-lg">
+          <div class="text-3xl mb-2">🛵</div>
+          <h3 class="font-black text-sm uppercase tracking-wider mb-1">Conduce y entrega</h3>
+          <p class="text-[11px] text-white/85 leading-relaxed mb-3">
+            Elige tus horarios, acepta carreras y gana en cada viaje.
+          </p>
+          <span class="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wider bg-white/15 px-2.5 py-1 rounded-lg border border-white/25">
+            Ser piloto →
+          </span>
+        </a>
+
+        <a href="registro.html?role=real_estate"
+           class="role-btn block bg-gradient-to-br from-amber-500 to-rose-600 text-white rounded-2xl p-5 shadow-lg">
+          <div class="text-3xl mb-2">🏠</div>
+          <h3 class="font-black text-sm uppercase tracking-wider mb-1">Publica inmuebles</h3>
+          <p class="text-[11px] text-white/85 leading-relaxed mb-3">
+            Sube casas, locales o habitaciones y gestiona tus leads.
+          </p>
+          <span class="inline-flex items-center gap-1 text-[11px] font-black uppercase tracking-wider bg-white/15 px-2.5 py-1 rounded-lg border border-white/25">
+            Publicar inmuebles →
+          </span>
+        </a>
+
+      </div>
+    </section>
+
+    <!-- ================================================================
+         SECCIÓN: ¿POR QUÉ PASAJE?
+         ================================================================ -->
+    <section class="grid grid-cols-1 md:grid-cols-3 gap-4">
+
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 text-center">
+        <div class="text-3xl mb-2">🔒</div>
+        <h3 class="text-sm font-black text-slate-900 mb-1">Pagos seguros</h3>
+        <p class="text-[11px] text-slate-500 font-medium leading-relaxed">
+          Cada pedido queda registrado y auditado. Tú decides cómo pagar: efectivo, transferencia o pasarela.
+        </p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 text-center">
+        <div class="text-3xl mb-2">⚡</div>
+        <h3 class="text-sm font-black text-slate-900 mb-1">Respuesta en minutos</h3>
+        <p class="text-[11px] text-slate-500 font-medium leading-relaxed">
+          Alertas sonoras en el dashboard para que no se te escape ningún pedido nuevo.
+        </p>
+      </div>
+
+      <div class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 text-center">
+        <div class="text-3xl mb-2">🇬🇹</div>
+        <h3 class="text-sm font-black text-slate-900 mb-1">Hecho en Xela</h3>
+        <p class="text-[11px] text-slate-500 font-medium leading-relaxed">
+          Pensado desde y para Quetzaltenango. Apoya a los emprendedores de tu comunidad.
+        </p>
+      </div>
+
+    </section>
+
   </main>
 
   <div id="pasajeFooter"></div>
 
-  <!-- MODAL VISTA RÁPIDA DE PRODUCTOS -->
-  <div id="productModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6">
-    <div class="relative w-full max-w-2xl">
-      <div id="modalProductNavWrapper"></div>
-
-      <div class="bg-white rounded-3xl shadow-2xl max-h-[88vh] overflow-y-auto">
-        <div id="productModalContent"></div>
+  <!-- ================================================================
+       BANNER DE INSTALACIÓN PWA
+       ================================================================ -->
+  <div id="pwaInstallBanner" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] max-w-md w-[92%] sm:w-auto">
+    <div class="bg-slate-900/95 backdrop-blur-md text-white rounded-3xl p-4 shadow-2xl border border-white/10 flex items-center gap-3">
+      <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-2xl flex-shrink-0">📲</div>
+      <div class="flex-1 min-w-0">
+        <p class="font-black text-sm">Instala Pasaje de los Altos</p>
+        <p class="text-[11px] text-white/70 mt-0.5">Acceso rápido desde tu pantalla de inicio</p>
+      </div>
+      <div class="flex flex-col gap-1.5 flex-shrink-0">
+        <button type="button" id="pwaInstallBtn" class="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-3 py-2 rounded-xl transition shadow">
+          Instalar
+        </button>
+        <button type="button" id="pwaInstallClose" class="text-white/50 hover:text-white/80 text-[10px] font-bold">
+          Ahora no
+        </button>
       </div>
     </div>
   </div>
 
+  <!-- ================================================================
+       SCRIPT: Banner Carousel + PWA + SW
+       ================================================================ -->
   <script>
-    const loadedProductsMap = new Map();
-    let currentPage = 0;
-    let isLoading = false;
-    let hasMore = true;
-    let currentCategory = 'todas';
-    let searchTerm = '';
-    let minPrice = null;
-    let maxPrice = null;
-    let currentSort = 'recent';
-    let predictiveCache = [];
+    (function () {
+      'use strict';
 
-    let activeModalProducts = [];
-    let activeProductIndex = -1;
-    let activeGalleryIndex = 0;
+      // =============================================================
+      // BANNER CAROUSEL GLOBAL (target_module = 'index')
+      // =============================================================
+      const adCarousel    = document.getElementById('heroBannerCarousel');
+      const bannerPrevBtn = document.getElementById('bannerPrevBtn');
+      const bannerNextBtn = document.getElementById('bannerNextBtn');
+      const bannerDots    = document.getElementById('bannerDots');
 
-    let heroBannersList = [];
-    let currentBannerIdx = 0;
-    let bannerAutoplayTimer = null;
-    let isBannerHovered = false;
+      let bannerSlides = [];
+      let bannerIndex = 0;
+      let bannerTimer = null;
+      let bannerHovered = false;
+      let bannerTouchStartX = 0;
 
-    const grid = document.getElementById('productsGrid');
-    const searchInput = document.getElementById('searchInput');
-    const clearSearchBtn = document.getElementById('clearSearchBtn');
-    const predictiveResults = document.getElementById('predictiveResults');
-    const minPriceInput = document.getElementById('minPriceInput');
-    const maxPriceInput = document.getElementById('maxPriceInput');
-    const clearPriceBtn = document.getElementById('clearPriceBtn');
-    const sortSelect = document.getElementById('sortSelect');
-    const featuredSection = document.getElementById('featuredSection');
-    const featuredList = document.getElementById('featuredList');
-    const flashSalesSection = document.getElementById('flashSalesSection');
-    const flashSalesList = document.getElementById('flashSalesList');
-    const favCountEl = document.getElementById('favCount');
-    const productModal = document.getElementById('productModal');
-    const productModalContent = document.getElementById('productModalContent');
-    const modalProductNavWrapper = document.getElementById('modalProductNavWrapper');
-
-    function shuffleArray(array) {
-      const arr = [...array];
-      for (let i = arr.length - 1; i > 0; i--) {
-        const j = Math.floor(Math.random() * (i + 1));
-        [arr[i], arr[j]] = [arr[j], arr[i]];
+      function getClient() {
+        return window._supabase ||
+          (typeof window.initSupabaseClient === 'function' ? window.initSupabaseClient() : null);
       }
-      return arr;
-    }
 
-    function debounce(fn, delay = 300) {
-      let timer;
-      return function (...args) {
-        clearTimeout(timer);
-        timer = setTimeout(() => fn.apply(this, args), delay);
-      };
-    }
-
-    // DISPARADOR DEL SIDEBAR PÚBLICO (MÓVIL)
-    document.getElementById('sidebarToggleBtn')?.addEventListener('click', () => {
-      if (typeof window.togglePublicSidebar === 'function') {
-        window.togglePublicSidebar();
-      } else if (window.PasajePublicSidebar) {
-        window.PasajePublicSidebar.toggle();
+      function esc(str) {
+        return String(str ?? '')
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
       }
-    });
 
-    window.setCatalogCategory = function (slug) {
-      currentCategory = slug || 'todas';
-      resetAndReload();
-    };
+      async function loadAdBanners() {
+        const client = getClient();
+        if (!client) { renderBannerFallback(); return; }
 
-    function updateFavCount() {
-      if (!favCountEl || !window.Favorites) return;
-      const n = window.Favorites.count();
-      if (n === 0) favCountEl.classList.add('hidden');
-      else { favCountEl.textContent = n; favCountEl.classList.remove('hidden'); }
-    }
-
-    async function loadHeroBanners() {
-      const carouselEl = document.getElementById('heroBannerCarousel');
-      const trackEl = document.getElementById('bannerSlidesTrack');
-      const dotsEl = document.getElementById('bannerDots');
-      const prevBtn = document.getElementById('bannerPrevBtn');
-      const nextBtn = document.getElementById('bannerNextBtn');
-
-      if (!carouselEl || !trackEl) return;
-
-      try {
-        if (typeof window.ProductsService !== 'undefined' && typeof window.ProductsService.fetchActiveBanners === 'function') {
-          heroBannersList = await window.ProductsService.fetchActiveBanners();
-        } else if (typeof window._supabase !== 'undefined') {
-          const { data } = await window._supabase
+        try {
+          const { data, error } = await client
             .from('banners')
-            .select('*')
+            .select('id, title, subtitle, image_url, link_type, link_value, sort_order, is_active, target_module, placement')
             .eq('is_active', true)
+            .eq('target_module', 'index')
+            .eq('placement', 'hero')
             .order('sort_order', { ascending: true });
-          heroBannersList = data || [];
+
+          if (error) throw error;
+
+          if (!data || data.length === 0) {
+            renderBannerFallback();
+            return;
+          }
+
+          renderBannerCarousel(data);
+          trackBannerImpressions(data);
+        } catch (e) {
+          console.warn('[Hub] Error cargando banners:', e);
+          renderBannerFallback();
         }
+      }
 
-        if (!heroBannersList || heroBannersList.length === 0) {
-          carouselEl.classList.add('hidden');
-          return;
-        }
+      function renderBannerFallback() {
+        if (!adCarousel) return;
+        adCarousel.innerHTML = `
+          <div class="banner-fallback absolute inset-0 flex items-center justify-between p-6 sm:p-10 text-white">
+            <div class="min-w-0 flex-1">
+              <span class="inline-flex items-center gap-1.5 text-[10px] font-black bg-white/20 px-2.5 py-1 rounded-full uppercase tracking-wider mb-3">
+                <span>✨</span><span>Pasaje de los Altos</span>
+              </span>
+              <h3 class="text-2xl sm:text-3xl md:text-4xl font-black leading-tight mb-2">
+                La Super-App de Xela
+              </h3>
+              <p class="text-xs sm:text-sm text-white/85 max-w-lg leading-relaxed">
+                Compra local, recibe a domicilio y encuentra tu próximo hogar. Todo en un solo lugar.
+              </p>
+            </div>
+            <div class="hidden sm:block text-white/15 text-8xl md:text-9xl font-black select-none pointer-events-none pl-4">🏔️</div>
+          </div>
+        `;
+        if (bannerPrevBtn) bannerPrevBtn.classList.add('hidden');
+        if (bannerNextBtn) bannerNextBtn.classList.add('hidden');
+        if (bannerDots) bannerDots.classList.add('hidden');
+      }
 
-        carouselEl.classList.remove('hidden');
+      function renderBannerCarousel(banners) {
+        if (!adCarousel) return;
 
-        trackEl.innerHTML = heroBannersList.map((b, idx) => {
-          const title = b.title ? ProductCardUI.escapeHtml(b.title) : '';
-          const subtitle = b.subtitle ? ProductCardUI.escapeHtml(b.subtitle) : '';
-          const imgUrl = b.image_url || window.PLACEHOLDER_IMG;
+        bannerSlides = banners;
+        bannerIndex = 0;
 
+        const slidesHtml = banners.map((b, idx) => {
+          const hasText = !!(b.title || b.subtitle);
           return `
-            <div class="banner-slide absolute inset-0 transition-opacity duration-700 ease-in-out cursor-pointer ${idx === 0 ? 'opacity-100 z-10' : 'opacity-0 z-0 pointer-events-none'}"
+            <div class="banner-slide ${idx === 0 ? 'is-active' : ''}"
                  data-banner-idx="${idx}"
-                 data-link-type="${b.link_type || 'external'}"
-                 data-link-value="${ProductCardUI.escapeHtml(b.link_value || '')}">
-              <img src="${imgUrl}" alt="${title || 'Banner Publicitario'}" class="w-full h-full object-cover">
-              
-              ${(title || subtitle) ? `
-                <div class="absolute inset-0 bg-gradient-to-t from-slate-950/80 via-slate-950/20 to-transparent flex flex-col justify-end p-4 sm:p-8 text-white">
-                  ${title ? `<h3 class="text-lg sm:text-2xl md:text-3xl font-black tracking-tight drop-shadow-md">${title}</h3>` : ''}
-                  ${subtitle ? `<p class="text-xs sm:text-sm font-medium text-slate-200 mt-1 max-w-xl drop-shadow">${subtitle}</p>` : ''}
+                 data-banner-id="${esc(b.id)}"
+                 data-link-type="${esc(b.link_type || 'external')}"
+                 data-link-value="${esc(b.link_value || '')}">
+              <img src="${esc(b.image_url)}" alt="${esc(b.title || 'Banner')}"
+                   class="w-full h-full object-cover"
+                   onerror="this.onerror=null;this.src='${window.PLACEHOLDER_IMG || ''}'">
+              ${hasText ? `
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent flex flex-col justify-end p-4 sm:p-6 md:p-8 text-white pointer-events-none">
+                  ${b.title ? `<h3 class="text-base sm:text-2xl md:text-3xl font-black tracking-tight drop-shadow-md leading-tight">${esc(b.title)}</h3>` : ''}
+                  ${b.subtitle ? `<p class="text-xs sm:text-sm font-medium text-slate-100 mt-1 max-w-xl drop-shadow">${esc(b.subtitle)}</p>` : ''}
+                  ${b.link_value ? `
+                    <span class="mt-2 inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold bg-white/15 backdrop-blur px-2.5 py-1 rounded-full self-start border border-white/20">
+                      <span>Ver más</span><span>→</span>
+                    </span>` : ''}
                 </div>
               ` : ''}
             </div>
           `;
         }).join('');
 
-        if (dotsEl) {
-          dotsEl.innerHTML = heroBannersList.map((_, idx) => `
-            <button type="button" data-banner-dot="${idx}" aria-label="Ir a banner ${idx + 1}"
-              class="w-2.5 h-2.5 rounded-full transition-all duration-300 ${idx === 0 ? 'bg-white w-6' : 'bg-white/50 hover:bg-white/80'}">
-            </button>
+        adCarousel.innerHTML = slidesHtml;
+
+        if (bannerDots) {
+          bannerDots.innerHTML = banners.map((_, idx) => `
+            <button type="button" class="banner-dot ${idx === 0 ? 'is-active' : ''}"
+                    data-banner-dot="${idx}"
+                    aria-label="Ir al banner ${idx + 1}"></button>
           `).join('');
+          bannerDots.classList.remove('hidden');
         }
 
-        attachBannerCarouselEvents(carouselEl, trackEl, prevBtn, nextBtn);
-        startBannerAutoplay();
+        if (bannerPrevBtn && banners.length > 1) bannerPrevBtn.classList.remove('hidden');
+        if (bannerNextBtn && banners.length > 1) bannerNextBtn.classList.remove('hidden');
 
-      } catch (err) {
-        console.warn('[HeroBanners] Error al cargar banners:', err);
-        if (carouselEl) carouselEl.classList.add('hidden');
+        bindBannerEvents();
+        startBannerAutoplay();
       }
-    }
 
-    function showBannerSlide(index) {
-      if (!heroBannersList || heroBannersList.length === 0) return;
-      const count = heroBannersList.length;
-      currentBannerIdx = (index + count) % count;
+      function bindBannerEvents() {
+        if (!adCarousel) return;
 
-      const slides = document.querySelectorAll('.banner-slide');
-      slides.forEach((s, idx) => {
-        if (idx === currentBannerIdx) {
-          s.classList.remove('opacity-0', 'z-0', 'pointer-events-none');
-          s.classList.add('opacity-100', 'z-10');
-        } else {
-          s.classList.remove('opacity-100', 'z-10');
-          s.classList.add('opacity-0', 'z-0', 'pointer-events-none');
-        }
-      });
+        bannerPrevBtn?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          showBannerSlide(bannerIndex - 1);
+          restartBannerAutoplay();
+        });
+        bannerNextBtn?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          showBannerSlide(bannerIndex + 1);
+          restartBannerAutoplay();
+        });
 
-      const dots = document.querySelectorAll('[data-banner-dot]');
-      dots.forEach((d, idx) => {
-        if (idx === currentBannerIdx) {
-          d.className = 'w-6 h-2.5 rounded-full bg-white transition-all duration-300';
-        } else {
-          d.className = 'w-2.5 h-2.5 rounded-full bg-white/50 hover:bg-white/80 transition-all duration-300';
-        }
-      });
-    }
-
-    function startBannerAutoplay() {
-      stopBannerAutoplay();
-      if (heroBannersList.length <= 1) return;
-      bannerAutoplayTimer = setInterval(() => {
-        if (!isBannerHovered) {
-          showBannerSlide(currentBannerIdx + 1);
-        }
-      }, 5000);
-    }
-
-    function stopBannerAutoplay() {
-      if (bannerAutoplayTimer) {
-        clearInterval(bannerAutoplayTimer);
-        bannerAutoplayTimer = null;
-      }
-    }
-
-    function attachBannerCarouselEvents(carouselEl, trackEl, prevBtn, nextBtn) {
-      prevBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        showBannerSlide(currentBannerIdx - 1);
-        startBannerAutoplay();
-      });
-
-      nextBtn?.addEventListener('click', (e) => {
-        e.stopPropagation();
-        showBannerSlide(currentBannerIdx + 1);
-        startBannerAutoplay();
-      });
-
-      document.getElementById('bannerDots')?.addEventListener('click', (e) => {
-        const dot = e.target.closest('[data-banner-dot]');
-        if (dot) {
+        bannerDots?.addEventListener('click', (e) => {
+          const dot = e.target.closest('[data-banner-dot]');
+          if (!dot) return;
           const idx = parseInt(dot.dataset.bannerDot, 10);
           showBannerSlide(idx);
-          startBannerAutoplay();
-        }
-      });
+          restartBannerAutoplay();
+        });
 
-      carouselEl.addEventListener('mouseenter', () => { isBannerHovered = true; });
-      carouselEl.addEventListener('mouseleave', () => { isBannerHovered = false; });
+        adCarousel.addEventListener('mouseenter', () => { bannerHovered = true; });
+        adCarousel.addEventListener('mouseleave', () => { bannerHovered = false; });
 
-      let touchStartX = 0;
-      let touchEndX = 0;
+        adCarousel.addEventListener('touchstart', (e) => {
+          bannerHovered = true;
+          bannerTouchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
 
-      trackEl.addEventListener('touchstart', (e) => {
-        isBannerHovered = true;
-        touchStartX = e.changedTouches[0].screenX;
-      }, { passive: true });
-
-      trackEl.addEventListener('touchend', (e) => {
-        isBannerHovered = false;
-        touchEndX = e.changedTouches[0].screenX;
-        const diffX = touchStartX - touchEndX;
-        if (Math.abs(diffX) > 40) {
-          if (diffX > 0) {
-            showBannerSlide(currentBannerIdx + 1);
-          } else {
-            showBannerSlide(currentBannerIdx - 1);
+        adCarousel.addEventListener('touchend', (e) => {
+          bannerHovered = false;
+          const dx = e.changedTouches[0].screenX - bannerTouchStartX;
+          if (Math.abs(dx) > 40) {
+            showBannerSlide(dx < 0 ? bannerIndex + 1 : bannerIndex - 1);
+            restartBannerAutoplay();
           }
-          startBannerAutoplay();
+        }, { passive: true });
+
+        adCarousel.addEventListener('click', async (e) => {
+          const slide = e.target.closest('.banner-slide');
+          if (!slide) return;
+
+          const bannerId  = slide.dataset.bannerId;
+          const linkType  = slide.dataset.linkType || 'external';
+          const linkValue = slide.dataset.linkValue || '';
+
+          if (bannerId) await trackBannerClick(bannerId);
+
+          if (!linkValue) return;
+
+          switch (linkType) {
+            case 'category':
+              window.location.href = `tiendas/productos.html?cat=${encodeURIComponent(linkValue)}`;
+              break;
+
+            case 'store':
+              window.location.href = `tiendas/tienda.html?slug=${encodeURIComponent(linkValue)}`;
+              break;
+
+            case 'product':
+              window.location.href = `tiendas/productos.html?p=${encodeURIComponent(linkValue)}`;
+              break;
+
+            case 'external':
+            default:
+              if (linkValue) {
+                const url = linkValue.startsWith('http') ? linkValue : `https://${linkValue}`;
+                window.open(url, '_blank', 'noopener,noreferrer');
+              }
+              break;
+          }
+        });
+      }
+
+      function showBannerSlide(idx) {
+        if (bannerSlides.length === 0) return;
+        bannerIndex = ((idx % bannerSlides.length) + bannerSlides.length) % bannerSlides.length;
+
+        adCarousel.querySelectorAll('.banner-slide').forEach((s, i) => {
+          s.classList.toggle('is-active', i === bannerIndex);
+        });
+
+        bannerDots?.querySelectorAll('.banner-dot').forEach((d, i) => {
+          d.classList.toggle('is-active', i === bannerIndex);
+        });
+      }
+
+      function startBannerAutoplay() {
+        stopBannerAutoplay();
+        if (bannerSlides.length <= 1) return;
+        bannerTimer = setInterval(() => {
+          if (!bannerHovered) showBannerSlide(bannerIndex + 1);
+        }, 5500);
+      }
+
+      function stopBannerAutoplay() {
+        if (bannerTimer) { clearInterval(bannerTimer); bannerTimer = null; }
+      }
+
+      function restartBannerAutoplay() {
+        stopBannerAutoplay();
+        startBannerAutoplay();
+      }
+
+      async function trackBannerImpressions(banners) {
+        const client = getClient();
+        if (!client || !banners || banners.length === 0) return;
+        for (const b of banners) {
+          try {
+            await client.rpc('increment_banner_impression', { banner_id: b.id });
+          } catch (e) { /* silencioso */ }
         }
-      }, { passive: true });
+      }
 
-      trackEl.addEventListener('click', async (e) => {
-        const slide = e.target.closest('.banner-slide');
-        if (!slide) return;
+      async function trackBannerClick(bannerId) {
+        const client = getClient();
+        if (!client || !bannerId) return;
+        try {
+          await client.rpc('increment_banner_click', { banner_id: bannerId });
+        } catch (e) { /* silencioso */ }
+      }
 
-        const type = slide.dataset.linkType || 'external';
-        const val = slide.dataset.linkValue || '';
+      // =============================================================
+      // PWA INSTALL PROMPT
+      // =============================================================
+      let deferredPrompt = null;
+      const pwaBanner = document.getElementById('pwaInstallBanner');
+      const pwaInstallBtn = document.getElementById('pwaInstallBtn');
+      const pwaCloseBtn = document.getElementById('pwaInstallClose');
 
-        if (!val && type !== 'category') return;
+      const isStandalone =
+        window.matchMedia('(display-mode: standalone)').matches ||
+        window.navigator.standalone === true;
 
-        switch (type) {
-          case 'category':
-            if (typeof window.setCatalogCategory === 'function') {
-              window.setCatalogCategory(val || 'todas');
-              const targetSec = document.getElementById('searchSection') || document.getElementById('productsGrid');
-              targetSec?.scrollIntoView({ behavior: 'smooth' });
-            } else {
-              window.location.href = `categorias.html${val ? '?cat=' + encodeURIComponent(val) : ''}`;
-            }
-            break;
+      if (!isStandalone && pwaBanner) {
+        const lastDismiss = localStorage.getItem('pasaje_pwa_dismissed');
+        const dismissedRecently = lastDismiss && (Date.now() - parseInt(lastDismiss, 10) < 1000 * 60 * 60 * 24 * 7);
 
-          case 'store':
-            window.location.href = `tienda.html?slug=${encodeURIComponent(val)}`;
-            break;
+        window.addEventListener('beforeinstallprompt', (e) => {
+          e.preventDefault();
+          deferredPrompt = e;
+          if (!dismissedRecently) pwaBanner.classList.remove('hidden');
+        });
 
-          case 'product':
-            if (loadedProductsMap.has(String(val))) {
-              openProductModal(loadedProductsMap.get(String(val)));
-            } else {
-              try {
-                if (typeof window._supabase !== 'undefined') {
-                  const { data } = await window._supabase
-                    .from('products')
-                    .select(`
-                      id, title, description, price, original_price, is_on_sale, sale_expires_at, image_url, image_urls, is_featured, is_active,
-                      stock_quantity, badge_tag, prep_time, min_order_qty, favorites_count,
-                      store_id, category_id, created_at,
-                      stores!inner ( id, name, whatsapp, slug, address, logo_url, is_active, is_suspended, is_verified ),
-                      categories ( id, name, slug, icon ),
-                      product_images ( id, image_url, sort_order ),
-                      product_variants ( id, variant_group, name, price_adjustment, stock_quantity )
-                    `)
-                    .eq('id', val)
-                    .maybeSingle();
+        pwaInstallBtn?.addEventListener('click', async () => {
+          if (!deferredPrompt) return;
+          pwaBanner.classList.add('hidden');
+          deferredPrompt.prompt();
+          try { await deferredPrompt.userChoice; } catch (e) { /* noop */ }
+          deferredPrompt = null;
+        });
 
-                  if (data && window.ProductsService) {
-                    const norm = window.ProductsService.normalizeProduct(data);
-                    if (norm) {
-                      loadedProductsMap.set(String(norm.id), norm);
-                      openProductModal(norm);
-                      return;
-                    }
+        pwaCloseBtn?.addEventListener('click', () => {
+          pwaBanner.classList.add('hidden');
+          try { localStorage.setItem('pasaje_pwa_dismissed', String(Date.now())); } catch (e) {}
+        });
+      }
+
+      // =============================================================
+      // SERVICE WORKER
+      // =============================================================
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
+            .then((reg) => {
+              reg.addEventListener('updatefound', () => {
+                const nw = reg.installing;
+                if (!nw) return;
+                nw.addEventListener('statechange', () => {
+                  if (nw.state === 'installed' && navigator.serviceWorker.controller) {
+                    nw.postMessage('SKIP_WAITING');
                   }
-                }
-              } catch (err) {
-                console.warn('[BannerProductClick] Error al cargar producto:', err);
-              }
-              window.location.href = `index.html?p=${encodeURIComponent(val)}`;
-            }
-            break;
+                });
+              });
+            })
+            .catch((err) => console.warn('[SW] registro falló:', err));
 
-          case 'external':
-          default:
-            if (val) {
-              const url = val.startsWith('http') ? val : `https://${val}`;
-              window.open(url, '_blank');
-            }
-            break;
+          let reloading = false;
+          navigator.serviceWorker.addEventListener('controllerchange', () => {
+            if (reloading) return;
+            reloading = true;
+            window.location.reload();
+          });
+        });
+      }
+
+      // =============================================================
+      // SIDEBAR TOGGLE (móvil)
+      // =============================================================
+      document.getElementById('sidebarToggleBtn')?.addEventListener('click', () => {
+        if (typeof window.togglePublicSidebar === 'function') {
+          window.togglePublicSidebar();
+        } else if (window.PasajePublicSidebar) {
+          window.PasajePublicSidebar.toggle();
         }
       });
-    }
 
-    async function loadFlashSales() {
-      try {
-        const salesPool = await ProductsService.getFlashSales(20);
-
-        if (!salesPool || salesPool.length === 0) {
-          flashSalesSection.classList.add('hidden');
-          return;
-        }
-
-        const randomSales = shuffleArray(salesPool).slice(0, 4);
-
-        randomSales.forEach(p => loadedProductsMap.set(String(p.id), p));
-        flashSalesSection.classList.remove('hidden');
-
-        let cardsHtml = randomSales.map(p => {
-          const storeName = p.store_name || 'Tienda';
-          const origPrice = p.original_price && parseFloat(p.original_price) > p.price ? parseFloat(p.original_price) : parseFloat(p.price) * 1.25;
-          const salePrice = parseFloat(p.price);
-          const diff = origPrice - salePrice;
-          const discountPct = origPrice > 0 ? Math.round((diff / origPrice) * 100) : 0;
-          const verifiedBadge = p.store_is_verified ? ' ✓' : '';
-
-          return `
-            <div class="product-card bg-white rounded-2xl p-3 shadow-lg flex-shrink-0 w-52 sm:w-56 text-slate-950 flex flex-col justify-between snap-start hover:shadow-xl transition-all duration-200" data-product-id="${p.id}">
-              <div>
-                <div class="relative rounded-xl overflow-hidden bg-slate-100 aspect-square mb-2.5">
-                  <img src="${p.image_url || window.PLACEHOLDER_IMG}" alt="${ProductCardUI.escapeHtml(p.title)}" class="w-full h-full object-cover">
-                  ${discountPct > 0 ? `<span class="absolute top-2 left-2 bg-rose-600 text-white text-[10px] font-black px-2 py-0.5 rounded-full shadow">⚡ -${discountPct}% OFF</span>` : ''}
-                </div>
-                <h4 class="text-xs font-black text-slate-900 truncate">${ProductCardUI.escapeHtml(p.title)}</h4>
-                <p class="text-[10px] text-slate-500 truncate">🏪 ${ProductCardUI.escapeHtml(storeName)}${verifiedBadge}</p>
-              </div>
-
-              <div class="mt-3 pt-2 border-t border-slate-100">
-                <div class="flex items-baseline gap-1.5">
-                  <span class="text-xs font-bold text-slate-400 line-through">Q ${origPrice.toFixed(2)}</span>
-                  <span class="text-sm font-black text-rose-600">Q ${salePrice.toFixed(2)}</span>
-                </div>
-                <button type="button" data-action="add-cart" data-product-id="${p.id}"
-                  class="mt-2 w-full bg-slate-900 hover:bg-rose-600 text-white font-bold py-1.5 rounded-xl text-[11px] transition">
-                  ⚡ Aprovechar Oferta
-                </button>
-              </div>
-            </div>`;
-        }).join('');
-
-        const extraCtaCard = `
-          <a href="ofertas.html" class="bg-black/20 hover:bg-black/30 backdrop-blur-md border border-white/30 rounded-2xl p-4 shadow-lg flex-shrink-0 w-44 sm:w-48 text-center flex flex-col items-center justify-center snap-start transition-all group text-white">
-            <span class="text-3xl mb-2 group-hover:scale-125 transition-transform duration-300">🔥</span>
-            <h4 class="text-xs font-black uppercase tracking-wider">Ver más promociones</h4>
-            <p class="text-[10px] text-rose-100 mt-1 mb-3">Ir a la sección de Ofertas</p>
-            <span class="bg-white text-rose-600 font-extrabold text-[11px] px-3 py-1.5 rounded-xl shadow-md group-hover:bg-rose-50 transition">
-              Explorar →
-            </span>
-          </a>
-        `;
-
-        flashSalesList.innerHTML = cardsHtml + extraCtaCard;
-
-        if (randomSales[0]?.sale_expires_at) {
-          startGlobalCountdown(randomSales[0].sale_expires_at);
-        }
-
-      } catch (err) {
-        console.warn('[Index] Error cargando ofertas relámpago:', err);
-      }
-    }
-
-    function startGlobalCountdown(expiresAt) {
-      const timerEl = document.getElementById('globalCountdown');
-      if (!timerEl) return;
-
-      const target = expiresAt ? new Date(expiresAt).getTime() : new Date().getTime() + 86400000;
-
-      setInterval(() => {
-        const now = new Date().getTime();
-        const distance = target - now;
-
-        if (distance < 0) {
-          timerEl.textContent = '00:00:00';
-          return;
-        }
-
-        const hours = Math.floor((distance % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
-        const minutes = Math.floor((distance % (1000 * 60 * 60)) / (1000 * 60));
-        const seconds = Math.floor((distance % (1000 * 60)) / 1000);
-
-        timerEl.textContent = `${String(hours).padStart(2, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}`;
-      }, 1000);
-    }
-
-    async function loadFeaturedStores() {
-      const storesCarousel = document.getElementById('storesCarousel');
-      const storesSection = document.getElementById('storesSection');
-      if (!storesCarousel) return;
-
-      try {
-        let stores = [];
-        
-        if (typeof window._supabase !== 'undefined') {
-          const { data, error } = await window._supabase
-            .from('stores')
-            .select('id, name, slug, logo_url, address, is_verified, is_active, is_suspended')
-            .eq('is_active', true)
-            .eq('is_suspended', false);
-
-          if (!error && data) stores = data;
-        }
-
-        if (!stores || stores.length === 0) {
-          storesSection?.classList.add('hidden');
-          return;
-        }
-
-        const randomStores = shuffleArray(stores).slice(0, 10);
-        storesSection?.classList.remove('hidden');
-
-        let storesHtml = randomStores.map(s => {
-          const logo = s.logo_url || window.PLACEHOLDER_IMG;
-          const verifiedBadge = s.is_verified ? '<span class="text-blue-500 text-[10px]" title="Verificada">✓</span>' : '';
-
-          return `
-            <a href="tienda.html?slug=${encodeURIComponent(s.slug || '')}"
-               class="glass-container hover:border-emerald-400 p-3.5 rounded-2xl flex items-center gap-3 flex-shrink-0 w-60 snap-start shadow-sm hover:shadow-md transition group bg-white">
-              <img src="${logo}" alt="${ProductCardUI.escapeHtml(s.name)}" class="w-12 h-12 rounded-xl object-cover bg-slate-100 flex-shrink-0 border border-slate-100">
-              <div class="min-w-0 flex-1">
-                <h4 class="text-xs font-extrabold text-slate-900 group-hover:text-emerald-600 truncate flex items-center gap-1">
-                  <span class="truncate">${ProductCardUI.escapeHtml(s.name)}</span>
-                  ${verifiedBadge}
-                </h4>
-                <p class="text-[10px] text-slate-500 truncate mt-0.5">${ProductCardUI.escapeHtml(s.address || 'Quetzaltenango')}</p>
-              </div>
-            </a>
-          `;
-        }).join('');
-
-        const extraStoreCard = `
-          <a href="tiendas.html"
-             class="bg-emerald-50 hover:bg-emerald-100 border border-emerald-200/80 rounded-2xl p-3.5 flex flex-col items-center justify-center text-center flex-shrink-0 w-44 snap-start shadow-sm transition group">
-            <span class="text-2xl mb-1 group-hover:scale-110 transition-transform">🏪</span>
-            <span class="text-xs font-black text-emerald-800">Ver todas las tiendas</span>
-            <span class="text-[10px] text-emerald-600 font-bold mt-0.5">Explorar directorio →</span>
-          </a>
-        `;
-
-        storesCarousel.innerHTML = storesHtml + extraStoreCard;
-
-      } catch (err) {
-        console.warn('[Index] Error al cargar tiendas destacadas:', err);
-      }
-    }
-
-    async function loadFeaturedProducts() {
-      try {
-        const featured = await ProductsService.getFeaturedProducts(10);
-        if (!featured || featured.length === 0) {
-          featuredSection.classList.add('hidden');
-          return;
-        }
-        featured.forEach(p => loadedProductsMap.set(String(p.id), p));
-        featuredSection.classList.remove('hidden');
-        featuredList.innerHTML = featured.map(p => ProductCardUI.render(p, { isFeatured: true })).join('');
-      } catch (err) {}
-    }
-
-    async function loadProductsPage(reset = false) {
-      if (isLoading) return;
-      if (reset) {
-        currentPage = 0;
-        hasMore = true;
-        loadedProductsMap.clear();
-        grid.innerHTML = '';
-      }
-      if (!hasMore) return;
-      isLoading = true;
-
-      try {
-        const res = await ProductsService.getProducts({
-          page: currentPage,
-          limit: ProductsService.PAGE_SIZE,
-          categorySlug: currentCategory,
-          searchTerm: searchTerm,
-          sortBy: currentSort,
-          minPrice: minPrice,
-          maxPrice: maxPrice
-        });
-
-        res.products.forEach(p => loadedProductsMap.set(String(p.id), p));
-
-        if (reset && res.products.length === 0) {
-          grid.innerHTML = '<p class="col-span-full text-center text-slate-500 py-12 text-xs font-semibold">No se encontraron productos.</p>';
-        } else {
-          grid.insertAdjacentHTML('beforeend', res.products.map(p => ProductCardUI.render(p)).join(''));
-        }
-
-        hasMore = res.hasMore;
-        currentPage++;
-      } catch (err) {
-        console.error('[Index] Error cargando catálogo:', err);
-      } finally {
-        isLoading = false;
-      }
-    }
-
-    function resetAndReload() { loadProductsPage(true); }
-
-    const triggerPredictiveSearch = debounce(async (val) => {
-      const term = val.trim();
-      if (term.length < 2) { predictiveResults.classList.add('hidden'); return; }
-      try {
-        const results = await ProductsService.searchPredictive(term, 6);
-        predictiveCache = results;
-
-        const escTerm = ProductCardUI.escapeHtml(term);
-        const viewAllFooter = `
-          <div data-action="view-all-results"
-            class="p-3 bg-slate-50 hover:bg-emerald-50 border-t border-slate-200 text-center cursor-pointer transition relative z-20 flex items-center justify-center gap-1.5 font-extrabold text-xs text-emerald-700">
-            <span>Ver todos los resultados para "${escTerm}"</span>
-            <span>→</span>
-          </div>`;
-
-        if (!results || results.length === 0) {
-          predictiveResults.innerHTML = `
-            <div class="p-4 text-center text-xs text-slate-500 font-medium">Sin coincidencias exactas</div>
-            ${viewAllFooter}`;
-          predictiveResults.classList.remove('hidden');
-          return;
-        }
-
-        const itemsHtml = results.map(p => `
-          <div class="predictive-item p-2.5 hover:bg-emerald-50 transition cursor-pointer flex items-center gap-3 border-b last:border-0" data-product-id="${p.id}">
-            <img src="${p.image_url || window.PLACEHOLDER_IMG}" class="w-11 h-11 rounded-xl object-cover bg-slate-100 flex-shrink-0">
-            <div class="flex-1 min-w-0"><h4 class="text-xs font-bold text-slate-900 truncate">${ProductCardUI.escapeHtml(p.title)}</h4></div>
-            <span class="text-xs font-black text-emerald-600">Q ${parseFloat(p.price).toFixed(2)}</span>
-          </div>`).join('');
-
-        predictiveResults.innerHTML = itemsHtml + viewAllFooter;
-        predictiveResults.classList.remove('hidden');
-      } catch (e) {}
-    }, 300);
-
-    searchInput?.addEventListener('input', (e) => {
-      const val = e.target.value;
-      if (val) clearSearchBtn.classList.remove('hidden');
-      else { clearSearchBtn.classList.add('hidden'); predictiveResults.classList.add('hidden'); }
-      triggerPredictiveSearch(val);
-    });
-
-    searchInput?.addEventListener('keydown', (e) => {
-      if (e.key === 'Enter') {
-        e.preventDefault();
-        searchTerm = searchInput.value.trim();
-        predictiveResults.classList.add('hidden');
-        resetAndReload();
-      }
-    });
-
-    predictiveResults?.addEventListener('click', (e) => {
-      const viewAllBtn = e.target.closest('[data-action="view-all-results"]');
-      if (viewAllBtn) {
-        searchTerm = searchInput.value.trim();
-        predictiveResults.classList.add('hidden');
-        resetAndReload();
-        return;
-      }
-
-      const item = e.target.closest('.predictive-item');
-      if (item) {
-        const matched = predictiveCache.find(x => String(x.id) === String(item.dataset.productId));
-        if (matched) { loadedProductsMap.set(String(matched.id), matched); predictiveResults.classList.add('hidden'); openProductModal(matched); }
-      }
-    });
-
-    clearSearchBtn?.addEventListener('click', () => { searchInput.value = ''; searchTerm = ''; clearSearchBtn.classList.add('hidden'); predictiveResults.classList.add('hidden'); resetAndReload(); });
-
-    document.addEventListener('click', (e) => {
-      if (searchInput && predictiveResults && !searchInput.contains(e.target) && !predictiveResults.contains(e.target)) predictiveResults.classList.add('hidden');
-    });
-
-    minPriceInput?.addEventListener('input', debounce(() => { minPrice = minPriceInput.value.trim() || null; clearPriceBtn.classList.toggle('hidden', !minPrice && !maxPrice); resetAndReload(); }, 350));
-    maxPriceInput?.addEventListener('input', debounce(() => { maxPrice = maxPriceInput.value.trim() || null; clearPriceBtn.classList.toggle('hidden', !minPrice && !maxPrice); resetAndReload(); }, 350));
-    clearPriceBtn?.addEventListener('click', () => { minPriceInput.value = ''; maxPriceInput.value = ''; minPrice = null; maxPrice = null; clearPriceBtn.classList.add('hidden'); resetAndReload(); });
-    sortSelect?.addEventListener('change', (e) => { currentSort = e.target.value; resetAndReload(); });
-
-    function handleProductActionClick(e) {
-      const favBtn = e.target.closest('[data-action="toggle-fav"]');
-      if (favBtn) {
-        e.preventDefault(); e.stopPropagation();
-        const pid = favBtn.dataset.productId;
-        const nowFav = window.Favorites.toggle(pid);
-        document.querySelectorAll(`[data-action="toggle-fav"][data-product-id="${pid}"]`).forEach(btn => {
-          btn.classList.toggle('fav-active', nowFav);
-          btn.style.color = nowFav ? '#ef4444' : '';
-          btn.innerHTML = window.heartSVG(nowFav);
-        });
-        updateFavCount();
-        return;
-      }
-
-      const cartBtn = e.target.closest('[data-action="add-cart"]');
-      if (cartBtn) {
-        e.preventDefault(); e.stopPropagation();
-        const pid = cartBtn.dataset.productId;
-        const product = loadedProductsMap.get(String(pid));
-        if (product && window.PasajeCart) {
-          window.PasajeCart.addToCart({
-            id: product.id, title: product.title, price: product.price,
-            image_url: product.image_url, storeId: product.store_id,
-            storeName: product.store_name, storeWhatsapp: product.store_whatsapp
-          });
-        }
-        return;
-      }
-
-      const card = e.target.closest('.product-card');
-      if (card) {
-        const product = loadedProductsMap.get(String(card.dataset.productId));
-        if (product) openProductModal(product);
-      }
-    }
-
-    grid.addEventListener('click', handleProductActionClick);
-    featuredList?.addEventListener('click', handleProductActionClick);
-    flashSalesList?.addEventListener('click', handleProductActionClick);
-
-    productModal?.addEventListener('click', (e) => {
-      const prevProdBtn = e.target.closest('#modalPrevProductBtn');
-      if (prevProdBtn) {
-        navigateModalProduct(-1);
-        return;
-      }
-
-      const nextProdBtn = e.target.closest('#modalNextProductBtn');
-      if (nextProdBtn) {
-        navigateModalProduct(1);
-        return;
-      }
-
-      const p = activeModalProducts[activeProductIndex];
-      if (!p) return;
-
-      const imgs = Array.isArray(p.images) && p.images.length > 0 ? p.images : [window.PLACEHOLDER_IMG];
-
-      const thumbBtn = e.target.closest('[data-gallery-thumb]');
-      if (thumbBtn) {
-        activeGalleryIndex = parseInt(thumbBtn.dataset.galleryIndex || '0', 10);
-        updateModalGalleryView(imgs);
-        return;
-      }
-
-      const prevImgBtn = e.target.closest('[data-gallery-nav="prev"]');
-      if (prevImgBtn) {
-        activeGalleryIndex = (activeGalleryIndex - 1 + imgs.length) % imgs.length;
-        updateModalGalleryView(imgs);
-        return;
-      }
-
-      const nextImgBtn = e.target.closest('[data-gallery-nav="next"]');
-      if (nextImgBtn) {
-        activeGalleryIndex = (activeGalleryIndex + 1) % imgs.length;
-        updateModalGalleryView(imgs);
-        return;
-      }
-    });
-
-    function updateModalGalleryView(imgs) {
-      const url = imgs[activeGalleryIndex];
-      const mainImg = productModalContent.querySelector('#mainGalleryViewer');
-      const idxBadge = productModalContent.querySelector('#galleryCurrentIdx');
-
-      if (mainImg && url) {
-        mainImg.src = url;
-        if (idxBadge) idxBadge.textContent = activeGalleryIndex + 1;
-
-        productModalContent.querySelectorAll('.gallery-thumb').forEach((b, idx) => {
-          if (idx === activeGalleryIndex) {
-            b.classList.remove('border-transparent', 'opacity-70', 'hover:opacity-100');
-            b.classList.add('border-emerald-500', 'scale-95', 'shadow-sm');
-          } else {
-            b.classList.remove('border-emerald-500', 'scale-95', 'shadow-sm');
-            b.classList.add('border-transparent', 'opacity-70', 'hover:opacity-100');
-          }
-        });
-      }
-    }
-
-    function navigateModalProduct(dir) {
-      if (!activeModalProducts || activeModalProducts.length === 0) return;
-      const nextIdx = activeProductIndex + dir;
-      if (nextIdx >= 0 && nextIdx < activeModalProducts.length) {
-        openProductModal(activeModalProducts[nextIdx], activeModalProducts, nextIdx);
-      }
-    }
-
-    document.addEventListener('keydown', (e) => {
-      const isModalOpen = productModal && !productModal.classList.contains('hidden');
-
-      if (e.key === 'Escape') {
-        if (isModalOpen) {
-          productModal.classList.add('hidden');
-          document.body.style.overflow = '';
-        }
-        if (window.PasajeCart && typeof window.PasajeCart.closeDrawer === 'function') {
-          window.PasajeCart.closeDrawer();
-        }
-        return;
-      }
-
-      if (!isModalOpen) return;
-
-      const p = activeModalProducts[activeProductIndex];
-      const imgs = (p && Array.isArray(p.images) && p.images.length > 0) ? p.images : [window.PLACEHOLDER_IMG];
-
-      if (e.key === 'ArrowUp' || (e.altKey && e.key === 'ArrowLeft')) {
-        e.preventDefault();
-        navigateModalProduct(-1);
-        return;
-      }
-
-      if (e.key === 'ArrowDown' || (e.altKey && e.key === 'ArrowRight')) {
-        e.preventDefault();
-        navigateModalProduct(1);
-        return;
-      }
-
-      if (e.key === 'ArrowLeft') {
-        e.preventDefault();
-        if (imgs.length > 1) {
-          activeGalleryIndex = (activeGalleryIndex - 1 + imgs.length) % imgs.length;
-          updateModalGalleryView(imgs);
-        } else {
-          navigateModalProduct(-1);
-        }
-        return;
-      }
-
-      if (e.key === 'ArrowRight') {
-        e.preventDefault();
-        if (imgs.length > 1) {
-          activeGalleryIndex = (activeGalleryIndex + 1) % imgs.length;
-          updateModalGalleryView(imgs);
-        } else {
-          navigateModalProduct(1);
-        }
-        return;
-      }
-    });
-
-    async function openProductModal(p, list = null, index = -1) {
-      if (list && Array.isArray(list) && list.length > 0) {
-        activeModalProducts = list;
-        activeProductIndex = index >= 0 ? index : list.findIndex(x => String(x.id) === String(p.id));
+      // =============================================================
+      // INIT
+      // =============================================================
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', loadAdBanners);
       } else {
-        activeModalProducts = Array.from(loadedProductsMap.values());
-        activeProductIndex = activeModalProducts.findIndex(x => String(x.id) === String(p.id));
+        loadAdBanners();
       }
-
-      if (activeProductIndex === -1) {
-        activeModalProducts.push(p);
-        activeProductIndex = activeModalProducts.length - 1;
-      }
-
-      activeGalleryIndex = 0;
-
-      const hasPrevProduct = activeProductIndex > 0;
-      const hasNextProduct = activeProductIndex < activeModalProducts.length - 1;
-
-      if (modalProductNavWrapper) {
-        modalProductNavWrapper.innerHTML = `
-          ${hasPrevProduct ? `
-            <button type="button" id="modalPrevProductBtn"
-              class="absolute -left-3 sm:-left-12 top-1/2 -translate-y-1/2 z-50 bg-white hover:bg-slate-100 text-slate-900 w-11 h-11 rounded-full shadow-2xl border border-slate-200 flex items-center justify-center font-black text-2xl transition transform hover:scale-110 active:scale-95"
-              title="Producto Anterior (Alt + ← / ↑)">‹</button>` : ''}
-
-          ${hasNextProduct ? `
-            <button type="button" id="modalNextProductBtn"
-              class="absolute -right-3 sm:-right-12 top-1/2 -translate-y-1/2 z-50 bg-white hover:bg-slate-100 text-slate-900 w-11 h-11 rounded-full shadow-2xl border border-slate-200 flex items-center justify-center font-black text-2xl transition transform hover:scale-110 active:scale-95"
-              title="Producto Siguiente (Alt + → / ↓)">›</button>` : ''}
-        `;
-      }
-
-      const galleryHTML = ProductCardUI.renderGalleryHTML(p.images, p.title, 0);
-      const variantsHTML = ProductCardUI.renderVariantsHTML(p.variants);
-
-      productModalContent.innerHTML = `
-        <div class="relative">
-          <button id="closeProductModalBtn" class="absolute top-3 right-3 z-20 bg-white/90 hover:bg-white text-slate-800 w-8 h-8 rounded-full shadow flex items-center justify-center font-bold text-xs transition">✕</button>
-          <div class="p-4 sm:p-5 pb-0">${galleryHTML}</div>
-        </div>
-        <div class="p-5">
-          <span class="text-[10px] uppercase font-extrabold text-blue-700 bg-blue-50 px-2 py-0.5 rounded">
-            ${p.category_icon || '📦'} ${ProductCardUI.escapeHtml(p.category_name || 'General')}
-          </span>
-          <h2 class="text-lg font-extrabold text-slate-900 mt-1">${ProductCardUI.escapeHtml(p.title)}</h2>
-          <p class="text-2xl font-black text-emerald-600 mt-2">Q ${parseFloat(p.price).toFixed(2)}</p>
-          ${p.description ? `<p class="text-xs text-slate-600 mt-2 leading-relaxed">${ProductCardUI.escapeHtml(p.description)}</p>` : ''}
-          ${variantsHTML}
-          <div class="mt-5 space-y-2">
-            <button type="button" id="modalAddToCartBtn" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-xs transition">🛒 Añadir al carrito</button>
-            <a href="${ProductCardUI.buildWAUrl(p, null, p.price)}" target="_blank" rel="noopener noreferrer"
-               class="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-bold py-3 rounded-xl text-xs transition shadow flex items-center justify-center gap-2">Pedir por WhatsApp</a>
-          </div>
-        </div>`;
-
-      productModal.classList.remove('hidden');
-      document.body.style.overflow = 'hidden';
-
-      document.getElementById('closeProductModalBtn').onclick = () => { productModal.classList.add('hidden'); document.body.style.overflow = ''; };
-      document.getElementById('modalAddToCartBtn').onclick = () => {
-        if (window.PasajeCart) {
-          window.PasajeCart.addToCart({
-            id: p.id, title: p.title, price: p.price, image_url: p.image_url,
-            storeId: p.store_id, storeName: p.store_name, storeWhatsapp: p.store_whatsapp
-          });
-          productModal.classList.add('hidden'); document.body.style.overflow = '';
-        }
-      };
-    }
-
-    try { updateFavCount(); } catch (e) {}
-    try { loadHeroBanners(); } catch (e) {}
-    try { loadFlashSales(); } catch (e) {}
-    try { loadFeaturedStores(); } catch (e) {}
-    try { loadFeaturedProducts(); } catch (e) {}
-    try { loadProductsPage(true); } catch (e) {}
+    })();
   </script>
-
-<!-- BANNER DE INSTALACIÓN PWA -->
-<div id="pwaInstallBanner" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] max-w-md w-[92%] sm:w-auto">
-  <div class="bg-slate-900/95 backdrop-blur-md text-white rounded-3xl p-4 shadow-2xl border border-white/10 flex items-center gap-3">
-    <div class="w-12 h-12 rounded-2xl bg-gradient-to-br from-emerald-400 to-emerald-600 flex items-center justify-center text-2xl flex-shrink-0">📲</div>
-    <div class="flex-1 min-w-0">
-      <p class="font-black text-sm">Instala Pasaje de los Altos</p>
-      <p class="text-[11px] text-white/70 mt-0.5">Acceso rápido desde tu pantalla de inicio</p>
-    </div>
-    <div class="flex flex-col gap-1.5 flex-shrink-0">
-      <button type="button" id="pwaInstallBtn" class="bg-emerald-500 hover:bg-emerald-600 text-white font-extrabold text-xs px-3 py-2 rounded-xl transition shadow">
-        Instalar
-      </button>
-      <button type="button" id="pwaInstallClose" class="text-white/50 hover:text-white/80 text-[10px] font-bold">
-        Ahora no
-      </button>
-    </div>
-  </div>
-</div>
-
-<script>
-  // =============================================================
-  // PWA Install prompt
-  // =============================================================
-  (function () {
-    let deferredPrompt = null;
-
-    const banner = document.getElementById('pwaInstallBanner');
-    const installBtn = document.getElementById('pwaInstallBtn');
-    const closeBtn = document.getElementById('pwaInstallClose');
-
-    // Si ya está instalada, no mostrar
-    const isStandalone =
-      window.matchMedia('(display-mode: standalone)').matches ||
-      window.navigator.standalone === true;
-
-    if (isStandalone) return;
-
-    // Si el usuario ya la cerró recientemente, no volver a mostrar
-    const lastDismiss = localStorage.getItem('pasaje_pwa_dismissed');
-    const dismissedRecently = lastDismiss && (Date.now() - parseInt(lastDismiss, 10) < 1000 * 60 * 60 * 24 * 7);
-
-    window.addEventListener('beforeinstallprompt', (e) => {
-      e.preventDefault();
-      deferredPrompt = e;
-      if (!dismissedRecently) {
-        banner.classList.remove('hidden');
-      }
-    });
-
-    installBtn?.addEventListener('click', async () => {
-      if (!deferredPrompt) return;
-      banner.classList.add('hidden');
-      deferredPrompt.prompt();
-      const result = await deferredPrompt.userChoice;
-      if (result.outcome === 'accepted') {
-        console.log('[PWA] Instalada');
-      }
-      deferredPrompt = null;
-    });
-
-    closeBtn?.addEventListener('click', () => {
-      banner.classList.add('hidden');
-      try { localStorage.setItem('pasaje_pwa_dismissed', String(Date.now())); } catch (e) {}
-    });
-  })();
-
-  // =============================================================
-  // Registro del Service Worker
-  // =============================================================
-  if ('serviceWorker' in navigator) {
-    window.addEventListener('load', () => {
-      navigator.serviceWorker.register('sw.js', { updateViaCache: 'none' })
-        .then((reg) => {
-          // Detectar nueva versión
-          reg.addEventListener('updatefound', () => {
-            const nw = reg.installing;
-            if (!nw) return;
-            nw.addEventListener('statechange', () => {
-              if (nw.state === 'installed' && navigator.serviceWorker.controller) {
-                nw.postMessage('SKIP_WAITING');
-              }
-            });
-          });
-        })
-        .catch((err) => console.warn('[SW] registro falló:', err));
-
-      let reloading = false;
-      navigator.serviceWorker.addEventListener('controllerchange', () => {
-        if (reloading) return;
-        reloading = true;
-        window.location.reload();
-      });
-    });
-  }
-</script>
 
 </body>
 </html>
