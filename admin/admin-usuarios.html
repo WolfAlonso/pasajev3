@@ -1,0 +1,1343 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Gestión de Usuarios, Vendedores y Auditoría · Admin</title>
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=7"></script>
+  <script src="../js/theme-loader.js?v=7"></script>
+  <script src="../js/admin-utils.js?v=7"></script>
+  <script src="../js/admin-sidebar.js?v=3"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .glass-container {
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+    .audit-tab-btn { transition: all .15s ease; }
+    @keyframes auditPulse {
+      0%, 100% { opacity: 1; }
+      50%      { opacity: .55; }
+    }
+    .audit-live-dot {
+      display: inline-block; width: 8px; height: 8px; border-radius: 50%;
+      background: #10b981; margin-right: 6px;
+      animation: auditPulse 1.6s ease-in-out infinite;
+    }
+    .target-chip {
+      display: inline-flex; align-items: center; gap: 6px;
+      background: rgba(30, 58, 138, .08);
+      border: 1px solid rgba(30, 58, 138, .18);
+      border-radius: 999px;
+      padding: 3px 10px;
+      font-size: 11px; font-weight: 700;
+      color: #1e3a8a;
+    }
+    .target-chip.driver {
+      background: rgba(5, 150, 105, .08);
+      border-color: rgba(5, 150, 105, .2);
+      color: #047857;
+    }
+    .sanction-modal-backdrop {
+      background: rgba(15, 23, 42, 0.65);
+      backdrop-filter: blur(6px);
+      -webkit-backdrop-filter: blur(6px);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-7xl mx-auto p-4 pb-16">
+    <div id="adminTabs"></div>
+
+    <div id="loadingState" class="glass-container rounded-2xl p-8 text-center text-sm text-slate-500 shadow-sm">
+      Cargando panel de usuarios y auditoría...
+    </div>
+
+    <section id="content" class="hidden space-y-5">
+
+      <!-- PESTAÑAS PRINCIPALES -->
+      <div class="bg-white p-1.5 rounded-2xl border shadow-sm grid grid-cols-2 gap-2 text-xs font-bold">
+        <button type="button" id="tabUsersBtn" class="py-2.5 rounded-xl bg-slate-900 text-white shadow-sm transition">👥 Usuarios & Vendedores</button>
+        <button type="button" id="tabAuditBtn" class="py-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition">⚠️ Auditoría de Cancelaciones</button>
+      </div>
+
+      <!-- SECCIÓN 1: GESTIÓN DE USUARIOS -->
+      <div id="secUsers" class="space-y-5">
+        <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+          <div class="glass-container rounded-2xl p-4 shadow-sm border border-slate-200/80">
+            <p class="text-[11px] font-bold text-slate-500 uppercase tracking-wider">Total Registrados</p>
+            <p id="statTotal" class="text-2xl font-black text-slate-800 mt-1">—</p>
+          </div>
+          <div class="glass-container rounded-2xl p-4 shadow-sm border border-purple-200/80 bg-purple-50/30">
+            <p class="text-[11px] font-bold text-purple-700 uppercase tracking-wider">🛡️ Administradores</p>
+            <p id="statAdmins" class="text-2xl font-black text-purple-700 mt-1">—</p>
+          </div>
+          <div class="glass-container rounded-2xl p-4 shadow-sm border border-blue-200/80 bg-blue-50/30">
+            <p class="text-[11px] font-bold text-blue-700 uppercase tracking-wider">🏪 Con Tienda Activa</p>
+            <p id="statWithStore" class="text-2xl font-black text-blue-700 mt-1">—</p>
+          </div>
+          <div class="glass-container rounded-2xl p-4 shadow-sm border border-emerald-200/80 bg-emerald-50/30">
+            <p class="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">🛵 Repartidores</p>
+            <p id="statDelivery" class="text-2xl font-black text-emerald-700 mt-1">—</p>
+          </div>
+          <div class="glass-container rounded-2xl p-4 shadow-sm border border-indigo-200/80 bg-indigo-50/30">
+            <p class="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">🏠 Agentes Inmuebles</p>
+            <p id="statRealEstate" class="text-2xl font-black text-indigo-700 mt-1">—</p>
+          </div>
+        </div>
+
+        <div class="glass-container rounded-2xl p-4 shadow-sm border border-slate-200/80 flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div class="flex flex-col sm:flex-row gap-2 w-full sm:w-auto flex-1">
+            <div class="relative flex-1">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="h-4 w-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+              </div>
+              <input id="userSearch" type="text" placeholder="Buscar por nombre, email, teléfono o tienda..."
+                class="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 outline-none bg-white">
+            </div>
+            <select id="userFilter"
+              class="border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold bg-white focus:ring-2 focus:ring-amber-500 outline-none cursor-pointer">
+              <option value="all">Todos los usuarios</option>
+              <option value="admins">🛡️ Solo Administradores</option>
+              <option value="vendedores">🏪 Solo Vendedores (Con Tienda)</option>
+              <option value="delivery">🛵 Solo Repartidores</option>
+              <option value="real_estate">🏠 Solo Agentes / Inmuebles</option>
+              <option value="no-store">👤 Sin Tienda Asignada</option>
+              <option value="suspended">🚫 Cuentas Suspendidas</option>
+            </select>
+          </div>
+
+          <button id="btnCreateUser" type="button"
+            class="w-full sm:w-auto bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition shadow-sm flex items-center justify-center gap-2">
+            <span>➕</span>
+            <span>Crear Nuevo Usuario / Agente</span>
+          </button>
+        </div>
+
+        <div id="usersList" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden divide-y divide-slate-100">
+          <p class="p-8 text-center text-sm text-slate-500">Cargando usuarios...</p>
+        </div>
+      </div>
+
+      <!-- SECCIÓN 2: AUDITORÍA -->
+      <div id="secAudit" class="hidden space-y-4">
+
+        <div class="glass-container rounded-2xl p-4 shadow-sm border border-slate-200/80 flex justify-between items-center flex-wrap gap-3">
+          <div>
+            <h2 class="text-base font-black text-slate-900 flex items-center gap-2">
+              <span class="audit-live-dot"></span>
+              ⚠️ Panel de Auditoría de Cancelaciones
+            </h2>
+            <p class="text-xs text-slate-500 mt-0.5">Gestión completa: sancionar con motivo y revocar cuando corresponda.</p>
+          </div>
+          <button type="button" id="btnRefreshAudit" class="text-xs font-bold bg-slate-900 text-white px-3 py-1.5 rounded-xl transition">🔄 Actualizar</button>
+        </div>
+
+        <!-- SUB-PESTAÑAS -->
+        <div class="bg-white p-1.5 rounded-2xl border shadow-sm grid grid-cols-2 gap-2 text-xs font-bold">
+          <button type="button" id="auditTabPendingBtn" class="audit-tab-btn py-2.5 rounded-xl bg-slate-900 text-white shadow-sm">
+            🔴 Disputas Pendientes
+            <span id="auditPendingCount" class="ml-1.5 inline-block min-w-[20px] bg-rose-500 text-white text-[10px] font-black px-1.5 py-0.5 rounded-full">0</span>
+          </button>
+          <button type="button" id="auditTabResolvedBtn" class="audit-tab-btn py-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200">
+            📜 Historial de Resueltas
+            <span id="auditResolvedCount" class="ml-1.5 inline-block min-w-[20px] bg-slate-300 text-slate-800 text-[10px] font-black px-1.5 py-0.5 rounded-full">0</span>
+          </button>
+        </div>
+
+        <!-- PANEL A: PENDIENTES -->
+        <div id="auditPanePending" class="space-y-3">
+          <div id="auditListPending" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden divide-y divide-slate-100">
+            <p class="p-8 text-center text-sm text-slate-500">Cargando disputas pendientes...</p>
+          </div>
+        </div>
+
+        <!-- PANEL B: RESUELTAS -->
+        <div id="auditPaneResolved" class="hidden space-y-3">
+          <div class="glass-container rounded-2xl p-3 shadow-sm border border-slate-200/80 flex flex-col sm:flex-row gap-2 items-center">
+            <div class="relative flex-1 w-full">
+              <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg class="h-4 w-4 text-slate-400" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+                </svg>
+              </div>
+              <input id="auditResolvedSearch" type="text"
+                placeholder="Buscar por ID, nombre, tienda o piloto..."
+                class="w-full pl-10 pr-4 py-2.5 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-amber-500 outline-none bg-white">
+            </div>
+            <select id="auditResolvedFilter"
+              class="border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold bg-white outline-none cursor-pointer">
+              <option value="all">Todas las resoluciones</option>
+              <option value="approved_no_sanction">✅ Sin Sanción</option>
+              <option value="warning_24h">⚠️ Sanción 24h</option>
+              <option value="suspension_7d">🚨 Sanción 7d</option>
+              <option value="revoked">🔄 Revocadas</option>
+            </select>
+          </div>
+
+          <div id="auditListResolved" class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden divide-y divide-slate-100">
+            <p class="p-8 text-center text-sm text-slate-500">Cargando historial...</p>
+          </div>
+        </div>
+
+      </div>
+
+    </section>
+  </main>
+
+  <!-- MODAL DE SANCIÓN (con motivo obligatorio) -->
+  <div id="sanctionModal" class="hidden fixed inset-0 z-[60] sanction-modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-slate-100 overflow-hidden">
+      <div id="sanctionModalHeader" class="px-6 py-4 border-b border-slate-100">
+        <div class="flex items-start gap-3">
+          <div id="sanctionModalIcon" class="w-10 h-10 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 bg-rose-100 text-rose-800">⚠️</div>
+          <div class="flex-1 min-w-0">
+            <h3 id="sanctionModalTitle" class="text-base font-black text-slate-900">Aplicar Sanción</h3>
+            <p id="sanctionModalSubtitle" class="text-xs text-slate-500 mt-0.5">—</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <div id="sanctionTargetBox" class="rounded-2xl bg-slate-50 border border-slate-200 p-3 text-xs space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-500 uppercase text-[10px]">Se sanciona a</span>
+            <span id="sanctionTargetBadge" class="target-chip">—</span>
+          </div>
+          <p id="sanctionTargetName" class="font-black text-slate-900 text-sm">—</p>
+          <p id="sanctionTargetDetail" class="text-slate-600">—</p>
+        </div>
+
+        <div id="sanctionDurationBox" class="rounded-2xl bg-rose-50 border border-rose-200 p-3 text-xs space-y-1.5">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-rose-900 uppercase text-[10px]">Suspensión</span>
+            <span id="sanctionDurationChip" class="text-[10px] font-black bg-rose-200 text-rose-900 px-2 py-0.5 rounded-full">—</span>
+          </div>
+          <p id="sanctionDurationText" class="text-rose-800 font-semibold">—</p>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">
+            Motivo del dictamen <span class="text-rose-500">*</span>
+          </label>
+          <textarea id="sanctionReasonInput" rows="3" minlength="10" maxlength="500"
+            placeholder="Explica por qué se aplica esta sanción. Mínimo 10 caracteres. Este texto queda guardado en la auditoría."
+            class="w-full border border-slate-300 p-3 rounded-xl text-xs outline-none focus:ring-2 focus:ring-rose-500 bg-slate-50 font-medium resize-none"></textarea>
+          <div class="flex justify-between mt-1">
+            <p class="text-[10px] text-slate-400">Obligatorio</p>
+            <p class="text-[10px] text-slate-400"><span id="sanctionReasonCount">0</span>/500</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-2">
+        <button type="button" id="sanctionModalCancel" class="bg-white hover:bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl text-xs border border-slate-200 transition">Cancelar</button>
+        <button type="button" id="sanctionModalConfirm" class="bg-rose-600 hover:bg-rose-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow">
+          Confirmar Sanción
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL DE REVOCACIÓN -->
+  <div id="revokeModal" class="hidden fixed inset-0 z-[60] sanction-modal-backdrop flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full border border-slate-100 overflow-hidden">
+      <div class="px-6 py-4 border-b border-slate-100">
+        <div class="flex items-start gap-3">
+          <div class="w-10 h-10 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 bg-emerald-100 text-emerald-800">🔄</div>
+          <div class="flex-1 min-w-0">
+            <h3 class="text-base font-black text-slate-900">Revocar Sanción</h3>
+            <p id="revokeModalSubtitle" class="text-xs text-slate-500 mt-0.5">—</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="p-6 space-y-4">
+        <div class="rounded-2xl bg-amber-50 border border-amber-200 p-3 text-xs space-y-1">
+          <p class="font-bold text-amber-900 text-[10px] uppercase">Al revocar se hará lo siguiente:</p>
+          <ul class="text-amber-800 space-y-0.5 text-[11px] list-disc list-inside">
+            <li>Se eliminará la suspensión activa (<code>suspended_until = NULL</code>)</li>
+            <li>El target quedará activo nuevamente</li>
+            <li>La resolución anterior quedará marcada como revocada</li>
+          </ul>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">
+            Motivo de la revocación <span class="text-rose-500">*</span>
+          </label>
+          <textarea id="revokeReasonInput" rows="3" minlength="10" maxlength="500"
+            placeholder="Explica por qué se revoca esta sanción. Mínimo 10 caracteres."
+            class="w-full border border-slate-300 p-3 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500 bg-slate-50 font-medium resize-none"></textarea>
+          <div class="flex justify-between mt-1">
+            <p class="text-[10px] text-slate-400">Obligatorio</p>
+            <p class="text-[10px] text-slate-400"><span id="revokeReasonCount">0</span>/500</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="px-6 py-4 bg-slate-50 border-t border-slate-100 grid grid-cols-2 gap-2">
+        <button type="button" id="revokeModalCancel" class="bg-white hover:bg-slate-100 text-slate-700 font-bold py-2.5 rounded-xl text-xs border border-slate-200 transition">Cancelar</button>
+        <button type="button" id="revokeModalConfirm" class="bg-emerald-600 hover:bg-emerald-700 disabled:opacity-50 disabled:cursor-not-allowed text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow">
+          Confirmar Revocación
+        </button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL USUARIOS (existente) -->
+  <div id="userModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-xl w-full max-h-[92vh] overflow-y-auto border border-slate-100">
+      <div id="userModalContent" class="p-6"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentAdmin = null;
+    let allUsers = [];
+    let allStores = [];
+    let userRolesMap = {};
+    let storeByUser = {};
+    let auditPendingCache = [];
+    let auditResolvedCache = [];
+    let auditActiveTab = 'pending';
+
+    // Estado del modal de sanción / revocación en curso
+    let sanctionContext = null;
+    let revokeContext = null;
+
+    const modal = document.getElementById('userModal');
+
+    (async () => {
+      const session = await adminGuardPage();
+      if (!session) return;
+      currentAdmin = session.user;
+      await initAdminNav({ user: session.user });
+
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+
+      setupTabs();
+      setupAuditTabs();
+      setupSanctionModal();
+      setupRevokeModal();
+      await reloadData();
+
+      document.getElementById('userSearch').addEventListener('input', renderUsers);
+      document.getElementById('userFilter').addEventListener('change', renderUsers);
+      document.getElementById('btnCreateUser').addEventListener('click', () => openUserModal(null));
+
+      document.getElementById('auditResolvedSearch').addEventListener('input', () => renderAuditResolved());
+      document.getElementById('auditResolvedFilter').addEventListener('change', () => renderAuditResolved());
+
+      document.getElementById('btnRefreshAudit').addEventListener('click', loadAuditCases);
+
+      if (window.PasajeRealtime) {
+        const debounced = PasajeRealtime.debounce(() => loadAuditCases(), 400);
+        PasajeRealtime.subscribeToTable(
+          'audit_delivery_requests_changes',
+          'delivery_requests',
+          null,
+          () => { if (!document.getElementById('secAudit').classList.contains('hidden')) debounced(); }
+        );
+      }
+    })();
+
+    function setupTabs() {
+      const bU = document.getElementById('tabUsersBtn'), bA = document.getElementById('tabAuditBtn');
+      const sU = document.getElementById('secUsers'), sA = document.getElementById('secAudit');
+
+      bU.onclick = () => {
+        sU.classList.remove('hidden'); sA.classList.add('hidden');
+        bU.className = 'py-2.5 rounded-xl bg-slate-900 text-white shadow-sm transition';
+        bA.className = 'py-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
+      };
+
+      bA.onclick = () => {
+        sA.classList.remove('hidden'); sU.classList.add('hidden');
+        bA.className = 'py-2.5 rounded-xl bg-slate-900 text-white shadow-sm transition';
+        bU.className = 'py-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200 transition';
+        loadAuditCases();
+      };
+    }
+
+    function setupAuditTabs() {
+      const bP = document.getElementById('auditTabPendingBtn');
+      const bR = document.getElementById('auditTabResolvedBtn');
+      const pP = document.getElementById('auditPanePending');
+      const pR = document.getElementById('auditPaneResolved');
+
+      bP.onclick = () => {
+        auditActiveTab = 'pending';
+        pP.classList.remove('hidden'); pR.classList.add('hidden');
+        bP.className = 'audit-tab-btn py-2.5 rounded-xl bg-slate-900 text-white shadow-sm';
+        bR.className = 'audit-tab-btn py-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200';
+      };
+
+      bR.onclick = () => {
+        auditActiveTab = 'resolved';
+        pR.classList.remove('hidden'); pP.classList.add('hidden');
+        bR.className = 'audit-tab-btn py-2.5 rounded-xl bg-slate-900 text-white shadow-sm';
+        bP.className = 'audit-tab-btn py-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200';
+        renderAuditResolved();
+      };
+    }
+
+    async function reloadData() {
+      await Promise.all([loadStores(), loadUserRoles(), loadUsers()]);
+    }
+
+    async function loadStores() {
+      const { data } = await _supabase.from('stores').select('id, user_id, name, slug, is_suspended, is_active, whatsapp, zone, suspended_until');
+      allStores = data || [];
+      storeByUser = {};
+      allStores.forEach(s => { if (s.user_id) storeByUser[s.user_id] = s; });
+    }
+
+    async function loadUserRoles() {
+      const { data } = await _supabase.from('user_roles').select('user_id, is_admin, is_merchant, is_delivery, is_real_estate');
+      userRolesMap = {};
+      (data || []).forEach(r => { userRolesMap[r.user_id] = r; });
+    }
+
+    async function loadUsers() {
+      const container = document.getElementById('usersList');
+      container.innerHTML = '<p class="p-8 text-center text-sm text-slate-500">Cargando lista de usuarios...</p>';
+
+      const { data, error } = await _supabase.rpc('admin_list_users');
+      if (error) {
+        container.innerHTML = `
+          <div class="p-8 text-center">
+            <p class="text-sm text-red-500 font-bold">Error al cargar usuarios.</p>
+            <p class="text-xs text-slate-500 mt-1">Verifica que la función RPC <code>admin_list_users()</code> esté instalada.</p>
+          </div>`;
+        console.error(error);
+        return;
+      }
+      allUsers = data || [];
+      updateStats();
+      renderUsers();
+    }
+
+    // =========================================================
+    // AUDITORÍA — carga
+    // =========================================================
+    async function loadAuditCases() {
+      const pendingContainer = document.getElementById('auditListPending');
+      const resolvedContainer = document.getElementById('auditListResolved');
+      if (pendingContainer) pendingContainer.innerHTML = '<p class="p-8 text-center text-sm text-slate-500">Cargando disputas pendientes...</p>';
+      if (resolvedContainer) resolvedContainer.innerHTML = '<p class="p-8 text-center text-sm text-slate-500">Cargando historial...</p>';
+
+      const { data, error } = await _supabase
+        .from('delivery_requests')
+        .select(`
+          *,
+          stores(id, name, owner_full_name),
+          driver:delivery_drivers!delivery_requests_driver_id_fkey(id, full_name, phone, user_id)
+        `)
+        .not('cancelled_at', 'is', null)
+        .order('cancelled_at', { ascending: false });
+
+      if (error) {
+        if (pendingContainer) pendingContainer.innerHTML = `<p class="p-8 text-center text-sm text-red-500 font-bold">Error al cargar auditoría: ${adminEscapeHtml(error.message)}</p>`;
+        if (resolvedContainer) resolvedContainer.innerHTML = '';
+        return;
+      }
+
+      const all = data || [];
+      auditPendingCache  = all.filter(r => (r.admin_resolution || 'pending') === 'pending');
+      auditResolvedCache = all.filter(r => (r.admin_resolution || 'pending') !== 'pending');
+
+      document.getElementById('auditPendingCount').textContent  = auditPendingCache.length;
+      document.getElementById('auditResolvedCount').textContent = auditResolvedCache.length;
+
+      renderAuditPending();
+      renderAuditResolved();
+    }
+
+    // =========================================================
+    // Helpers de auditoría
+    // =========================================================
+    function fmtDateTime(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      const date = d.toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const time = d.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: true });
+      return `${date} · ${time}`;
+    }
+
+    // Determina a quién hay que sancionar: el target es el emisor de la cancelación
+    function getSanctionTarget(r) {
+      const role = r.cancelled_by_role;
+      if (role === 'seller') {
+        return {
+          type: 'store',
+          id: r.store_id,
+          name: r.stores?.name || 'Comercio (desconocido)',
+          roleLabel: '🏪 Vendedor / Tienda',
+          roleShort: 'Vendedor',
+          chipClass: '',
+          detail: r.stores?.owner_full_name ? `Propietario: ${r.stores.owner_full_name}` : 'Sin propietario registrado'
+        };
+      }
+      // driver
+      return {
+        type: 'driver',
+        id: r.driver_id,
+        name: r.driver?.full_name || 'Piloto (desconocido)',
+        roleLabel: '🛵 Repartidor',
+        roleShort: 'Repartidor',
+        chipClass: 'driver',
+        detail: r.driver?.phone ? `📞 ${r.driver.phone}` : 'Sin teléfono registrado'
+      };
+    }
+
+    function isSanctionActive(r) {
+      if (!['warning_24h', 'suspension_7d'].includes(r.admin_resolution)) return false;
+      if (r.revoked_at) return false;
+      // Verificamos en la tabla destino si sigue suspendido
+      const target = getSanctionTarget(r);
+      if (target.type === 'store') {
+        const st = allStores.find(s => String(s.id) === String(target.id));
+        if (!st?.suspended_until) return false;
+        return new Date(st.suspended_until).getTime() > Date.now();
+      } else {
+        // drivers no están cargados en allStores; confiamos en el delivery_requests.updated_at + duración
+        // Un cálculo simple: si hay suspended_until en el driver lo dejamos al realtime;
+        // aquí usamos fecha de resolución + duración
+        const baseIso = r.updated_at || r.cancelled_at;
+        if (!baseIso) return false;
+        const base = new Date(baseIso).getTime();
+        const dur = r.admin_resolution === 'warning_24h' ? 24 * 3600 * 1000 : 7 * 24 * 3600 * 1000;
+        return (base + dur) > Date.now();
+      }
+    }
+
+    function auditStatusBadge(r) {
+      const status = r.admin_resolution || 'pending';
+      if (status === 'approved_no_sanction') {
+        return '<span class="text-[10px] bg-emerald-100 text-emerald-900 font-black px-2.5 py-1 rounded-full border border-emerald-300">✅ Sin Sanción</span>';
+      }
+      if (status === 'revoked') {
+        return '<span class="text-[10px] bg-slate-200 text-slate-800 font-black px-2.5 py-1 rounded-full border border-slate-300">🔄 Revocada</span>';
+      }
+      if (status === 'warning_24h') {
+        return '<span class="text-[10px] bg-amber-100 text-amber-900 font-black px-2.5 py-1 rounded-full border border-amber-300">⚠️ Suspensión 24h</span>';
+      }
+      if (status === 'suspension_7d') {
+        return '<span class="text-[10px] bg-red-900 text-white font-black px-2.5 py-1 rounded-full">🚨 Suspensión 7d</span>';
+      }
+      return '<span class="text-[10px] bg-amber-100 text-amber-900 font-black px-2.5 py-1 rounded-full border border-amber-300">⏳ Pendiente</span>';
+    }
+
+    // =========================================================
+    // PANEL A — Pendientes
+    // =========================================================
+    function renderAuditPending() {
+      const container = document.getElementById('auditListPending');
+      if (!auditPendingCache.length) {
+        container.innerHTML = `
+          <div class="p-12 text-center">
+            <p class="text-4xl mb-2">✅</p>
+            <p class="text-sm font-bold text-slate-500">No hay disputas pendientes</p>
+            <p class="text-xs text-slate-400 mt-1">Cuando un comercio o piloto cancele una carrera, aparecerá aquí.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = auditPendingCache.map(r => {
+        const target = getSanctionTarget(r);
+        const seconds = r.time_elapsed_seconds || 0;
+        const timeFormatted = Math.floor(seconds / 60) + 'm ' + (seconds % 60) + 's';
+        const cancelDate = fmtDateTime(r.cancelled_at);
+
+        // El emisor del reporte (quien canceló)
+        const emisorLabel = r.cancelled_by_role === 'seller'
+          ? '🏪 El vendedor canceló esta carrera'
+          : '🛵 El repartidor canceló esta carrera';
+
+        return `
+          <div class="p-5 hover:bg-slate-50/80 transition space-y-4">
+            <div class="flex justify-between items-start flex-wrap gap-2">
+              <div class="min-w-0">
+                <span class="text-[10px] font-mono text-slate-400 block">ID: ${r.id}</span>
+                <p class="text-[11px] font-bold text-slate-500 mt-1 uppercase tracking-wide">Emisor del reporte</p>
+                <p class="text-xs text-slate-700 font-semibold">${emisorLabel}</p>
+                <p class="text-[10px] text-slate-400 mt-1">
+                  ⏱️ Tiempo transcurrido antes de cancelar: <strong class="text-rose-600 font-mono">${timeFormatted}</strong>
+                  · ${cancelDate}
+                </p>
+              </div>
+              <div>${auditStatusBadge(r)}</div>
+            </div>
+
+            <div class="rounded-2xl border-2 border-blue-200 bg-blue-50/60 p-3.5 space-y-2">
+              <p class="text-[10px] font-black text-blue-900 uppercase tracking-wider">🎯 Se sancionará a:</p>
+              <div class="flex items-center gap-2 flex-wrap">
+                <span class="target-chip ${target.chipClass}">${target.roleLabel}</span>
+                <span class="font-black text-slate-900 text-sm">${adminEscapeHtml(target.name)}</span>
+              </div>
+              <p class="text-[11px] text-slate-600">${adminEscapeHtml(target.detail)}</p>
+            </div>
+
+            <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 text-xs text-slate-700">
+              <p class="font-bold text-slate-900 text-[11px] uppercase tracking-wide mb-1">Motivo original del reporte:</p>
+              <p class="italic">"${adminEscapeHtml(r.cancellation_reason || 'Sin motivo ingresado')}"</p>
+            </div>
+
+            <div class="grid grid-cols-1 sm:grid-cols-3 gap-2 pt-1">
+              <button type="button" data-action="sanction" data-type="approved_no_sanction" data-req="${r.id}"
+                class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3 py-2.5 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5">
+                ✅ Sin Sanción
+              </button>
+              <button type="button" data-action="sanction" data-type="warning_24h" data-req="${r.id}"
+                class="bg-amber-500 hover:bg-amber-600 text-white font-extrabold text-xs px-3 py-2.5 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5">
+                ⚠️ Suspender 24h
+              </button>
+              <button type="button" data-action="sanction" data-type="suspension_7d" data-req="${r.id}"
+                class="bg-rose-600 hover:bg-rose-700 text-white font-extrabold text-xs px-3 py-2.5 rounded-xl transition shadow-sm flex items-center justify-center gap-1.5">
+                🚨 Suspender 7d
+              </button>
+            </div>
+          </div>`;
+      }).join('');
+
+      container.querySelectorAll('[data-action="sanction"]').forEach(btn => {
+        btn.onclick = () => openSanctionModal(btn.dataset.req, btn.dataset.type);
+      });
+    }
+
+    // =========================================================
+    // PANEL B — Resueltas
+    // =========================================================
+    function renderAuditResolved() {
+      const container = document.getElementById('auditListResolved');
+      const term = (document.getElementById('auditResolvedSearch').value || '').toLowerCase().trim();
+      const filter = document.getElementById('auditResolvedFilter').value;
+
+      let list = auditResolvedCache;
+      if (filter !== 'all') {
+        list = list.filter(r => (r.admin_resolution || '') === filter);
+      }
+      if (term) {
+        list = list.filter(r => {
+          const target = getSanctionTarget(r);
+          const haystack = [
+            r.id, r.cancellation_reason, r.admin_resolution_notes, r.revoked_reason,
+            r.stores?.name, r.driver?.full_name, target.name
+          ].filter(Boolean).join(' ').toLowerCase();
+          return haystack.includes(term);
+        });
+      }
+
+      if (!list.length) {
+        container.innerHTML = `
+          <div class="p-12 text-center">
+            <p class="text-4xl mb-2">📜</p>
+            <p class="text-sm font-bold text-slate-500">${auditResolvedCache.length === 0 ? 'Aún no hay casos resueltos' : 'Sin resultados para tu búsqueda'}</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(r => {
+        const target = getSanctionTarget(r);
+        const seconds = r.time_elapsed_seconds || 0;
+        const timeFormatted = Math.floor(seconds / 60) + 'm ' + (seconds % 60) + 's';
+        const cancelDate = fmtDateTime(r.cancelled_at);
+        const resolvedDate = fmtDateTime(r.updated_at);
+
+        const active = isSanctionActive(r);
+        const wasSanctioned = ['warning_24h', 'suspension_7d'].includes(r.admin_resolution);
+        const canRevoke = wasSanctioned && !r.revoked_at;
+        const resolvedLabel = r.admin_resolution === 'approved_no_sanction'
+          ? '✅ Sin Sanción'
+          : r.admin_resolution === 'revoked'
+            ? '🔄 Revocada'
+            : r.admin_resolution === 'warning_24h'
+              ? '⚠️ Suspensión 24h'
+              : '🚨 Suspensión 7d';
+
+        return `
+          <div class="p-5 hover:bg-slate-50/80 transition space-y-4">
+            <div class="flex justify-between items-start flex-wrap gap-2">
+              <div class="min-w-0">
+                <span class="text-[10px] font-mono text-slate-400 block">ID: ${r.id}</span>
+                <p class="text-[11px] font-bold text-slate-500 mt-1 uppercase tracking-wide">Sancionado</p>
+                <div class="flex items-center gap-2 flex-wrap mt-0.5">
+                  <span class="target-chip ${target.chipClass}">${target.roleLabel}</span>
+                  <span class="font-black text-slate-900 text-sm">${adminEscapeHtml(target.name)}</span>
+                </div>
+                <p class="text-[10px] text-slate-400 mt-1">
+                  ⏱️ Cancelación tomó: <strong class="text-rose-600 font-mono">${timeFormatted}</strong>
+                  · ${cancelDate}
+                </p>
+              </div>
+              <div>${auditStatusBadge(r)}</div>
+            </div>
+
+            <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 text-xs text-slate-700 space-y-1.5">
+              <p><span class="font-bold text-slate-900 text-[11px] uppercase tracking-wide">Motivo original:</span> <span class="italic">"${adminEscapeHtml(r.cancellation_reason || 'Sin motivo')}"</span></p>
+              ${r.admin_resolution_notes ? `
+                <p class="pt-1 border-t border-slate-200/60">
+                  <span class="font-bold text-slate-900 text-[11px] uppercase tracking-wide">Motivo del dictamen:</span>
+                  <span class="block mt-0.5">${adminEscapeHtml(r.admin_resolution_notes)}</span>
+                </p>` : ''}
+              ${r.revoked_reason ? `
+                <p class="pt-1 border-t border-slate-200/60 text-emerald-800">
+                  <span class="font-bold text-emerald-900 text-[11px] uppercase tracking-wide">🔄 Revocada:</span>
+                  <span class="block mt-0.5">${adminEscapeHtml(r.revoked_reason)}</span>
+                  <span class="block text-[10px] text-slate-400 mt-0.5">${fmtDateTime(r.revoked_at)}</span>
+                </p>` : ''}
+            </div>
+
+            ${(function() {
+              const emisorEsTarget = (r.cancelled_by_role === 'driver' && target.type === 'driver') ||
+                                     (r.cancelled_by_role === 'seller' && target.type === 'store');
+              if (r.admin_resolution === 'approved_no_sanction') {
+                return `
+                  <div class="rounded-2xl border-2 border-emerald-300 bg-emerald-50 p-3">
+                    <p class="text-[10px] font-black text-emerald-900 uppercase tracking-wider">✅ Resultado a FAVOR de:</p>
+                    <div class="flex items-center gap-2 flex-wrap mt-1.5">
+                      <span class="target-chip ${target.chipClass}">${target.roleLabel}</span>
+                      <span class="font-black text-emerald-950 text-sm">${adminEscapeHtml(target.name)}</span>
+                    </div>
+                    <p class="text-[11px] text-emerald-800 mt-1">El administrador determinó que no hubo méritos para sancionar. Ninguna suspensión fue aplicada.</p>
+                  </div>`;
+              }
+              if (r.admin_resolution === 'revoked') {
+                return `
+                  <div class="rounded-2xl border-2 border-slate-300 bg-slate-50 p-3">
+                    <p class="text-[10px] font-black text-slate-700 uppercase tracking-wider">🔄 Sanción REVOCADA en favor de:</p>
+                    <div class="flex items-center gap-2 flex-wrap mt-1.5">
+                      <span class="target-chip ${target.chipClass}">${target.roleLabel}</span>
+                      <span class="font-black text-slate-900 text-sm">${adminEscapeHtml(target.name)}</span>
+                    </div>
+                    <p class="text-[11px] text-slate-700 mt-1">La suspensión fue eliminada y el target queda activo nuevamente.</p>
+                  </div>`;
+              }
+              if (r.admin_resolution === 'warning_24h' || r.admin_resolution === 'suspension_7d') {
+                const durLabel = r.admin_resolution === 'warning_24h' ? '24 horas' : '7 días';
+                return `
+                  <div class="rounded-2xl border-2 border-rose-300 bg-rose-50 p-3">
+                    <p class="text-[10px] font-black text-rose-900 uppercase tracking-wider">🚨 Resultado EN CONTRA de:</p>
+                    <div class="flex items-center gap-2 flex-wrap mt-1.5">
+                      <span class="target-chip ${target.chipClass}">${target.roleLabel}</span>
+                      <span class="font-black text-rose-950 text-sm">${adminEscapeHtml(target.name)}</span>
+                    </div>
+                    <p class="text-[11px] text-rose-800 mt-1">
+                      Se aplicó una suspensión de <strong>${durLabel}</strong>.
+                      ${emisorEsTarget ? 'El emisor del reporte fue sancionado.' : ''}
+                    </p>
+                  </div>`;
+              }
+              return '';
+            })()}
+
+            ${wasSanctioned && !r.revoked_at ? `
+              <div class="rounded-2xl border ${active ? 'border-rose-300 bg-rose-50' : 'border-slate-300 bg-slate-50'} p-3">
+                <div class="flex items-center justify-between flex-wrap gap-2">
+                  <div>
+                    <p class="text-[10px] font-black uppercase tracking-wide ${active ? 'text-rose-900' : 'text-slate-600'}">
+                      ${active ? '🔴 Suspensión activa' : '⚪ Suspensión finalizada'}
+                    </p>
+                    <p class="text-xs font-bold ${active ? 'text-rose-800' : 'text-slate-700'} mt-0.5">
+                      ${r.admin_resolution === 'warning_24h' ? 'Duración: 24 horas' : 'Duración: 7 días'}
+                    </p>
+                    <p class="text-[10px] text-slate-500 mt-0.5">Resuelto el ${resolvedDate}</p>
+                  </div>
+                  ${canRevoke ? `
+                    <button type="button" data-action="revoke" data-req="${r.id}"
+                      class="bg-white hover:bg-slate-100 text-slate-800 font-extrabold text-xs px-3 py-2 rounded-xl transition border border-slate-300 flex items-center gap-1.5 shadow-sm">
+                      🔄 Revocar Sanción
+                    </button>` : ''}
+                </div>
+              </div>` : ''}
+          </div>`;
+      }).join('');
+
+      container.querySelectorAll('[data-action="revoke"]').forEach(btn => {
+        btn.onclick = () => openRevokeModal(btn.dataset.req);
+      });
+    }
+
+    // =========================================================
+    // MODAL: aplicar sanción (con motivo obligatorio)
+    // =========================================================
+    function setupSanctionModal() {
+      const input = document.getElementById('sanctionReasonInput');
+      const count = document.getElementById('sanctionReasonCount');
+      const confirmBtn = document.getElementById('sanctionModalConfirm');
+
+      input.addEventListener('input', () => {
+        count.textContent = input.value.length;
+        confirmBtn.disabled = input.value.trim().length < 10;
+      });
+
+      document.getElementById('sanctionModalCancel').onclick = closeSanctionModal;
+      confirmBtn.onclick = applySanction;
+
+      document.addEventListener('keydown', (ev) => {
+        if (ev.key === 'Escape') {
+          if (!document.getElementById('sanctionModal').classList.contains('hidden')) closeSanctionModal();
+          if (!document.getElementById('revokeModal').classList.contains('hidden')) closeRevokeModal();
+        }
+      });
+    }
+
+    function openSanctionModal(reqId, actionType) {
+      const r = auditPendingCache.find(x => String(x.id) === String(reqId));
+      if (!r) return;
+
+      const target = getSanctionTarget(r);
+      sanctionContext = { req: r, actionType, target };
+
+      const modalEl = document.getElementById('sanctionModal');
+      const titleEl = document.getElementById('sanctionModalTitle');
+      const subEl   = document.getElementById('sanctionModalSubtitle');
+      const iconEl  = document.getElementById('sanctionModalIcon');
+      const tBadge  = document.getElementById('sanctionTargetBadge');
+      const tName   = document.getElementById('sanctionTargetName');
+      const tDetail = document.getElementById('sanctionTargetDetail');
+      const durBox  = document.getElementById('sanctionDurationBox');
+      const durChip = document.getElementById('sanctionDurationChip');
+      const durText = document.getElementById('sanctionDurationText');
+
+      // Target
+      tBadge.textContent = target.roleLabel;
+      tBadge.className = 'target-chip ' + target.chipClass;
+      tName.textContent = target.name;
+      tDetail.textContent = target.detail;
+
+      // Título / subtítulo según acción
+      if (actionType === 'approved_no_sanction') {
+        iconEl.className = 'w-10 h-10 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 bg-emerald-100 text-emerald-800';
+        iconEl.textContent = '✅';
+        titleEl.textContent = 'Aprobar Sin Sanción';
+        subEl.textContent = `Se archivará el caso sin aplicar suspensión a ${target.name}.`;
+        durBox.classList.add('hidden');
+      } else if (actionType === 'warning_24h') {
+        iconEl.className = 'w-10 h-10 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 bg-amber-100 text-amber-800';
+        iconEl.textContent = '⚠️';
+        titleEl.textContent = 'Suspender 24 horas';
+        subEl.textContent = `Se suspenderá temporalmente a ${target.name} por 24 horas.`;
+        durBox.classList.remove('hidden');
+        durChip.textContent = '24h';
+        durText.textContent = 'No podrá operar durante 24 horas desde la confirmación.';
+      } else {
+        iconEl.className = 'w-10 h-10 rounded-2xl flex items-center justify-center text-xl flex-shrink-0 bg-red-100 text-red-800';
+        iconEl.textContent = '🚨';
+        titleEl.textContent = 'Suspender 7 días';
+        subEl.textContent = `Suspensión grave a ${target.name}. Los repartidores pierden también su rol de delivery.`;
+        durBox.classList.remove('hidden');
+        durChip.textContent = '7d';
+        durText.textContent = 'No podrá operar durante 7 días. Además, se revocará el rol correspondiente.';
+      }
+
+      // Reset textarea y botón
+      const input = document.getElementById('sanctionReasonInput');
+      input.value = '';
+      document.getElementById('sanctionReasonCount').textContent = '0';
+      document.getElementById('sanctionModalConfirm').disabled = true;
+
+      modalEl.classList.remove('hidden');
+      setTimeout(() => input.focus(), 100);
+    }
+
+    function closeSanctionModal() {
+      document.getElementById('sanctionModal').classList.add('hidden');
+      sanctionContext = null;
+    }
+
+    async function applySanction() {
+      if (!sanctionContext) return;
+      const { req, actionType, target } = sanctionContext;
+      const reason = document.getElementById('sanctionReasonInput').value.trim();
+      if (reason.length < 10) {
+        alert('El motivo debe tener al menos 10 caracteres.');
+        return;
+      }
+
+      const confirmBtn = document.getElementById('sanctionModalConfirm');
+      confirmBtn.disabled = true;
+      const oldText = confirmBtn.textContent;
+      confirmBtn.textContent = 'Procesando...';
+
+      const now = new Date();
+      const suspendedUntil = actionType === 'warning_24h'
+        ? new Date(now.getTime() + 24 * 3600 * 1000).toISOString()
+        : actionType === 'suspension_7d'
+          ? new Date(now.getTime() + 7 * 24 * 3600 * 1000).toISOString()
+          : null;
+
+      try {
+        // 1) Marcar la solicitud
+        const { error: updErr } = await _supabase.from('delivery_requests').update({
+          admin_resolution: actionType,
+          sanction_type: actionType,
+          admin_resolution_notes: reason,
+          updated_at: now.toISOString()
+        }).eq('id', req.id);
+        if (updErr) throw updErr;
+
+        // 2) Aplicar el efecto sobre el target
+        if (actionType !== 'approved_no_sanction') {
+          if (target.type === 'store' && target.id) {
+            const { error: stErr } = await _supabase.from('stores').update({
+              suspended_until: suspendedUntil,
+              is_suspended: actionType === 'suspension_7d'
+            }).eq('id', target.id);
+            if (stErr) throw stErr;
+          } else if (target.type === 'driver' && target.id) {
+            const { error: dvErr } = await _supabase.from('delivery_drivers').update({
+              suspended_until: suspendedUntil,
+              is_available: false
+            }).eq('id', target.id);
+            if (dvErr) throw dvErr;
+
+            if (actionType === 'suspension_7d') {
+              const { data: driver } = await _supabase
+                .from('delivery_drivers').select('user_id').eq('id', target.id).maybeSingle();
+              if (driver?.user_id) {
+                await _supabase.from('user_roles')
+                  .update({ is_delivery: false }).eq('user_id', driver.user_id);
+              }
+            }
+          }
+        }
+
+        closeSanctionModal();
+        await Promise.all([loadAuditCases(), loadStores()]);
+        alert(`✅ Resolución guardada. ${actionType === 'approved_no_sanction' ? 'Sin sanción aplicada' : 'Sanción aplicada a ' + target.name}.`);
+
+        // Saltar automáticamente al historial para que se vea el resultado
+        if (auditActiveTab !== 'resolved') {
+          document.getElementById('auditTabResolvedBtn').click();
+        }
+      } catch (err) {
+        console.error('[Sanción]', err);
+        alert('Error al aplicar la sanción: ' + (err.message || err));
+      } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = oldText;
+      }
+    }
+
+    // =========================================================
+    // MODAL: revocar sanción
+    // =========================================================
+    function setupRevokeModal() {
+      const input = document.getElementById('revokeReasonInput');
+      const count = document.getElementById('revokeReasonCount');
+      const confirmBtn = document.getElementById('revokeModalConfirm');
+
+      input.addEventListener('input', () => {
+        count.textContent = input.value.length;
+        confirmBtn.disabled = input.value.trim().length < 10;
+      });
+
+      document.getElementById('revokeModalCancel').onclick = closeRevokeModal;
+      confirmBtn.onclick = applyRevocation;
+    }
+
+    function openRevokeModal(reqId) {
+      const r = auditResolvedCache.find(x => String(x.id) === String(reqId));
+      if (!r) return;
+
+      const target = getSanctionTarget(r);
+      revokeContext = { req: r, target };
+
+      document.getElementById('revokeModalSubtitle').textContent =
+        `Se eliminará la suspensión de ${target.name} y quedará reactivado.`;
+
+      const input = document.getElementById('revokeReasonInput');
+      input.value = '';
+      document.getElementById('revokeReasonCount').textContent = '0';
+      document.getElementById('revokeModalConfirm').disabled = true;
+
+      document.getElementById('revokeModal').classList.remove('hidden');
+      setTimeout(() => input.focus(), 100);
+    }
+
+    function closeRevokeModal() {
+      document.getElementById('revokeModal').classList.add('hidden');
+      revokeContext = null;
+    }
+
+    async function applyRevocation() {
+      if (!revokeContext) return;
+      const { req, target } = revokeContext;
+      const reason = document.getElementById('revokeReasonInput').value.trim();
+      if (reason.length < 10) {
+        alert('El motivo debe tener al menos 10 caracteres.');
+        return;
+      }
+
+      const confirmBtn = document.getElementById('revokeModalConfirm');
+      confirmBtn.disabled = true;
+      const oldText = confirmBtn.textContent;
+      confirmBtn.textContent = 'Revocando...';
+
+      try {
+        const now = new Date();
+
+        // 1) Marcar la solicitud como revocada (mantiene la resolución previa en notes)
+        const { error: updErr } = await _supabase.from('delivery_requests').update({
+          admin_resolution: 'revoked',
+          revoked_at: now.toISOString(),
+          revoked_by_user_id: currentAdmin?.id || null,
+          revoked_reason: reason,
+          updated_at: now.toISOString()
+        }).eq('id', req.id);
+        if (updErr) throw updErr;
+
+        // 2) Reactivar el target
+        if (target.type === 'store' && target.id) {
+          const { error: stErr } = await _supabase.from('stores').update({
+            suspended_until: null,
+            is_suspended: false
+          }).eq('id', target.id);
+          if (stErr) throw stErr;
+        } else if (target.type === 'driver' && target.id) {
+          const { error: dvErr } = await _supabase.from('delivery_drivers').update({
+            suspended_until: null
+          }).eq('id', target.id);
+          if (dvErr) throw dvErr;
+
+          // Si la sanción previa fue grave (7d) se le había quitado el rol.
+          // Al revocar, se lo devolvemos.
+          if (req.admin_resolution === 'suspension_7d') {
+            const { data: driver } = await _supabase
+              .from('delivery_drivers').select('user_id').eq('id', target.id).maybeSingle();
+            if (driver?.user_id) {
+              await _supabase.from('user_roles')
+                .update({ is_delivery: true }).eq('user_id', driver.user_id);
+            }
+          }
+        }
+
+        closeRevokeModal();
+        await Promise.all([loadAuditCases(), loadStores()]);
+        alert(`🔄 Sanción revocada. ${target.name} queda activo nuevamente.`);
+      } catch (err) {
+        console.error('[Revocar]', err);
+        alert('Error al revocar: ' + (err.message || err));
+      } finally {
+        confirmBtn.disabled = false;
+        confirmBtn.textContent = oldText;
+      }
+    }
+
+    // =========================================================
+    // Usuarios (código existente)
+    // =========================================================
+    function updateStats() {
+      const total = allUsers.length;
+      const admins = allUsers.filter(u => u.is_admin).length;
+      const withStore = allUsers.filter(u => storeByUser[u.user_id]).length;
+      const deliveryCount = Object.values(userRolesMap).filter(r => r.is_delivery).length;
+      const realEstateCount = Object.values(userRolesMap).filter(r => r.is_real_estate).length;
+
+      document.getElementById('statTotal').textContent      = total;
+      document.getElementById('statAdmins').textContent     = admins;
+      document.getElementById('statWithStore').textContent  = withStore;
+      document.getElementById('statDelivery').textContent   = deliveryCount;
+      document.getElementById('statRealEstate').textContent = realEstateCount;
+    }
+
+    function renderUsers() {
+      const container = document.getElementById('usersList');
+      const e = adminEscapeHtml;
+      const term = document.getElementById('userSearch').value.toLowerCase().trim();
+      const filter = document.getElementById('userFilter').value;
+
+      const list = allUsers.filter(u => {
+        const store = storeByUser[u.user_id];
+        const roles = userRolesMap[u.user_id] || {};
+
+        if (filter === 'admins' && !u.is_admin) return false;
+        if (filter === 'vendedores' && !store) return false;
+        if (filter === 'delivery' && !roles.is_delivery) return false;
+        if (filter === 'real_estate' && !roles.is_real_estate) return false;
+        if (filter === 'no-store' && store) return false;
+        if (filter === 'suspended' && (!store || !store.is_suspended)) return false;
+
+        if (!term) return true;
+        const haystack = [u.email, u.user_id, u.display_name, u.phone, u.notes, store?.name]
+          .filter(Boolean).join(' ').toLowerCase();
+        return haystack.includes(term);
+      });
+
+      if (list.length === 0) {
+        container.innerHTML = '<p class="p-8 text-center text-sm text-slate-500">No se encontraron usuarios coincidentes.</p>';
+        return;
+      }
+
+      container.innerHTML = list.map(u => {
+        const isSelf = u.user_id === currentAdmin?.id;
+        const store = storeByUser[u.user_id];
+        const roles = userRolesMap[u.user_id] || {};
+        const initial = (u.display_name || u.email || 'U').charAt(0).toUpperCase();
+        const regDate = u.created_at ? adminFormatDate(u.created_at) : '—';
+
+        return `
+          <div class="p-4 hover:bg-slate-50/80 transition">
+            <div class="flex items-start gap-3 flex-wrap">
+              <div class="w-11 h-11 rounded-2xl bg-gradient-to-br from-slate-800 to-indigo-900 text-amber-400 flex items-center justify-center font-black text-sm shadow-sm flex-shrink-0">
+                ${initial}
+              </div>
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="font-extrabold text-slate-900 text-sm truncate">${e(u.display_name || '(Sin nombre asignado)')}</h3>
+                  ${u.is_admin
+                    ? '<span class="text-[10px] bg-purple-100 text-purple-800 font-black px-2 py-0.5 rounded-full border border-purple-200">🛡️ Admin</span>'
+                    : '<span class="text-[10px] bg-slate-100 text-slate-700 font-extrabold px-2 py-0.5 rounded-full border border-slate-200">👤 Vendedor</span>'}
+                  ${roles.is_delivery ? '<span class="text-[10px] bg-emerald-100 text-emerald-800 font-black px-2 py-0.5 rounded-full border border-emerald-200">🛵 Repartidor</span>' : ''}
+                  ${roles.is_real_estate ? '<span class="text-[10px] bg-indigo-100 text-indigo-800 font-black px-2 py-0.5 rounded-full border border-indigo-200">🏠 Inmuebles</span>' : ''}
+                  ${isSelf ? '<span class="text-[10px] bg-blue-100 text-blue-800 font-black px-2 py-0.5 rounded-full">Tu cuenta</span>' : ''}
+                  ${store
+                    ? `<span class="text-[10px] ${store.is_suspended ? 'bg-rose-100 text-rose-800 border-rose-300' : 'bg-emerald-100 text-emerald-800 border-emerald-300'} font-extrabold px-2 py-0.5 rounded-full border">
+                         🏪 ${e(store.name)}${store.is_suspended ? ' (SUSPENDIDA)' : ' (Activa)'}
+                       </span>`
+                    : ''}
+                </div>
+                <div class="grid grid-cols-1 sm:grid-cols-3 gap-x-4 gap-y-1 mt-1.5 text-xs text-slate-600 font-medium">
+                  <p class="truncate">📧 ${e(u.email || 'Sin email registrado')}</p>
+                  <p class="truncate">📱 ${e(u.phone || 'Sin teléfono')}</p>
+                  <p class="truncate text-[11px] text-slate-400">📅 Reg: ${regDate}</p>
+                </div>
+                ${u.notes ? `<p class="text-[11px] text-amber-800 bg-amber-50/80 border border-amber-200/60 px-2.5 py-1 rounded-lg mt-2 inline-block font-medium">📝 Nota: ${e(u.notes)}</p>` : ''}
+              </div>
+              <div class="flex items-center gap-1.5 flex-wrap flex-shrink-0">
+                <button data-user-edit="${u.user_id}"
+                  class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-1.5 rounded-xl transition">✏️ Editar</button>
+                ${store ? `
+                  <button data-store-suspend="${store.id}" data-current-state="${store.is_suspended ? '1' : '0'}"
+                    class="text-xs font-bold px-3 py-1.5 rounded-xl transition ${store.is_suspended ? 'bg-emerald-100 hover:bg-emerald-200 text-emerald-800' : 'bg-rose-100 hover:bg-rose-200 text-rose-800'}">
+                    ${store.is_suspended ? '✅ Reactivar Tienda' : '🚫 Suspender Tienda'}
+                  </button>` : ''}
+                <button data-user-delete="${u.user_id}" ${isSelf ? 'disabled' : ''}
+                  class="text-xs font-bold px-3 py-1.5 rounded-xl transition ${isSelf ? 'bg-slate-100 text-slate-400 cursor-not-allowed' : 'bg-slate-100 hover:bg-red-50 text-slate-600 hover:text-red-600'}">🗑️</button>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      container.onclick = async (ev) => {
+        const editBtn = ev.target.closest('[data-user-edit]');
+        if (editBtn) { ev.stopPropagation(); openUserModal(editBtn.dataset.userEdit); return; }
+
+        const suspendBtn = ev.target.closest('[data-store-suspend]');
+        if (suspendBtn) {
+          ev.stopPropagation();
+          await toggleStoreSuspension(suspendBtn.dataset.storeSuspend, suspendBtn.dataset.currentState !== '1');
+          return;
+        }
+
+        const deleteBtn = ev.target.closest('[data-user-delete]');
+        if (deleteBtn && !deleteBtn.disabled) {
+          ev.stopPropagation();
+          await deleteUserRecord(deleteBtn.dataset.userDelete);
+        }
+      };
+    }
+
+    async function toggleStoreSuspension(storeId, suspend) {
+      const actionText = suspend ? 'SUSPENDER' : 'REACTIVAR';
+      if (!confirm(`¿Estás seguro de que deseas ${actionText} esta tienda?`)) return;
+      const { error } = await _supabase.from('stores').update({ is_suspended: suspend }).eq('id', storeId);
+      if (error) alert('Error al actualizar estado: ' + error.message);
+      else await reloadData();
+    }
+
+    async function deleteUserRecord(userId) {
+      const u = allUsers.find(x => x.user_id === userId);
+      if (!u) return;
+      if (!confirm(`⚠️ ELIMINACIÓN DEFINITIVA:\n¿Eliminar a "${u.email}"?`)) return;
+      try {
+        const { error } = await _supabase.rpc('admin_delete_user', { target_user_id: userId });
+        if (error) throw error;
+        alert('Usuario eliminado.');
+        await reloadData();
+      } catch (err) {
+        alert('Error durante la eliminación: ' + (err.message || err));
+      }
+    }
+
+    function openUserModal(userId) {
+      const isEditing = !!userId;
+      const u = isEditing ? allUsers.find(x => x.user_id === userId) : null;
+      const roles = isEditing ? (userRolesMap[userId] || {}) : {};
+      const e = adminEscapeHtml;
+      const currentStore = isEditing ? storeByUser[u.user_id] : null;
+
+      const storeOptionsHTML = allStores.map(s => {
+        const isAssignedToOther = s.user_id && s.user_id !== userId;
+        const assignedLabel = isAssignedToOther ? ' (Asignada a otro vendedor)' : '';
+        const selected = currentStore && currentStore.id === s.id ? 'selected' : '';
+        return `<option value="${s.id}" ${selected}>${e(s.name)}${assignedLabel}</option>`;
+      }).join('');
+
+      document.getElementById('userModalContent').innerHTML = `
+        <div class="flex items-start justify-between mb-4 pb-3 border-b border-slate-100">
+          <div>
+            <h3 class="text-lg font-black text-slate-900">${isEditing ? 'Editar Usuario' : '➕ Crear Nuevo Usuario / Agente'}</h3>
+            <p class="text-xs text-slate-500 font-medium">${isEditing ? `ID: ${e(u.user_id)}` : 'Registra un nuevo usuario y asigna sus roles'}</p>
+          </div>
+          <button id="closeUserModalBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center transition">✕</button>
+        </div>
+
+        <form id="userModalForm" class="space-y-4">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Correo Electrónico *</label>
+            <input type="email" id="modalEmail" required ${isEditing ? 'disabled' : ''} value="${isEditing ? e(u.email || '') : ''}"
+              class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-amber-500 ${isEditing ? 'bg-slate-50 text-slate-500' : ''}">
+          </div>
+          ${!isEditing ? `
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Contraseña Inicial *</label>
+              <input type="password" id="modalPassword" required minlength="6"
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-amber-500">
+            </div>` : ''}
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre Completo</label>
+              <input type="text" id="modalDisplayName" value="${isEditing ? e(u.display_name || '') : ''}"
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-amber-500">
+            </div>
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Teléfono WhatsApp</label>
+              <input type="tel" id="modalPhone" value="${isEditing ? e(u.phone || '') : ''}"
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-amber-500">
+            </div>
+          </div>
+          <div class="space-y-2">
+            <div class="p-3 bg-purple-50/80 border border-purple-200/80 rounded-2xl flex items-center justify-between">
+              <div>
+                <span class="block text-xs font-black text-purple-900 uppercase">🛡️ Rol de Administrador General</span>
+                <span class="text-[11px] text-purple-700">Acceso completo a la Consola /admin/</span>
+              </div>
+              <input type="checkbox" id="modalIsAdmin" ${isEditing && u.is_admin ? 'checked' : ''} class="w-5 h-5 accent-purple-600 rounded cursor-pointer">
+            </div>
+            <div class="p-3 bg-indigo-50/80 border border-indigo-200/80 rounded-2xl flex items-center justify-between">
+              <div>
+                <span class="block text-xs font-black text-indigo-900 uppercase">🏠 Agente Inmuebles (is_real_estate)</span>
+                <span class="text-[11px] text-indigo-700">Habilita el panel Pasaje Inmuebles</span>
+              </div>
+              <input type="checkbox" id="modalIsRealEstate" ${isEditing && roles.is_real_estate ? 'checked' : ''} class="w-5 h-5 accent-indigo-600 rounded cursor-pointer">
+            </div>
+            <div class="p-3 bg-emerald-50/80 border border-emerald-200/80 rounded-2xl flex items-center justify-between">
+              <div>
+                <span class="block text-xs font-black text-emerald-900 uppercase">🛵 Repartidor de Delivery (is_delivery)</span>
+                <span class="text-[11px] text-emerald-700">Habilita el panel Pasaje Delivery</span>
+              </div>
+              <input type="checkbox" id="modalIsDelivery" ${isEditing && roles.is_delivery ? 'checked' : ''} class="w-5 h-5 accent-emerald-600 rounded cursor-pointer">
+            </div>
+          </div>
+          <div class="p-3.5 bg-blue-50/80 border border-blue-200/80 rounded-2xl space-y-3">
+            <span class="block text-xs font-black text-blue-900 uppercase">🏪 Asignación de Tienda Comercial</span>
+            <select id="modalStoreSelect" class="w-full border border-blue-200 p-2.5 rounded-xl text-xs font-bold bg-white text-slate-800 outline-none">
+              <option value="">-- Sin tienda vinculada --</option>
+              <option value="__NEW__">➕ Crear Nueva Tienda</option>
+              ${storeOptionsHTML}
+            </select>
+            <div id="newStoreFields" class="hidden space-y-2 pt-2 border-t border-blue-200/60">
+              <input type="text" id="modalNewStoreName" placeholder="Nombre de la nueva tienda..."
+                class="w-full border border-blue-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none">
+            </div>
+          </div>
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Notas Internas</label>
+            <textarea id="modalNotes" rows="2"
+              class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-medium bg-white outline-none focus:ring-2 focus:ring-amber-500">${isEditing ? e(u.notes || '') : ''}</textarea>
+          </div>
+          <div class="flex gap-2 pt-3 border-t border-slate-100">
+            <button type="button" id="cancelUserModalBtn" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition">Cancelar</button>
+            <button type="submit" id="saveUserModalBtn" class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow-sm">
+              ${isEditing ? 'Guardar Cambios' : 'Crear Usuario'}
+            </button>
+          </div>
+        </form>
+      `;
+
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+
+      const closeFn = () => { modal.classList.add('hidden'); document.body.style.overflow = ''; };
+      document.getElementById('closeUserModalBtn').onclick = closeFn;
+      document.getElementById('cancelUserModalBtn').onclick = closeFn;
+
+      const storeSelect = document.getElementById('modalStoreSelect');
+      const newStoreFields = document.getElementById('newStoreFields');
+      storeSelect.addEventListener('change', () => {
+        if (storeSelect.value === '__NEW__') newStoreFields.classList.remove('hidden');
+        else newStoreFields.classList.add('hidden');
+      });
+
+      document.getElementById('userModalForm').onsubmit = async (evt) => {
+        evt.preventDefault();
+        const submitBtn = document.getElementById('saveUserModalBtn');
+        submitBtn.disabled = true; submitBtn.textContent = 'Procesando...';
+
+        try {
+          let targetUserId = userId;
+          const displayName = document.getElementById('modalDisplayName').value.trim() || null;
+          const phone = document.getElementById('modalPhone').value.trim() || null;
+          const isAdmin = document.getElementById('modalIsAdmin').checked;
+          const isRealEstate = document.getElementById('modalIsRealEstate').checked;
+          const isDelivery = document.getElementById('modalIsDelivery').checked;
+          const notes = document.getElementById('modalNotes').value.trim() || null;
+
+          if (!isEditing) {
+            const email = document.getElementById('modalEmail').value.trim();
+            const password = document.getElementById('modalPassword').value;
+            const tempSupabase = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { persistSession: false } });
+            const { data: authData, error: authError } = await tempSupabase.auth.signUp({
+              email, password, options: { data: { display_name: displayName, phone: phone } }
+            });
+            if (authError) throw authError;
+            if (!authData.user) throw new Error('No se pudo crear el usuario.');
+            targetUserId = authData.user.id;
+          }
+
+          await _supabase.from('user_profiles').upsert([{
+            user_id: targetUserId, display_name: displayName, phone: phone, notes: notes, updated_at: new Date().toISOString()
+          }], { onConflict: 'user_id' });
+
+          await _supabase.from('user_roles').upsert([{
+            user_id: targetUserId, is_admin: isAdmin, is_merchant: true, is_delivery: isDelivery, is_real_estate: isRealEstate
+          }], { onConflict: 'user_id' });
+
+          closeFn();
+          await reloadData();
+        } catch (err) {
+          alert('Error: ' + err.message);
+        } finally {
+          submitBtn.disabled = false;
+          submitBtn.textContent = isEditing ? 'Guardar Cambios' : 'Crear Usuario';
+        }
+      };
+    }
+
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && !modal.classList.contains('hidden')) {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+      }
+    });
+  </script>
+</body>
+</html>

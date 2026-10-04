@@ -1,0 +1,489 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Cupones · Pasaje de los Altos</title>
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=4"></script>
+  <script src="../js/theme-loader.js?v=4"></script>
+  <script src="../js/dashboard-utils.js?v=5"></script>
+  <script src="../js/dashboard-sidebar.js?v=4"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .chip { white-space: nowrap; font-size: 12px; font-weight: 700; padding: 6px 14px; border-radius: 12px; transition: all .15s ease; cursor: pointer; border: 1px solid #e2e8f0; }
+    .chip-active { background: #1e3a8a; color: white; border-color: #1e3a8a; }
+    .chip-idle { background: rgba(255,255,255,0.8); color: #475569; }
+    .chip-idle:hover { background: #ffffff; color: #0f172a; }
+  </style>
+  <script>
+    (function () {
+      if (typeof window.dashEscapeHtml === 'undefined') {
+        window.dashEscapeHtml = function (s) {
+          return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        };
+      }
+      if (typeof window.dashFormatDateTime === 'undefined') {
+        window.dashFormatDateTime = function (iso) {
+          if (!iso) return '—';
+          return new Date(iso).toLocaleString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' });
+        };
+      }
+    })();
+  </script>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+  <div id="dashboardHeader"></div>
+
+  <main class="max-w-6xl mx-auto p-4 pb-16">
+    <div id="dashboardTabs"></div>
+
+    <div id="loadingState" class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-8 text-center text-sm text-slate-500 shadow-sm">
+      Cargando cupones...
+    </div>
+
+    <section id="content" class="hidden space-y-4">
+
+      <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-5 shadow-sm">
+        <div class="flex items-start gap-3">
+          <div class="text-3xl">🎟️</div>
+          <div>
+            <h3 class="text-lg font-extrabold text-slate-900">Cupones de Descuento</h3>
+            <p class="text-xs text-slate-500 mt-0.5">
+              Crea códigos que tus clientes pueden aplicar en el carrito antes de enviar su pedido.
+            </p>
+          </div>
+        </div>
+      </div>
+
+      <!-- KPIs -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-4 border-l-4 border-slate-400 shadow-sm">
+          <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider">Total</p>
+          <p id="statTotal" class="text-2xl font-extrabold text-slate-800 mt-1">—</p>
+        </div>
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-4 border-l-4 border-emerald-500 shadow-sm">
+          <p class="text-[10px] font-bold text-emerald-700 uppercase tracking-wider">✅ Activos</p>
+          <p id="statActive" class="text-2xl font-extrabold text-emerald-600 mt-1">—</p>
+        </div>
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-4 border-l-4 border-blue-500 shadow-sm">
+          <p class="text-[10px] font-bold text-blue-700 uppercase tracking-wider">🔢 Usos totales</p>
+          <p id="statUses" class="text-2xl font-extrabold text-blue-600 mt-1">—</p>
+        </div>
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-4 border-l-4 border-rose-500 shadow-sm">
+          <p class="text-[10px] font-bold text-rose-700 uppercase tracking-wider">⏰ Expirados</p>
+          <p id="statExpired" class="text-2xl font-extrabold text-rose-600 mt-1">—</p>
+        </div>
+      </div>
+
+      <!-- Formulario de creación -->
+      <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-5 shadow-sm">
+        <h3 class="font-bold text-slate-800 text-sm mb-3 flex items-center gap-2">
+          <span>➕</span> Crear nuevo cupón
+        </h3>
+
+        <form id="couponForm" class="grid grid-cols-1 sm:grid-cols-12 gap-3">
+
+          <div class="sm:col-span-3">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Código *</label>
+            <div class="flex">
+              <input type="text" id="cCode" required maxlength="20" placeholder="VERANO25"
+                class="flex-1 border border-slate-200 p-2.5 rounded-l-xl text-xs uppercase focus:ring-2 focus:ring-emerald-500 outline-none font-mono font-extrabold bg-white">
+              <button type="button" id="cCodeRandom"
+                class="bg-slate-100 hover:bg-slate-200 border border-slate-200 border-l-0 text-slate-700 text-xs font-bold px-3 rounded-r-xl transition"
+                title="Generar aleatorio">🎲</button>
+            </div>
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Tipo *</label>
+            <select id="cType" required
+              class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white font-semibold focus:ring-2 focus:ring-emerald-500 outline-none">
+              <option value="percentage">% Porcentaje</option>
+              <option value="fixed">Q Monto fijo</option>
+            </select>
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Valor *</label>
+            <input type="number" step="0.01" min="0.01" id="cValue" required placeholder="15"
+              class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-bold focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+          </div>
+
+          <div class="sm:col-span-2">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Mín. compra (Q)</label>
+            <input type="number" step="0.01" min="0" id="cMin" value="0"
+              class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+
+          <div class="sm:col-span-3">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Usos máx.</label>
+            <input type="number" min="1" id="cMaxUses" placeholder="Ilimitado"
+              class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+
+          <div class="sm:col-span-9">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Expira el (opcional)</label>
+            <input type="datetime-local" id="cExpires"
+              class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+
+          <div class="sm:col-span-3 flex items-end">
+            <button type="submit" id="couponSaveBtn"
+              class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl text-xs transition shadow-sm disabled:opacity-60">
+              Crear Cupón
+            </button>
+          </div>
+        </form>
+      </div>
+
+      <!-- Filtros -->
+      <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-3 shadow-sm">
+        <div class="flex gap-2 overflow-x-auto no-scrollbar" id="couponFilterChips">
+          <button data-coupon-filter="active" class="chip chip-active">✅ Activos</button>
+          <button data-coupon-filter="inactive" class="chip chip-idle">⛔ Inactivos</button>
+          <button data-coupon-filter="expired" class="chip chip-idle">⏰ Expirados</button>
+          <button data-coupon-filter="all" class="chip chip-idle">📋 Todos</button>
+        </div>
+      </div>
+
+      <!-- Lista -->
+      <div id="couponsList" class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 overflow-hidden divide-y divide-slate-100 shadow-sm">
+        <p class="p-8 text-center text-sm text-slate-500">Cargando cupones...</p>
+      </div>
+
+    </section>
+  </main>
+
+  <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] bg-emerald-600 text-white text-xs font-bold px-5 py-3 rounded-xl shadow-2xl max-w-[90vw] text-center transition-opacity duration-300"></div>
+
+  <script>
+    let currentStore = null;
+    let allCoupons = [];
+    let currentFilter = 'active';
+
+    (async () => {
+      try {
+        const { session, store } = await guardDashboardPage();
+        if (!session || !store) return;
+        currentStore = store;
+
+        await initDashboardNav({ store, user: session.user });
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+
+        await loadCoupons();
+
+        document.getElementById('cCode').addEventListener('input', (e) => {
+          e.target.value = e.target.value.toUpperCase().replace(/[^A-Z0-9_-]/g, '');
+        });
+
+        document.getElementById('cCodeRandom').addEventListener('click', () => {
+          const codes = ['PROMO', 'DCTO', 'OFERTA', 'ESPECIAL', 'BIENVENIDA', 'VERANO'];
+          const base = codes[Math.floor(Math.random() * codes.length)];
+          const num = Math.floor(Math.random() * 900) + 100;
+          document.getElementById('cCode').value = base + num;
+        });
+
+        document.getElementById('couponForm').addEventListener('submit', onCreateCoupon);
+
+        document.getElementById('couponFilterChips').addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-coupon-filter]');
+          if (!btn) return;
+          document.querySelectorAll('#couponFilterChips .chip').forEach(b => {
+            b.classList.remove('chip-active');
+            b.classList.add('chip-idle');
+          });
+          btn.classList.remove('chip-idle');
+          btn.classList.add('chip-active');
+          currentFilter = btn.dataset.couponFilter;
+          renderCoupons();
+        });
+      } catch(err) {
+        console.error('[Cupones] Error inicial:', err);
+      }
+    })();
+
+    function idEq(a, b) { return String(a) === String(b); }
+
+    function isExpired(c) {
+      return c.expires_at && new Date(c.expires_at) < new Date();
+    }
+
+    function isExhausted(c) {
+      return c.max_uses !== null && c.max_uses !== undefined && c.uses_count >= c.max_uses;
+    }
+
+    function formatValue(c) {
+      if (c.discount_type === 'percentage') return `${parseFloat(c.discount_value).toFixed(0)}%`;
+      return `Q ${parseFloat(c.discount_value).toFixed(2)}`;
+    }
+
+    function showToast(msg, type) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.remove('bg-emerald-600', 'bg-red-600');
+      t.classList.add(type === 'err' ? 'bg-red-600' : 'bg-emerald-600');
+      t.classList.remove('hidden');
+      requestAnimationFrame(() => { t.style.opacity = '1'; });
+      clearTimeout(showToast._t);
+      showToast._t = setTimeout(() => {
+        t.style.opacity = '0';
+        setTimeout(() => t.classList.add('hidden'), 300);
+      }, 2600);
+    }
+
+    async function loadCoupons() {
+      const container = document.getElementById('couponsList');
+      container.innerHTML = '<p class="p-8 text-center text-sm text-slate-500">Cargando cupones...</p>';
+
+      const { data, error } = await _supabase
+        .from('coupons')
+        .select('*')
+        .eq('store_id', currentStore.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        container.innerHTML = '<p class="p-8 text-center text-sm text-red-500">Error al cargar cupones.</p>';
+        console.error(error);
+        return;
+      }
+
+      allCoupons = data || [];
+      updateStats();
+      renderCoupons();
+    }
+
+    function updateStats() {
+      const total = allCoupons.length;
+      const active = allCoupons.filter(c => c.is_active && !isExpired(c) && !isExhausted(c)).length;
+      const uses = allCoupons.reduce((acc, c) => acc + (c.uses_count || 0), 0);
+      const expired = allCoupons.filter(c => isExpired(c) || isExhausted(c)).length;
+
+      document.getElementById('statTotal').textContent   = total;
+      document.getElementById('statActive').textContent  = active;
+      document.getElementById('statUses').textContent    = uses;
+      document.getElementById('statExpired').textContent = expired;
+    }
+
+    function renderCoupons() {
+      const container = document.getElementById('couponsList');
+      const e = window.dashEscapeHtml;
+
+      let list = allCoupons;
+      if (currentFilter === 'active') {
+        list = allCoupons.filter(c => c.is_active && !isExpired(c) && !isExhausted(c));
+      } else if (currentFilter === 'inactive') {
+        list = allCoupons.filter(c => !c.is_active);
+      } else if (currentFilter === 'expired') {
+        list = allCoupons.filter(c => isExpired(c) || isExhausted(c));
+      }
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="p-10 text-center">
+            <div class="text-4xl mb-2">🎟️</div>
+            <p class="text-sm text-slate-500">
+              ${allCoupons.length === 0
+                ? 'Aún no tienes cupones. Crea el primero arriba.'
+                : 'No hay cupones en esta vista.'}
+            </p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(c => {
+        const expired = isExpired(c);
+        const exhausted = isExhausted(c);
+        const available = c.is_active && !expired && !exhausted;
+
+        const statusBadge =
+          available ? '<span class="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-full">✅ Activo</span>' :
+          exhausted ? '<span class="text-[10px] bg-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded-full">🚫 Agotado</span>' :
+          expired ? '<span class="text-[10px] bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full">⏰ Expirado</span>' :
+          '<span class="text-[10px] bg-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded-full">⛔ Inactivo</span>';
+
+        const usesInfo = c.max_uses
+          ? `${c.uses_count || 0} / ${c.max_uses}`
+          : `${c.uses_count || 0} / ∞`;
+
+        const expiresText = c.expires_at
+          ? `Expira: ${window.dashFormatDateTime(c.expires_at)}`
+          : 'Sin fecha de expiración';
+
+        const minText = parseFloat(c.min_purchase) > 0
+          ? `Mínimo Q ${parseFloat(c.min_purchase).toFixed(2)}`
+          : 'Sin mínimo de compra';
+
+        return `
+          <div class="p-4 ${!available ? 'opacity-70' : ''}">
+            <div class="flex items-start gap-3 flex-wrap">
+              <div class="w-12 h-12 rounded-xl bg-gradient-to-br from-amber-400 to-amber-600 text-white flex items-center justify-center font-extrabold text-lg flex-shrink-0 shadow-sm">
+                🎟️
+              </div>
+
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="font-extrabold text-slate-900 truncate font-mono text-base">${e(c.code)}</h3>
+                  <button type="button" data-copy="${e(c.code)}" class="text-[10px] font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-2 py-0.5 rounded-md transition" title="Copiar código">📋 Copiar</button>
+                  ${statusBadge}
+                </div>
+
+                <p class="text-xs text-emerald-600 font-extrabold mt-0.5">
+                  ${formatValue(c)} de descuento
+                </p>
+
+                <div class="grid grid-cols-1 sm:grid-cols-2 gap-x-4 gap-y-0.5 mt-1 text-[11px] text-slate-500 font-medium">
+                  <p class="truncate">🧾 ${usesInfo} usos</p>
+                  <p class="truncate">💰 ${minText}</p>
+                  <p class="col-span-full truncate">⏰ ${expiresText}</p>
+                </div>
+              </div>
+
+              <div class="flex items-center gap-2 flex-shrink-0">
+                <label class="inline-flex items-center cursor-pointer" title="${c.is_active ? 'Desactivar' : 'Activar'}">
+                  <input type="checkbox" data-coupon-toggle="${c.id}" ${c.is_active ? 'checked' : ''} class="sr-only peer">
+                  <div class="w-9 h-5 bg-slate-200 peer-checked:bg-emerald-500 rounded-full peer transition relative
+                              after:content-[''] after:absolute after:top-0.5 after:left-0.5 after:bg-white
+                              after:rounded-full after:h-4 after:w-4 after:transition-all
+                              peer-checked:after:translate-x-full"></div>
+                </label>
+                <button data-coupon-delete="${c.id}"
+                  class="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-bold px-2.5 py-1.5 rounded-xl transition">
+                  🗑️
+                </button>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      container.querySelectorAll('[data-copy]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          navigator.clipboard.writeText(btn.dataset.copy);
+          showToast(`Código ${btn.dataset.copy} copiado`);
+        });
+      });
+
+      container.querySelectorAll('[data-coupon-toggle]').forEach(input => {
+        input.addEventListener('change', async () => {
+          const id = input.dataset.couponToggle;
+          const newVal = input.checked;
+          input.disabled = true;
+
+          const { error } = await _supabase
+            .from('coupons')
+            .update({ is_active: newVal })
+            .eq('id', id);
+
+          if (error) {
+            console.error(error);
+            showToast('Error: ' + error.message, 'err');
+            input.checked = !newVal;
+            input.disabled = false;
+            return;
+          }
+
+          const c = allCoupons.find(x => idEq(x.id, id));
+          if (c) c.is_active = newVal;
+          updateStats();
+          renderCoupons();
+          showToast(newVal ? 'Cupón activado' : 'Cupón desactivado');
+        });
+      });
+
+      container.querySelectorAll('[data-coupon-delete]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const id = btn.dataset.couponDelete;
+          const c = allCoupons.find(x => idEq(x.id, id));
+          if (!c) return;
+          if (!confirm(`¿Eliminar el cupón "${c.code}"? Esta acción no se puede deshacer.`)) return;
+
+          btn.disabled = true;
+          const { error } = await _supabase.from('coupons').delete().eq('id', id);
+          if (error) {
+            console.error(error);
+            showToast('Error: ' + error.message, 'err');
+            btn.disabled = false;
+            return;
+          }
+
+          allCoupons = allCoupons.filter(x => !idEq(x.id, id));
+          updateStats();
+          renderCoupons();
+          showToast('Cupón eliminado');
+        });
+      });
+    }
+
+    async function onCreateCoupon(ev) {
+      ev.preventDefault();
+      const btn = document.getElementById('couponSaveBtn');
+      btn.disabled = true;
+      btn.textContent = 'Guardando...';
+
+      try {
+        const code = document.getElementById('cCode').value.trim().toUpperCase();
+        const discount_type = document.getElementById('cType').value;
+        const discount_value = parseFloat(document.getElementById('cValue').value);
+        const min_purchase = parseFloat(document.getElementById('cMin').value) || 0;
+        const maxRaw = document.getElementById('cMaxUses').value.trim();
+        const max_uses = maxRaw === '' ? null : Math.max(1, parseInt(maxRaw, 10));
+        const expiresRaw = document.getElementById('cExpires').value;
+        const expires_at = expiresRaw ? new Date(expiresRaw).toISOString() : null;
+
+        if (!code) throw new Error('El código es obligatorio.');
+        if (!discount_value || discount_value <= 0) throw new Error('El valor debe ser mayor a 0.');
+        if (discount_type === 'percentage' && discount_value > 100) {
+          throw new Error('El porcentaje no puede superar el 100%.');
+        }
+
+        const payload = {
+          store_id: currentStore.id,
+          code,
+          discount_type,
+          discount_value,
+          min_purchase,
+          max_uses,
+          is_active: true,
+          expires_at,
+        };
+
+        const { data, error } = await _supabase
+          .from('coupons')
+          .insert([payload])
+          .select()
+          .single();
+
+        if (error) {
+          if (error.code === '23505') {
+            throw new Error('Ya existe un cupón con ese código en tu tienda.');
+          }
+          throw error;
+        }
+
+        allCoupons.unshift(data);
+        updateStats();
+        renderCoupons();
+
+        ev.target.reset();
+        document.getElementById('cMin').value = '0';
+        showToast('Cupón creado correctamente');
+      } catch (err) {
+        console.error('[Cupones] Crear:', err);
+        showToast('Error: ' + (err.message || 'desconocido'), 'err');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Crear Cupón';
+      }
+    }
+  </script>
+</body>
+</html>

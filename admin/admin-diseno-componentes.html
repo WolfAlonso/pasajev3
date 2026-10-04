@@ -1,0 +1,1309 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Componentes y Cards · Admin</title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="../js/theme-loader.js?v=7"></script>
+  <script src="../js/admin-utils.js?v=6"></script>
+  <script src="../js/admin-sidebar.js?v=3"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: #1e293b; }
+
+    .design-layout { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
+    @media (min-width: 1100px) { .design-layout { grid-template-columns: minmax(0, 1fr) 440px; } }
+
+    .panel-section {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+      margin-bottom: 12px; overflow: hidden; transition: box-shadow .15s, border-color .3s;
+    }
+    .panel-section > summary {
+      list-style: none; cursor: pointer; padding: 14px 18px;
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 14px; color: #1f2937; user-select: none;
+    }
+    .panel-section > summary::-webkit-details-marker { display: none; }
+    .panel-section > summary:hover { background: #f8fafc; }
+    .panel-section > summary .chev { margin-left: auto; transition: transform .2s ease; color: #94a3b8; }
+    .panel-section[open] > summary .chev { transform: rotate(180deg); }
+    .panel-section > summary .sec-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; border-radius: 8px; background: #f1f5f9; font-size: 16px;
+    }
+
+    .panel-body { padding: 18px; border-top: 1px solid #f1f5f9; }
+    .field-label { display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 5px; text-transform: uppercase; }
+    .input-text { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; font-size: 13px; color: #1e293b; }
+    .input-mono { font-family: ui-monospace, monospace; font-size: 12px; text-transform: uppercase; }
+
+    .color-group { display: flex; align-items: center; gap: 8px; }
+    .color-group input[type="color"] { width: 52px; height: 40px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; padding: 2px; }
+
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none; width: 100%; height: 5px;
+      background: #e2e8f0; border-radius: 999px; outline: none; margin: 8px 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 18px; height: 18px;
+      border-radius: 50%; background: #fff; border: 3px solid #10b981; cursor: pointer;
+    }
+
+    .range-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; font-weight: 600; color: #475569; }
+    .range-value { font-family: ui-monospace, monospace; color: #059669; background: #ecfdf5; padding: 1px 7px; border-radius: 5px; font-size: 11px; }
+
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px; }
+    .toggle-switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-switch .slider { position: absolute; inset: 0; background: #cbd5e1; border-radius: 999px; cursor: pointer; transition: background .2s; }
+    .toggle-switch .slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
+    .toggle-switch input:checked + .slider { background: #10b981; }
+    .toggle-switch input:checked + .slider::before { transform: translateX(18px); }
+
+    .category-tab-btn {
+      padding: 8px 16px; border-radius: 10px; font-weight: 700; font-size: 12px;
+      cursor: pointer; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; transition: all .15s;
+    }
+    .category-tab-btn.active { background: #10b981; color: #fff; border-color: #10b981; }
+
+    .banner-filter-chip { transition: all .15s ease; cursor: pointer; }
+
+    .carousel-track-container { position: relative; overflow: hidden; border-radius: 14px; padding: 4px 0; }
+    .carousel-track {
+      display: flex; gap: 12px; overflow-x: auto; scroll-behavior: smooth;
+      padding: 6px 2px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    }
+    .carousel-track::-webkit-scrollbar { height: 6px; }
+    .carousel-track::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+
+    .preset-card {
+      flex: 0 0 240px; scroll-snap-align: start;
+      background: #fff; border: 2px solid #e2e8f0; border-radius: 12px; padding: 12px;
+      cursor: pointer; text-align: left; transition: all .2s cubic-bezier(.2,.7,.2,1);
+      position: relative; overflow: hidden;
+    }
+    .preset-card:hover { border-color: #10b981; transform: translateY(-2px); box-shadow: 0 6px 16px -4px rgba(15,23,42,.1); }
+    .preset-swatches { display: flex; height: 12px; border-radius: 5px; overflow: hidden; margin-top: 10px; border: 1px solid rgba(0,0,0,.08); }
+    .preset-swatch { flex: 1; height: 100%; }
+
+    .carousel-nav-btn {
+      position: absolute; top: 50%; transform: translateY(-50%); z-index: 10;
+      width: 32px; height: 32px; border-radius: 50%; background: #fff; border: 1px solid #cbd5e1;
+      display: flex; align-items: center; justify-content: center; font-weight: 800; color: #0f172a;
+      box-shadow: 0 4px 10px rgba(0,0,0,.1); cursor: pointer; transition: all .15s;
+    }
+    .carousel-nav-btn:hover { background: #10b981; color: #fff; border-color: #10b981; }
+    .carousel-nav-btn.prev { left: 4px; }
+    .carousel-nav-btn.next { right: 4px; }
+
+    .option-cards { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 10px; margin-top: 6px; }
+    .option-card { cursor: pointer; display: block; position: relative; }
+    .option-card input { position: absolute; opacity: 0; pointer-events: none; }
+    .option-card .oc-box { border: 2px solid #e2e8f0; border-radius: 12px; padding: 10px; background: #fff; text-align: center; transition: all .15s; }
+    .option-card input:checked + .oc-box { border-color: #10b981; background: #ecfdf5; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+    .subgroup { padding-top: 12px; margin-top: 12px; border-top: 1px dashed #e2e8f0; }
+
+    .mock-product {
+      position: relative;
+      padding: var(--pv-pcp, 1rem);
+      background-color: rgba(var(--pv-pct-rgb, 255,255,255), var(--pv-pco, 0.92));
+      backdrop-filter: blur(var(--pv-pcbl, 14px));
+      border: 1px solid rgba(255,255,255, var(--pv-pcbo, .4));
+      border-radius: var(--pv-pcr, 1rem);
+      box-shadow: 0 8px 24px -10px rgba(15,23,42, var(--pv-pcsh, .15));
+      transition: transform .22s ease;
+    }
+    .mock-product.lift:hover { transform: translateY(-4px); }
+    .mock-product .mp-thumb {
+      aspect-ratio: var(--pv-pcar, 1 / 1);
+      border-radius: calc(var(--pv-pcr, 1rem) - 6px);
+      background: linear-gradient(135deg, rgba(16,185,129,.2), rgba(245,158,11,.2));
+      display: flex; align-items: center; justify-content: center; font-size: 34px; margin-bottom: 10px;
+    }
+    .mock-product .mp-badge {
+      display: inline-block; font-size: var(--pv-bdg-size, 10px); font-weight: 700;
+      padding: 2px 8px; border-radius: var(--pv-bdg-radius, 999px);
+      background: var(--pv-bdg-bg, #10B981); color: var(--pv-bdg-text, #FFFFFF); margin-bottom: 8px;
+    }
+    .mock-product .mp-title { color: var(--pv-pcheading, #1F2937); font-weight: var(--pv-card-title-w, 700); font-size: var(--pv-card-title-s, 13px); }
+    .mock-product .mp-desc { color: var(--pv-pctext, #4B5563); font-size: var(--pv-card-desc-s, 11px); margin-top: 2px; }
+    .mock-product .mp-store { color: var(--pv-pcmuted, #6B7280); font-size: var(--pv-card-store-s, 10px); margin-top: 4px; }
+    .mock-product .mp-price { color: #10B981; font-weight: var(--pv-price-w, 800); font-size: var(--pv-price-s, 17px); }
+
+    .mock-btn {
+      padding: var(--pv-btn-py, 7px) var(--pv-btn-px, 13px);
+      border-radius: var(--pv-btn-radius, 0.6rem);
+      font-weight: var(--pv-btn-weight, 700); font-size: 11px; border: none; cursor: pointer;
+    }
+    .mock-btn-primary { background: #10B981; color: var(--pv-btn-primary-text, #fff); }
+    .mock-btn-secondary { background: #064E3B; color: var(--pv-btn-secondary-text, #fff); }
+    .mock-btn-accent { background: #F59E0B; color: var(--pv-btn-accent-text, #fff); }
+
+    .save-bar { position: sticky; bottom: 0; z-index: 20; padding-top: 12px; background: linear-gradient(to top, #f1f5f9 60%, transparent); margin-top: 10px; }
+    .save-bar-inner { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .btn { padding: 9px 16px; border-radius: 9px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; }
+    .btn-primary { background: #10b981; color: #fff; }
+    .btn-ghost { background: #f1f5f9; color: #475569; }
+  </style>
+</head>
+<body class="min-h-screen pb-12">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-[1400px] mx-auto p-4">
+    <div id="adminTabs"></div>
+
+    <div id="loadingState" class="bg-white rounded-xl border p-8 text-center text-sm text-gray-500">
+      Cargando configuración de componentes de productos...
+    </div>
+
+    <section id="content" class="hidden">
+      <div class="mb-4 bg-white p-4 rounded-xl border border-slate-200">
+        <h1 class="text-xl font-extrabold text-slate-900 flex items-center gap-2">🎴 Componentes y Banners Publicitarios</h1>
+        <p class="text-xs text-slate-500 mt-0.5">Configura el Carrusel Hero de la portada pública y el estilo de las tarjetas de producto.</p>
+      </div>
+
+      <div class="design-layout">
+        <div>
+
+          <!-- GESTIÓN DE BANNERS PUBLICITARIOS (FASE 23-C) -->
+          <details class="panel-section" open>
+            <summary>
+              <span class="sec-icon">🖼️</span> Gestión de Banners Publicitarios (Hero Carousel)
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body space-y-4">
+
+              <div class="flex items-center justify-between gap-2 border-b border-slate-100 pb-3">
+                <div>
+                  <p class="text-xs font-bold text-slate-800">Banners por Módulo</p>
+                  <p class="text-[11px] text-slate-500">Administra los banners del Index, Tiendas, Inmuebles y Delivery por separado.</p>
+                </div>
+                <button type="button" id="openCreateBannerBtn"
+                  class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-3.5 py-2 rounded-xl transition shadow flex items-center gap-1">
+                  <span>+</span> <span>Nuevo Banner</span>
+                </button>
+              </div>
+
+              <!-- Filtro por módulo -->
+              <div class="flex items-center gap-2 flex-wrap pb-2 border-b border-slate-100">
+                <span class="text-[10px] font-bold text-slate-500 uppercase">Filtrar por módulo:</span>
+                <button type="button" data-banner-filter="all" class="banner-filter-chip bg-slate-900 text-white text-[11px] font-bold px-3 py-1.5 rounded-full transition">Todos</button>
+                <button type="button" data-banner-filter="index" class="banner-filter-chip bg-white text-slate-600 border border-slate-200 hover:border-indigo-500 text-[11px] font-bold px-3 py-1.5 rounded-full transition">🏠 Index</button>
+                <button type="button" data-banner-filter="tiendas" class="banner-filter-chip bg-white text-slate-600 border border-slate-200 hover:border-indigo-500 text-[11px] font-bold px-3 py-1.5 rounded-full transition">🛍️ Tiendas</button>
+                <button type="button" data-banner-filter="inmuebles" class="banner-filter-chip bg-white text-slate-600 border border-slate-200 hover:border-indigo-500 text-[11px] font-bold px-3 py-1.5 rounded-full transition">🏢 Inmuebles</button>
+                <button type="button" data-banner-filter="delivery" class="banner-filter-chip bg-white text-slate-600 border border-slate-200 hover:border-indigo-500 text-[11px] font-bold px-3 py-1.5 rounded-full transition">🛵 Delivery</button>
+              </div>
+
+              <!-- Lista -->
+              <div id="bannersAdminList" class="space-y-3">
+                <p class="text-xs text-slate-500 text-center py-4">Cargando banners...</p>
+              </div>
+
+            </div>
+          </details>
+
+          <!-- CARRUSEL 20 PRESETS DE COMPONENTES -->
+          <details class="panel-section">
+            <summary>
+              <span class="sec-icon">👓</span>
+              20 Presets para Tarjetas de Productos
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body">
+
+              <div class="flex items-center gap-2 mb-4">
+                <button type="button" class="category-tab-btn active" id="tabConfortComp" onclick="filterCategoryComp('confort')">👓 Confort Visual (10)</button>
+                <button type="button" class="category-tab-btn" id="tabFestivosComp" onclick="filterCategoryComp('festivos')">🇬🇹 Ferias y Festividades (10)</button>
+              </div>
+
+              <div class="carousel-track-container">
+                <button type="button" class="carousel-nav-btn prev" onclick="scrollCarousel(-260)">‹</button>
+                <button type="button" class="carousel-nav-btn next" onclick="scrollCarousel(260)">›</button>
+
+                <div class="carousel-track" id="presetsCompTrack">
+
+                  <div class="preset-card comp-confort-item" onclick="applyCompPreset(1)">
+                    <span class="text-[10px] font-bold text-amber-700 bg-amber-100 px-2 py-0.5 rounded-full">1. Sepia Papel</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Cálido Cuidado</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#FDF6E2"></div><div class="preset-swatch" style="background:#451A03"></div><div class="preset-swatch" style="background:#D97706"></div></div>
+                  </div>
+                  <div class="preset-card comp-confort-item" onclick="applyCompPreset(2)">
+                    <span class="text-[10px] font-bold text-teal-700 bg-teal-100 px-2 py-0.5 rounded-full">2. Slate Dark</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Pizarra Antirreflejo</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#1E293B"></div><div class="preset-swatch" style="background:#F8FAFC"></div><div class="preset-swatch" style="background:#14B8A6"></div></div>
+                  </div>
+                  <div class="preset-card comp-confort-item" onclick="applyCompPreset(3)">
+                    <span class="text-[10px] font-bold text-emerald-700 bg-emerald-100 px-2 py-0.5 rounded-full">3. Sage Focus</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Menta & Bosque</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#065F46"></div><div class="preset-swatch" style="background:#ECFDF5"></div><div class="preset-swatch" style="background:#10B981"></div></div>
+                  </div>
+                  <div class="preset-card comp-confort-item" onclick="applyCompPreset(4)">
+                    <span class="text-[10px] font-bold text-blue-700 bg-blue-100 px-2 py-0.5 rounded-full">4. Niebla Nórdica</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Diurno Mate</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#FFFFFF"></div><div class="preset-swatch" style="background:#0F172A"></div><div class="preset-swatch" style="background:#2563EB"></div></div>
+                  </div>
+                  <div class="preset-card comp-confort-item" onclick="applyCompPreset(5)">
+                    <span class="text-[10px] font-bold text-stone-700 bg-stone-200 px-2 py-0.5 rounded-full">5. Café Mocha</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Tostado Atardecer</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#292524"></div><div class="preset-swatch" style="background:#FAFAF9"></div><div class="preset-swatch" style="background:#D97706"></div></div>
+                  </div>
+                  <div class="preset-card comp-confort-item" onclick="applyCompPreset(6)">
+                    <span class="text-[10px] font-bold text-orange-700 bg-orange-100 px-2 py-0.5 rounded-full">6. Pergamino</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Impreso Clásico</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#EAE0D5"></div><div class="preset-swatch" style="background:#1C1917"></div><div class="preset-swatch" style="background:#C85A32"></div></div>
+                  </div>
+                  <div class="preset-card comp-confort-item" onclick="applyCompPreset(7)">
+                    <span class="text-[10px] font-bold text-slate-200 bg-black px-2 py-0.5 rounded-full">7. OLED Noche</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Negro Absoluto</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#111111"></div><div class="preset-swatch" style="background:#FFFFFF"></div><div class="preset-swatch" style="background:#10B981"></div></div>
+                  </div>
+                  <div class="preset-card comp-confort-item" onclick="applyCompPreset(8)">
+                    <span class="text-[10px] font-bold text-cyan-700 bg-cyan-100 px-2 py-0.5 rounded-full">8. Océano Abisal</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Calma Ciliar</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#112240"></div><div class="preset-swatch" style="background:#E6F1FF"></div><div class="preset-swatch" style="background:#64FFDA"></div></div>
+                  </div>
+                  <div class="preset-card comp-confort-item" onclick="applyCompPreset(9)">
+                    <span class="text-[10px] font-bold text-purple-700 bg-purple-100 px-2 py-0.5 rounded-full">9. Sombra Cerezo</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Ciruela Suave</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#2D2438"></div><div class="preset-swatch" style="background:#FDF2F8"></div><div class="preset-swatch" style="background:#EC4899"></div></div>
+                  </div>
+                  <div class="preset-card comp-confort-item" onclick="applyCompPreset(10)">
+                    <span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full">10. Luz Atenuada</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Hueso Antideslumbrante</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#FFFFFF"></div><div class="preset-swatch" style="background:#0F172A"></div><div class="preset-swatch" style="background:#16A34A"></div></div>
+                  </div>
+
+                  <div class="preset-card comp-festivo-item hidden" onclick="applyCompPreset(11)">
+                    <span class="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">11. Independencia</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Azul Chapín</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#0066FF"></div><div class="preset-swatch" style="background:#FFFFFF"></div><div class="preset-swatch" style="background:#60A5FA"></div></div>
+                  </div>
+                  <div class="preset-card comp-festivo-item hidden" onclick="applyCompPreset(12)">
+                    <span class="text-[10px] font-bold text-indigo-800 bg-indigo-100 px-2 py-0.5 rounded-full">12. Feria de Xelajú</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Xelafer Festiva</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#1E1B4B"></div><div class="preset-swatch" style="background:#F8FAFC"></div><div class="preset-swatch" style="background:#EF4444"></div></div>
+                  </div>
+                  <div class="preset-card comp-festivo-item hidden" onclick="applyCompPreset(13)">
+                    <span class="text-[10px] font-bold text-purple-900 bg-purple-100 px-2 py-0.5 rounded-full">13. Semana Santa</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Púrpura Procesional</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#2E1065"></div><div class="preset-swatch" style="background:#FEF3C7"></div><div class="preset-swatch" style="background:#FBBF24"></div></div>
+                  </div>
+                  <div class="preset-card comp-festivo-item hidden" onclick="applyCompPreset(14)">
+                    <span class="text-[10px] font-bold text-fuchsia-900 bg-fuchsia-100 px-2 py-0.5 rounded-full">14. Fiambre Chapín</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Violeta y Remolacha</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#3B0764"></div><div class="preset-swatch" style="background:#FDF4FF"></div><div class="preset-swatch" style="background:#FACC15"></div></div>
+                  </div>
+                  <div class="preset-card comp-festivo-item hidden" onclick="applyCompPreset(15)">
+                    <span class="text-[10px] font-bold text-orange-900 bg-orange-100 px-2 py-0.5 rounded-full">15. Barriletes Gigantes</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Color Popular Sumpango</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#0F172A"></div><div class="preset-swatch" style="background:#FFFFFF"></div><div class="preset-swatch" style="background:#F97316"></div></div>
+                  </div>
+                  <div class="preset-card comp-festivo-item hidden" onclick="applyCompPreset(16)">
+                    <span class="text-[10px] font-bold text-red-900 bg-red-100 px-2 py-0.5 rounded-full">16. Navidad Chapina</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Rojo Pascua & Pinabete</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#052E16"></div><div class="preset-swatch" style="background:#FEF3C7"></div><div class="preset-swatch" style="background:#DC2626"></div></div>
+                  </div>
+                  <div class="preset-card comp-festivo-item hidden" onclick="applyCompPreset(17)">
+                    <span class="text-[10px] font-bold text-yellow-900 bg-yellow-100 px-2 py-0.5 rounded-full">17. Año Nuevo</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Negro y Dorado Gala</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#09090B"></div><div class="preset-swatch" style="background:#FFFFFF"></div><div class="preset-swatch" style="background:#FBBF24"></div></div>
+                  </div>
+                  <div class="preset-card comp-festivo-item hidden" onclick="applyCompPreset(18)">
+                    <span class="text-[10px] font-bold text-purple-100 bg-purple-900 px-2 py-0.5 rounded-full">18. Halloween</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Naranja Calabaza Neón</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#180228"></div><div class="preset-swatch" style="background:#FAF5FF"></div><div class="preset-swatch" style="background:#EA580C"></div></div>
+                  </div>
+                  <div class="preset-card comp-festivo-item hidden" onclick="applyCompPreset(19)">
+                    <span class="text-[10px] font-bold text-teal-900 bg-teal-100 px-2 py-0.5 rounded-full">19. Rabín Ajau</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Verde Quetzal Textil</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#064E3B"></div><div class="preset-swatch" style="background:#ECFDF5"></div><div class="preset-swatch" style="background:#F43F5E"></div></div>
+                  </div>
+                  <div class="preset-card comp-festivo-item hidden" onclick="applyCompPreset(20)">
+                    <span class="text-[10px] font-bold text-red-100 bg-red-900 px-2 py-0.5 rounded-full">20. Quema del Diablo</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Fuego Festivo</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#1C1917"></div><div class="preset-swatch" style="background:#FEF2F2"></div><div class="preset-swatch" style="background:#EF4444"></div></div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- TARJETAS -->
+          <details class="panel-section">
+            <summary>
+              <span class="sec-icon">🎴</span> Estilo de Tarjetas de Producto
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body">
+              <div class="toggle-row">
+                <span class="text-xs font-semibold">Vidrio en tarjetas</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="productGlassEnabled" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="grid-2 mt-3">
+                <div>
+                  <label class="field-label">Tinte Exclusivo Tarjetas</label>
+                  <div class="color-group">
+                    <input type="color" id="productTint" value="#FFFFFF">
+                    <input type="text" id="productTintHex" value="#FFFFFF" maxlength="7" class="input-text input-mono">
+                  </div>
+                </div>
+                <div>
+                  <div class="range-row"><span>Opacidad</span><span class="range-value" id="productOpacityLabel">92%</span></div>
+                  <input type="range" id="productOpacity" min="20" max="100" step="1" value="92">
+                </div>
+              </div>
+
+              <div class="grid-2 mt-2">
+                <div>
+                  <div class="range-row"><span>Radio</span><span class="range-value" id="productRadiusLabel">1rem</span></div>
+                  <input type="range" id="productRadius" min="0" max="32" step="1" value="16">
+                </div>
+                <div>
+                  <div class="range-row"><span>Padding</span><span class="range-value" id="productPaddingLabel">1rem</span></div>
+                  <input type="range" id="productPadding" min="0" max="3" step="0.25" value="1">
+                </div>
+              </div>
+
+              <div class="subgroup">
+                <p class="field-label">Aspecto de Imagen</p>
+                <div class="option-cards">
+                  <label class="option-card">
+                    <input type="radio" name="productAspect" value="1 / 1" checked>
+                    <span class="oc-box"><span class="text-xs font-bold block">1 : 1</span><span class="text-[10px] text-slate-400">Cuadrada</span></span>
+                  </label>
+                  <label class="option-card">
+                    <input type="radio" name="productAspect" value="4 / 3">
+                    <span class="oc-box"><span class="text-xs font-bold block">4 : 3</span><span class="text-[10px] text-slate-400">Clásica</span></span>
+                  </label>
+                  <label class="option-card">
+                    <input type="radio" name="productAspect" value="16 / 9">
+                    <span class="oc-box"><span class="text-xs font-bold block">16 : 9</span><span class="text-[10px] text-slate-400">Wide</span></span>
+                  </label>
+                </div>
+              </div>
+
+              <div class="toggle-row mt-3">
+                <span class="text-xs font-semibold">Elevar al pasar el mouse</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="productHoverLift" checked>
+                  <span class="slider"></span>
+                </label>
+              </div>
+            </div>
+          </details>
+
+          <!-- TIPOGRAFÍA -->
+          <details class="panel-section">
+            <summary>
+              <span class="sec-icon">🔤</span> Tipografía Independiente de Tarjetas
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body">
+              <div class="grid-2">
+                <div>
+                  <div class="range-row"><span>Tamaño Título</span><span class="range-value" id="cardTitleSizeLabel">1rem</span></div>
+                  <input type="range" id="cardTitleSize" min="0.7" max="1.6" step="0.05" value="1">
+                </div>
+                <div>
+                  <div class="range-row"><span>Peso Título</span><span class="range-value" id="cardTitleWeightLabel">700</span></div>
+                  <input type="range" id="cardTitleWeight" min="400" max="900" step="100" value="700">
+                </div>
+              </div>
+
+              <div class="grid-3 mt-3">
+                <div>
+                  <label class="field-label">Color Título</label>
+                  <div class="color-group"><input type="color" id="pcHeadingColor" value="#1F2937"><input type="text" id="pcHeadingHex" value="#1F2937" class="input-text input-mono"></div>
+                </div>
+                <div>
+                  <label class="field-label">Color Desc.</label>
+                  <div class="color-group"><input type="color" id="pcTextColor" value="#4B5563"><input type="text" id="pcTextHex" value="#4B5563" class="input-text input-mono"></div>
+                </div>
+                <div>
+                  <label class="field-label">Color Tienda</label>
+                  <div class="color-group"><input type="color" id="pcMutedColor" value="#6B7280"><input type="text" id="pcMutedHex" value="#6B7280" class="input-text input-mono"></div>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- PRECIOS Y BADGES -->
+          <details class="panel-section">
+            <summary>
+              <span class="sec-icon">💰</span> Precios y Badges
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body">
+              <div class="grid-2">
+                <div>
+                  <div class="range-row"><span>Tamaño Precio</span><span class="range-value" id="priceSizeLabel">1.125rem</span></div>
+                  <input type="range" id="priceSize" min="0.85" max="1.8" step="0.05" value="1.125">
+                </div>
+                <div>
+                  <div class="range-row"><span>Peso Precio</span><span class="range-value" id="priceWeightLabel">800</span></div>
+                  <input type="range" id="priceWeight" min="400" max="900" step="100" value="800">
+                </div>
+              </div>
+
+              <div class="grid-2 mt-3">
+                <div>
+                  <label class="field-label">Fondo Badge</label>
+                  <div class="color-group"><input type="color" id="badgeBgColor" value="#10B981"><input type="text" id="badgeBgHex" value="#10B981" class="input-text input-mono"></div>
+                </div>
+                <div>
+                  <label class="field-label">Texto Badge</label>
+                  <div class="color-group"><input type="color" id="badgeTextColor" value="#FFFFFF"><input type="text" id="badgeTextHex" value="#FFFFFF" class="input-text input-mono"></div>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- BOTONES -->
+          <details class="panel-section">
+            <summary>
+              <span class="sec-icon">🔘</span> Estilos de Botones
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body">
+              <div class="grid-3">
+                <div>
+                  <div class="range-row"><span>Radio</span><span class="range-value" id="btnPrimaryRadiusLabel">0.75rem</span></div>
+                  <input type="range" id="btnPrimaryRadius" min="0" max="32" step="1" value="12">
+                </div>
+                <div>
+                  <div class="range-row"><span>Padding X</span><span class="range-value" id="btnPrimaryPxLabel">0.75rem</span></div>
+                  <input type="range" id="btnPrimaryPx" min="0.25" max="2" step="0.05" value="0.75">
+                </div>
+                <div>
+                  <div class="range-row"><span>Padding Y</span><span class="range-value" id="btnPrimaryPyLabel">0.5rem</span></div>
+                  <input type="range" id="btnPrimaryPy" min="0.25" max="1.5" step="0.05" value="0.5">
+                </div>
+              </div>
+
+              <div class="grid-3 mt-3">
+                <div>
+                  <label class="field-label">Texto Primario</label>
+                  <div class="color-group"><input type="color" id="btnPrimaryTextColor" value="#FFFFFF"><input type="text" id="btnPrimaryTextHex" value="#FFFFFF" class="input-text input-mono"></div>
+                </div>
+                <div>
+                  <label class="field-label">Texto Secundario</label>
+                  <div class="color-group"><input type="color" id="btnSecondaryTextColor" value="#FFFFFF"><input type="text" id="btnSecondaryTextHex" value="#FFFFFF" class="input-text input-mono"></div>
+                </div>
+                <div>
+                  <label class="field-label">Texto Acento</label>
+                  <div class="color-group"><input type="color" id="btnAccentTextColor" value="#FFFFFF"><input type="text" id="btnAccentTextHex" value="#FFFFFF" class="input-text input-mono"></div>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <div class="save-bar">
+            <div class="save-bar-inner">
+              <div>
+                <p class="text-sm font-bold text-slate-800">¿Guardar componentes?</p>
+                <p class="text-[11px] text-slate-500">Afectará la vista de productos en la tienda.</p>
+              </div>
+              <div class="flex gap-2">
+                <button type="button" id="resetBtn" class="btn btn-ghost">↩️ Descartar</button>
+                <button type="button" id="saveBtn" class="btn btn-primary">💾 Guardar cambios</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- PREVIEW -->
+        <div class="sticky top-4">
+          <div class="bg-white rounded-2xl border p-4 shadow-sm">
+            <h3 class="font-extrabold text-sm mb-3">👁️ Vista previa de tarjeta de producto</h3>
+            <div id="previewCanvas" class="bg-slate-100 p-4 rounded-xl border">
+
+              <div class="mock-product" id="mockProduct">
+                <div class="mp-thumb">📦</div>
+                <span class="mp-badge">⭐ Destacado</span>
+                <div class="mp-title">Café Artesanal Xela 500g</div>
+                <div class="mp-desc">Tostado medio de molienda fina.</div>
+                <div class="mp-store">Por Beneficio Los Altos</div>
+                <div class="flex items-center justify-between mt-3">
+                  <span class="mp-price">Q 85.00</span>
+                  <button class="mock-btn mock-btn-primary">Pedir</button>
+                </div>
+              </div>
+
+              <div class="flex gap-2 mt-4">
+                <button class="mock-btn mock-btn-primary">Primario</button>
+                <button class="mock-btn mock-btn-secondary">Secundario</button>
+                <button class="mock-btn mock-btn-accent">Acento</button>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL CREAR / EDITAR BANNER -->
+  <div id="bannerModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[80] flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto border border-slate-200">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h3 id="bannerModalTitle" class="text-base font-extrabold text-slate-900">🖼️ Agregar Banner Publicitario</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Configura la imagen, módulo destino, orden y redirección del slide</p>
+        </div>
+        <button type="button" id="closeBannerModalBtn"
+          class="bg-slate-100 hover:bg-slate-200 text-slate-700 w-8 h-8 rounded-full font-bold flex items-center justify-center">✕</button>
+      </div>
+
+      <form id="bannerAdminForm" class="p-5 space-y-4">
+        <input type="hidden" id="bannerId">
+
+        <!-- Imagen -->
+        <div>
+          <label class="field-label">Imagen del Banner *</label>
+          <div class="flex gap-2 mb-2">
+            <input type="text" id="bannerImageUrl" required placeholder="https://ejemplo.com/banner.jpg" class="input-text text-xs">
+            <label class="bg-slate-800 hover:bg-black text-white font-bold text-xs px-3 py-2 rounded-lg cursor-pointer transition flex items-center justify-center flex-shrink-0">
+              <span>Subir</span>
+              <input type="file" id="bannerFileInput" accept="image/*" class="hidden">
+            </label>
+          </div>
+          <div id="bannerImgPreview" class="hidden rounded-xl overflow-hidden border border-slate-200 bg-slate-100 aspect-[21/9] relative">
+            <img id="bannerImgPreviewEl" src="" class="w-full h-full object-cover">
+          </div>
+        </div>
+
+        <!-- Título y Subtítulo -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">Título Principal (Opcional)</label>
+            <input type="text" id="bannerTitle" placeholder="Ej. ¡Grandes Ofertas de Xela!" class="input-text text-xs font-semibold">
+          </div>
+          <div>
+            <label class="field-label">Subtítulo / Bajada (Opcional)</label>
+            <input type="text" id="bannerSubtitle" placeholder="Ej. Hasta 30% OFF en repostería local" class="input-text text-xs">
+          </div>
+        </div>
+
+        <!-- Tipo de Enlace y Destino -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">Tipo de Redirección (link_type) *</label>
+            <select id="bannerLinkType" required class="input-text text-xs font-bold bg-white">
+              <option value="category">🏷️ Categoría (Slug)</option>
+              <option value="store">🏪 Tienda (Slug)</option>
+              <option value="product">📦 Producto (ID / Quick View)</option>
+              <option value="external">🌐 Enlace Externo (URL)</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Valor / Destino (link_value) *</label>
+            <select id="bannerLinkQuickSelect" class="input-text text-xs font-bold bg-emerald-50 border-emerald-300 text-emerald-900 mb-1.5 hidden">
+              <option value="">-- Selecciona una opción sugerida --</option>
+            </select>
+            <input type="text" id="bannerLinkValue" required placeholder="Ej. panaderia, mi-tienda, ID, https://..." class="input-text text-xs font-mono">
+          </div>
+        </div>
+
+        <!-- MÓDULO DESTINO Y POSICIÓN (FASE 23-C) -->
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="field-label">Módulo Destino *</label>
+            <select id="bannerTargetModule" required class="input-text text-xs font-bold bg-white">
+              <option value="index">🏠 Index / Portada Principal</option>
+              <option value="tiendas" selected>🛍️ Sección Tiendas</option>
+              <option value="inmuebles">🏢 Sección Inmuebles</option>
+              <option value="delivery">🛵 Sección Delivery</option>
+            </select>
+          </div>
+          <div>
+            <label class="field-label">Posición *</label>
+            <select id="bannerPlacement" required class="input-text text-xs font-bold bg-white">
+              <option value="hero" selected>🎯 Hero (destacado arriba)</option>
+              <option value="mid">📌 Mid (intermedio)</option>
+              <option value="sidebar">📎 Sidebar</option>
+              <option value="bottom">⬇️ Bottom (pie)</option>
+            </select>
+          </div>
+        </div>
+
+        <!-- Orden y Estado -->
+        <div class="grid grid-cols-2 gap-3 pt-2">
+          <div>
+            <label class="field-label">Prioridad de Orden (sort_order)</label>
+            <input type="number" id="bannerSortOrder" value="1" min="1" step="1" class="input-text text-xs font-bold">
+          </div>
+          <div class="flex items-center pt-5">
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="bannerIsActive" checked class="w-4 h-4 accent-emerald-600 rounded">
+              <span class="text-xs font-bold text-slate-800">✅ Banner Activo</span>
+            </label>
+          </div>
+        </div>
+
+        <div class="flex gap-2 pt-3 border-t">
+          <button type="button" id="cancelBannerBtn" class="btn btn-ghost flex-1 text-xs">Cancelar</button>
+          <button type="submit" id="saveBannerBtn" class="btn btn-primary flex-1 text-xs">Guardar Banner</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-[90] bg-emerald-600 text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-2xl transition-opacity duration-300"></div>
+
+  <script>
+    let adminBanners = [];
+    let cachedCategories = [];
+    let cachedStores = [];
+    let cachedProducts = [];
+    let currentBannerFilter = 'all';
+
+    const COMPONENT_PRESETS = {
+      1: { tint: '#FDF6E2', opacity: 90, heading: '#451A03', text: '#78350F', muted: '#92400E', badgeBg: '#D97706', badgeText: '#FFFFFF' },
+      2: { tint: '#1E293B', opacity: 85, heading: '#F8FAFC', text: '#E2E8F0', muted: '#94A3B8', badgeBg: '#14B8A6', badgeText: '#FFFFFF' },
+      3: { tint: '#065F46', opacity: 85, heading: '#ECFDF5', text: '#D1FAE5', muted: '#6EE7B7', badgeBg: '#10B981', badgeText: '#FFFFFF' },
+      4: { tint: '#FFFFFF', opacity: 92, heading: '#0F172A', text: '#1E293B', muted: '#64748B', badgeBg: '#2563EB', badgeText: '#FFFFFF' },
+      5: { tint: '#292524', opacity: 85, heading: '#FAFAF9', text: '#E7E5E4', muted: '#A8A29E', badgeBg: '#D97706', badgeText: '#FFFFFF' },
+      6: { tint: '#EAE0D5', opacity: 90, heading: '#1C1917', text: '#2B2B2B', muted: '#78716C', badgeBg: '#C85A32', badgeText: '#FFFFFF' },
+      7: { tint: '#111111', opacity: 95, heading: '#FFFFFF', text: '#E5E7EB', muted: '#9CA3AF', badgeBg: '#10B981', badgeText: '#FFFFFF' },
+      8: { tint: '#112240', opacity: 88, heading: '#E6F1FF', text: '#CCD6F6', muted: '#8892B0', badgeBg: '#64FFDA', badgeText: '#0A192F' },
+      9: { tint: '#2D2438', opacity: 85, heading: '#FDF2F8', text: '#F3E8EE', muted: '#A78BFA', badgeBg: '#EC4899', badgeText: '#FFFFFF' },
+      10: { tint: '#FFFFFF', opacity: 94, heading: '#0F172A', text: '#334155', muted: '#64748B', badgeBg: '#16A34A', badgeText: '#FFFFFF' },
+      11: { tint: '#0066FF', opacity: 90, heading: '#FFFFFF', text: '#F0F9FF', muted: '#BAE6FD', badgeBg: '#60A5FA', badgeText: '#FFFFFF' },
+      12: { tint: '#1E1B4B', opacity: 88, heading: '#F8FAFC', text: '#E0E7FF', muted: '#C7D2FE', badgeBg: '#EF4444', badgeText: '#FFFFFF' },
+      13: { tint: '#2E1065', opacity: 85, heading: '#FEF3C7', text: '#F3E8FF', muted: '#D8B4FE', badgeBg: '#FBBF24', badgeText: '#2E1065' },
+      14: { tint: '#3B0764', opacity: 88, heading: '#FDF4FF', text: '#F5D0FE', muted: '#E9D5FF', badgeBg: '#FACC15', badgeText: '#3B0764' },
+      15: { tint: '#0F172A', opacity: 85, heading: '#FFFFFF', text: '#E2E8F0', muted: '#94A3B8', badgeBg: '#F97316', badgeText: '#FFFFFF' },
+      16: { tint: '#052E16', opacity: 90, heading: '#FEF3C7', text: '#F0FDF4', muted: '#86EFAC', badgeBg: '#DC2626', badgeText: '#FFFFFF' },
+      17: { tint: '#09090B', opacity: 92, heading: '#FFFFFF', text: '#F4F4F5', muted: '#A1A1AA', badgeBg: '#FBBF24', badgeText: '#000000' },
+      18: { tint: '#180228', opacity: 88, heading: '#FAF5FF', text: '#F3E8FF', muted: '#C084FC', badgeBg: '#EA580C', badgeText: '#FFFFFF' },
+      19: { tint: '#064E3B', opacity: 88, heading: '#ECFDF5', text: '#D1FAE5', muted: '#6EE7B7', badgeBg: '#F43F5E', badgeText: '#FFFFFF' },
+      20: { tint: '#1C1917', opacity: 90, heading: '#FEF2F2', text: '#FEE2E2', muted: '#FCA5A5', badgeBg: '#EF4444', badgeText: '#FFFFFF' }
+    };
+
+    (async () => {
+      const session = await adminGuardPage();
+      if (!session) return;
+      await initAdminNav({ user: session.user });
+
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+
+      bindColorPairs();
+      bindInputs();
+      bindActions();
+      bindBannerAdminEvents();
+      loadSettings();
+      await Promise.all([ loadAdminBanners(), preloadLinkOptions() ]);
+    })();
+
+    // =============================================================
+    // SUGERENCIAS DE ENLACES
+    // =============================================================
+    async function preloadLinkOptions() {
+      if (cachedCategories.length && cachedStores.length && cachedProducts.length) return;
+      try {
+        const [catRes, storeRes, prodRes] = await Promise.all([
+          _supabase.from('categories').select('id, name, slug, icon').order('name'),
+          _supabase.from('stores').select('id, name, slug').eq('is_active', true).order('name'),
+          _supabase.from('products').select('id, title, price').eq('is_active', true).order('title').limit(150)
+        ]);
+        cachedCategories = catRes.data || [];
+        cachedStores = storeRes.data || [];
+        cachedProducts = prodRes.data || [];
+      } catch (err) {
+        console.warn('[AdminBanners] Error precargando opciones de enlaces:', err);
+      }
+    }
+
+    function updateLinkValueOptions(selectedType, currentValue = '') {
+      const selectEl = document.getElementById('bannerLinkQuickSelect');
+      if (!selectEl) return;
+
+      selectEl.innerHTML = '<option value="">-- Selecciona una opción sugerida --</option>';
+
+      if (selectedType === 'category') {
+        selectEl.classList.remove('hidden');
+        cachedCategories.forEach(c => {
+          const opt = document.createElement('option');
+          opt.value = c.slug || '';
+          opt.textContent = `${c.icon || '🏷️'} ${c.name} (${c.slug})`;
+          if (c.slug === currentValue) opt.selected = true;
+          selectEl.appendChild(opt);
+        });
+      } else if (selectedType === 'store') {
+        selectEl.classList.remove('hidden');
+        cachedStores.forEach(s => {
+          const opt = document.createElement('option');
+          opt.value = s.slug || '';
+          opt.textContent = `🏪 ${s.name} (${s.slug})`;
+          if (s.slug === currentValue) opt.selected = true;
+          selectEl.appendChild(opt);
+        });
+      } else if (selectedType === 'product') {
+        selectEl.classList.remove('hidden');
+        cachedProducts.forEach(p => {
+          const opt = document.createElement('option');
+          opt.value = p.id;
+          opt.textContent = `📦 ${p.title} - Q${parseFloat(p.price || 0).toFixed(2)} (ID: ${p.id})`;
+          if (String(p.id) === String(currentValue)) opt.selected = true;
+          selectEl.appendChild(opt);
+        });
+      } else {
+        selectEl.classList.add('hidden');
+      }
+    }
+
+    // =============================================================
+    // LISTADO DE BANNERS
+    // =============================================================
+    async function loadAdminBanners() {
+      const listEl = document.getElementById('bannersAdminList');
+      if (!listEl) return;
+
+      try {
+        const { data, error } = await _supabase
+          .from('banners')
+          .select('*')
+          .order('target_module', { ascending: true })
+          .order('sort_order', { ascending: true });
+
+        if (error) throw error;
+        adminBanners = data || [];
+        renderAdminBannersList();
+      } catch (err) {
+        console.warn('[AdminBanners] Error al cargar banners:', err.message);
+        listEl.innerHTML = `<p class="text-xs text-rose-500 text-center py-4">No se pudo consultar la tabla 'banners'. Revisa Supabase.</p>`;
+      }
+    }
+
+    function renderAdminBannersList() {
+      const listEl = document.getElementById('bannersAdminList');
+      if (!listEl) return;
+
+      const filtered = currentBannerFilter === 'all'
+        ? adminBanners
+        : adminBanners.filter(b => (b.target_module || 'index') === currentBannerFilter);
+
+      if (filtered.length === 0) {
+        listEl.innerHTML = `
+          <div class="text-center py-6 bg-slate-50 border border-dashed rounded-xl">
+            <p class="text-2xl mb-1">🖼️</p>
+            <p class="text-xs font-bold text-slate-700">
+              ${currentBannerFilter === 'all'
+                ? 'No hay banners publicitarios registrados'
+                : `No hay banners para "${currentBannerFilter}"`}
+            </p>
+            <p class="text-[11px] text-slate-500 mt-0.5">Haz clic en "Nuevo Banner" para agregar el primero.</p>
+          </div>`;
+        return;
+      }
+
+      const moduleLabels = {
+        index: '🏠 Index',
+        tiendas: '🛍️ Tiendas',
+        inmuebles: '🏢 Inmuebles',
+        delivery: '🛵 Delivery'
+      };
+      const typeLabels = {
+        category: '🏷️ Categoría',
+        store: '🏪 Tienda',
+        product: '📦 Producto',
+        external: '🌐 Externo'
+      };
+
+      listEl.innerHTML = filtered.map((b, idx) => {
+        const title = b.title || 'Sin Título';
+        const img = b.image_url || 'https://via.placeholder.com/600x200?text=Banner';
+        const typeLabel = typeLabels[b.link_type] || '🌐';
+        const moduleLabel = moduleLabels[b.target_module] || '🏠 Index';
+        const isFirst = idx === 0;
+        const isLast = idx === filtered.length - 1;
+
+        return `
+          <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 p-3 bg-white border border-slate-200 rounded-xl shadow-sm hover:border-emerald-500 transition">
+            <div class="flex items-center gap-3 min-w-0 w-full sm:w-auto">
+              <div class="w-24 h-12 rounded-lg bg-slate-100 overflow-hidden flex-shrink-0 border">
+                <img src="${img}" alt="${title}" class="w-full h-full object-cover">
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h4 class="font-extrabold text-xs text-slate-900 truncate">${title}</h4>
+                  <span class="text-[10px] font-bold px-2 py-0.5 rounded-full ${b.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-100 text-slate-500'}">
+                    ${b.is_active ? '✅ Activo' : '⏸️ Pausado'}
+                  </span>
+                  <span class="text-[10px] font-bold bg-indigo-50 text-indigo-800 px-2 py-0.5 rounded-full">${moduleLabel}</span>
+                  <span class="text-[10px] font-mono bg-blue-50 text-blue-800 px-1.5 py-0.5 rounded font-bold">#${b.sort_order || 1}</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-0.5 truncate">
+                  ${typeLabel}: <span class="font-mono text-slate-700">${b.link_value || 'N/A'}</span>
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-1.5 w-full sm:w-auto justify-end border-t sm:border-t-0 pt-2 sm:pt-0">
+              <button type="button" data-action="move-up" data-id="${b.id}" ${isFirst ? 'disabled' : ''} class="bg-slate-100 hover:bg-slate-200 text-slate-700 p-1.5 rounded-lg text-xs font-bold disabled:opacity-30">▲</button>
+              <button type="button" data-action="move-down" data-id="${b.id}" ${isLast ? 'disabled' : ''} class="bg-slate-100 hover:bg-slate-200 text-slate-700 p-1.5 rounded-lg text-xs font-bold disabled:opacity-30">▼</button>
+              <button type="button" data-action="toggle-active" data-id="${b.id}" data-active="${!b.is_active}" class="bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold text-xs px-2.5 py-1.5 rounded-lg">
+                ${b.is_active ? 'Pausar' : 'Activar'}
+              </button>
+              <button type="button" data-action="edit" data-id="${b.id}" class="bg-blue-50 text-blue-700 hover:bg-blue-100 font-bold text-xs px-2.5 py-1.5 rounded-lg">Editar</button>
+              <button type="button" data-action="delete" data-id="${b.id}" class="bg-rose-50 text-rose-700 hover:bg-rose-100 font-bold text-xs px-2.5 py-1.5 rounded-lg">🗑️</button>
+            </div>
+          </div>`;
+      }).join('');
+    }
+
+    function bindBannerAdminEvents() {
+      const openBtn = document.getElementById('openCreateBannerBtn');
+      const closeBtn = document.getElementById('closeBannerModalBtn');
+      const cancelBtn = document.getElementById('cancelBannerBtn');
+      const modal = document.getElementById('bannerModal');
+      const form = document.getElementById('bannerAdminForm');
+      const imgInput = document.getElementById('bannerImageUrl');
+      const fileInput = document.getElementById('bannerFileInput');
+      const linkTypeSelect = document.getElementById('bannerLinkType');
+      const linkQuickSelect = document.getElementById('bannerLinkQuickSelect');
+      const linkValueInput = document.getElementById('bannerLinkValue');
+      const listEl = document.getElementById('bannersAdminList');
+
+      // Filtro por módulo
+      document.querySelectorAll('.banner-filter-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          currentBannerFilter = chip.dataset.bannerFilter || 'all';
+          document.querySelectorAll('.banner-filter-chip').forEach(c => {
+            c.className = 'banner-filter-chip bg-white text-slate-600 border border-slate-200 hover:border-indigo-500 text-[11px] font-bold px-3 py-1.5 rounded-full transition';
+          });
+          chip.className = 'banner-filter-chip bg-slate-900 text-white text-[11px] font-bold px-3 py-1.5 rounded-full transition';
+          renderAdminBannersList();
+        });
+      });
+
+      // Delegación de eventos de la lista
+      listEl?.addEventListener('click', async (e) => {
+        const btn = e.target.closest('button[data-action]');
+        if (!btn) return;
+
+        const action = btn.dataset.action;
+        const id = btn.dataset.id;
+
+        if (action === 'move-up') {
+          await moveBannerOrder(id, -1);
+        } else if (action === 'move-down') {
+          await moveBannerOrder(id, 1);
+        } else if (action === 'toggle-active') {
+          const nextActive = btn.dataset.active === 'true';
+          await toggleBannerActive(id, nextActive);
+        } else if (action === 'edit') {
+          await openBannerModal(id);
+        } else if (action === 'delete') {
+          await deleteBanner(id);
+        }
+      });
+
+      openBtn?.addEventListener('click', () => openBannerModal());
+      closeBtn?.addEventListener('click', closeBannerModal);
+      cancelBtn?.addEventListener('click', closeBannerModal);
+
+      imgInput?.addEventListener('input', (e) => updateBannerImgPreview(e.target.value));
+
+      linkTypeSelect?.addEventListener('change', (e) => {
+        updateLinkValueOptions(e.target.value);
+        linkValueInput.value = '';
+      });
+
+      linkQuickSelect?.addEventListener('change', (e) => {
+        if (e.target.value) {
+          linkValueInput.value = e.target.value;
+        }
+      });
+
+      fileInput?.addEventListener('change', async (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+
+        try {
+          showToast('⏳ Subiendo imagen...');
+          const ext = file.name.split('.').pop() || 'jpg';
+          const filename = `banner-${Date.now()}-${Math.random().toString(36).slice(2, 6)}.${ext}`;
+
+          let publicUrl = null;
+          if (typeof window.uploadImage === 'function') {
+            publicUrl = await window.uploadImage(file, 'logos', 'public');
+          } else if (typeof window._supabase !== 'undefined') {
+            const { error: upErr } = await _supabase.storage.from('logos').upload(`public/${filename}`, file);
+            if (upErr) throw upErr;
+            const { data: pubData } = _supabase.storage.from('logos').getPublicUrl(`public/${filename}`);
+            publicUrl = pubData.publicUrl;
+          }
+
+          if (publicUrl) {
+            imgInput.value = publicUrl;
+            updateBannerImgPreview(publicUrl);
+            showToast('✅ Imagen cargada con éxito');
+          }
+        } catch (err) {
+          alert('Error al subir imagen: ' + err.message);
+        }
+      });
+
+      form?.addEventListener('submit', handleBannerFormSubmit);
+    }
+
+    function updateBannerImgPreview(url) {
+      const prevWrapper = document.getElementById('bannerImgPreview');
+      const prevImg = document.getElementById('bannerImgPreviewEl');
+      if (url && url.trim()) {
+        prevImg.src = url.trim();
+        prevWrapper.classList.remove('hidden');
+      } else {
+        prevWrapper.classList.add('hidden');
+      }
+    }
+
+    async function openBannerModal(bannerId = null) {
+      const modal = document.getElementById('bannerModal');
+      const form = document.getElementById('bannerAdminForm');
+      const titleEl = document.getElementById('bannerModalTitle');
+
+      await preloadLinkOptions();
+
+      form.reset();
+      document.getElementById('bannerId').value = '';
+      updateBannerImgPreview('');
+
+      if (bannerId) {
+        const b = adminBanners.find(x => String(x.id) === String(bannerId));
+        if (b) {
+          titleEl.textContent = '✏️ Editar Banner Publicitario';
+          document.getElementById('bannerId').value = b.id;
+          document.getElementById('bannerImageUrl').value = b.image_url || '';
+          document.getElementById('bannerTitle').value = b.title || '';
+          document.getElementById('bannerSubtitle').value = b.subtitle || '';
+          document.getElementById('bannerLinkType').value = b.link_type || 'category';
+          document.getElementById('bannerLinkValue').value = b.link_value || '';
+          document.getElementById('bannerSortOrder').value = b.sort_order || 1;
+          document.getElementById('bannerIsActive').checked = b.is_active !== false;
+          document.getElementById('bannerTargetModule').value = b.target_module || 'index';
+          document.getElementById('bannerPlacement').value = b.placement || 'hero';
+
+          updateLinkValueOptions(b.link_type || 'category', b.link_value || '');
+          updateBannerImgPreview(b.image_url);
+        }
+      } else {
+        titleEl.textContent = '🖼️ Agregar Banner Publicitario';
+        document.getElementById('bannerSortOrder').value = adminBanners.length + 1;
+        document.getElementById('bannerTargetModule').value = 'tiendas';
+        document.getElementById('bannerPlacement').value = 'hero';
+        updateLinkValueOptions('category');
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeBannerModal() {
+      document.getElementById('bannerModal').classList.add('hidden');
+    }
+
+    async function handleBannerFormSubmit(e) {
+      e.preventDefault();
+      const saveBtn = document.getElementById('saveBannerBtn');
+      saveBtn.disabled = true; saveBtn.textContent = 'Guardando...';
+
+      try {
+        const id = document.getElementById('bannerId').value;
+        const payload = {
+          image_url: document.getElementById('bannerImageUrl').value.trim(),
+          title: document.getElementById('bannerTitle').value.trim() || null,
+          subtitle: document.getElementById('bannerSubtitle').value.trim() || null,
+          link_type: document.getElementById('bannerLinkType').value,
+          link_value: document.getElementById('bannerLinkValue').value.trim(),
+          sort_order: parseInt(document.getElementById('bannerSortOrder').value, 10) || 1,
+          is_active: document.getElementById('bannerIsActive').checked,
+          target_module: document.getElementById('bannerTargetModule').value || 'index',
+          placement: document.getElementById('bannerPlacement').value || 'hero'
+        };
+
+        if (id) {
+          const { error } = await _supabase.from('banners').update(payload).eq('id', id);
+          if (error) throw error;
+          showToast('✅ Banner actualizado correctamente');
+        } else {
+          const { error } = await _supabase.from('banners').insert([payload]);
+          if (error) throw error;
+          showToast('🎉 Banner creado con éxito');
+        }
+
+        closeBannerModal();
+        await loadAdminBanners();
+      } catch (err) {
+        alert('Error al guardar el banner: ' + err.message);
+      } finally {
+        saveBtn.disabled = false; saveBtn.textContent = 'Guardar Banner';
+      }
+    }
+
+    async function toggleBannerActive(id, newStatus) {
+      try {
+        const { error } = await _supabase.from('banners').update({ is_active: newStatus }).eq('id', id);
+        if (error) throw error;
+        showToast(newStatus ? '✅ Banner activado' : '⏸️ Banner pausado');
+        await loadAdminBanners();
+      } catch (err) {
+        alert('Error al cambiar estado: ' + err.message);
+      }
+    }
+
+    async function moveBannerOrder(id, delta) {
+      const filtered = currentBannerFilter === 'all'
+        ? adminBanners
+        : adminBanners.filter(b => (b.target_module || 'index') === currentBannerFilter);
+
+      const idx = filtered.findIndex(x => String(x.id) === String(id));
+      if (idx === -1) return;
+      const targetIdx = idx + delta;
+      if (targetIdx < 0 || targetIdx >= filtered.length) return;
+
+      const currentB = filtered[idx];
+      const targetB = filtered[targetIdx];
+
+      const tempOrder = currentB.sort_order || (idx + 1);
+      currentB.sort_order = targetB.sort_order || (targetIdx + 1);
+      targetB.sort_order = tempOrder;
+
+      try {
+        await Promise.all([
+          _supabase.from('banners').update({ sort_order: currentB.sort_order }).eq('id', currentB.id),
+          _supabase.from('banners').update({ sort_order: targetB.sort_order }).eq('id', targetB.id)
+        ]);
+        showToast('↔️ Orden actualizado');
+        await loadAdminBanners();
+      } catch (err) {
+        console.warn('Error reordenando:', err);
+      }
+    }
+
+    async function deleteBanner(id) {
+      if (!confirm('¿Estás seguro de eliminar este banner publicitario?')) return;
+      try {
+        const { error } = await _supabase.from('banners').delete().eq('id', id);
+        if (error) throw error;
+        showToast('🗑️ Banner eliminado');
+        await loadAdminBanners();
+      } catch (err) {
+        alert('Error al eliminar: ' + err.message);
+      }
+    }
+
+    window.openBannerModal = openBannerModal;
+    window.toggleBannerActive = toggleBannerActive;
+    window.moveBannerOrder = moveBannerOrder;
+    window.deleteBanner = deleteBanner;
+
+    function scrollCarousel(amount) {
+      document.getElementById('presetsCompTrack').scrollBy({ left: amount, behavior: 'smooth' });
+    }
+
+    function filterCategoryComp(cat) {
+      document.getElementById('tabConfortComp').classList.toggle('active', cat === 'confort');
+      document.getElementById('tabFestivosComp').classList.toggle('active', cat === 'festivos');
+
+      document.querySelectorAll('.comp-confort-item').forEach(el => el.classList.toggle('hidden', cat !== 'confort'));
+      document.querySelectorAll('.comp-festivo-item').forEach(el => el.classList.toggle('hidden', cat !== 'festivos'));
+
+      document.getElementById('presetsCompTrack').scrollLeft = 0;
+    }
+
+    function applyCompPreset(id) {
+      const p = COMPONENT_PRESETS[id];
+      if (!p) return;
+
+      setVal('productTint', p.tint); setVal('productTintHex', p.tint);
+      setVal('productOpacity', p.opacity);
+      setVal('pcHeadingColor', p.heading); setVal('pcHeadingHex', p.heading);
+      setVal('pcTextColor', p.text); setVal('pcTextHex', p.text);
+      setVal('pcMutedColor', p.muted); setVal('pcMutedHex', p.muted);
+      setVal('badgeBgColor', p.badgeBg); setVal('badgeBgHex', p.badgeBg);
+      setVal('badgeTextColor', p.badgeText); setVal('badgeTextHex', p.badgeText);
+
+      updateLabels();
+      updatePreview();
+      showToast(`👓 Preset de tarjeta #${id} aplicado`);
+    }
+
+    function bindColorPairs() {
+      const keys = ['pcHeading', 'pcText', 'pcMuted', 'badgeBg', 'badgeText', 'btnPrimaryText', 'btnSecondaryText', 'btnAccentText', 'productTint'];
+      keys.forEach(k => {
+        const picker = document.getElementById(k + 'Color') || document.getElementById(k);
+        const hex = document.getElementById(k + 'Hex');
+        if (!picker || !hex) return;
+        picker.addEventListener('input', () => { hex.value = picker.value.toUpperCase(); updatePreview(); });
+        hex.addEventListener('input', () => { if (/^#[0-9A-F]{6}$/i.test(hex.value)) { picker.value = hex.value; updatePreview(); } });
+      });
+    }
+
+    function bindInputs() {
+      document.querySelectorAll('input[type="range"]').forEach(el => {
+        el.addEventListener('input', () => { updateLabels(); updatePreview(); });
+      });
+      document.querySelectorAll('input[type="checkbox"], input[type="radio"]').forEach(el => {
+        el.addEventListener('change', updatePreview);
+      });
+    }
+
+    function updateLabels() {
+      const setLbl = (id, lblId, suf) => {
+        const el = document.getElementById(id);
+        const lbl = document.getElementById(lblId);
+        if (el && lbl) lbl.textContent = el.value + suf;
+      };
+      setLbl('productOpacity', 'productOpacityLabel', '%');
+      setLbl('cardTitleSize', 'cardTitleSizeLabel', 'rem');
+      setLbl('cardTitleWeight', 'cardTitleWeightLabel', '');
+      setLbl('priceSize', 'priceSizeLabel', 'rem');
+      setLbl('priceWeight', 'priceWeightLabel', '');
+      setLbl('btnPrimaryRadius', 'btnPrimaryRadiusLabel', 'rem');
+      setLbl('btnPrimaryPx', 'btnPrimaryPxLabel', 'rem');
+      setLbl('btnPrimaryPy', 'btnPrimaryPyLabel', 'rem');
+    }
+
+    function hexToRgbStr(hex) {
+      const c = String(hex || '').replace('#', '').trim();
+      if (c.length !== 6) return '255,255,255';
+      return `${parseInt(c.slice(0,2),16)},${parseInt(c.slice(2,4),16)},${parseInt(c.slice(4,6),16)}`;
+    }
+
+    function updatePreview() {
+      const canvas = document.getElementById('previewCanvas');
+      if (!canvas) return;
+
+      const pEnabled = document.getElementById('productGlassEnabled').checked;
+      const pTint = document.getElementById('productTint').value;
+      const pOpacity = document.getElementById('productOpacity').value;
+      const pRadiusPx = document.getElementById('productRadius').value;
+      const pPadding = document.getElementById('productPadding').value;
+      const pAspect = document.querySelector('input[name="productAspect"]:checked')?.value || '1 / 1';
+      const pLift = document.getElementById('productHoverLift').checked;
+
+      canvas.style.setProperty('--pv-pct-rgb', hexToRgbStr(pTint));
+      canvas.style.setProperty('--pv-pco', pEnabled ? (pOpacity / 100).toFixed(2) : '0');
+      canvas.style.setProperty('--pv-pcr', `${pRadiusPx / 16}rem`);
+      canvas.style.setProperty('--pv-pcp', `${pPadding}rem`);
+      canvas.style.setProperty('--pv-pcar', pAspect);
+
+      canvas.style.setProperty('--pv-card-title-s', `${document.getElementById('cardTitleSize').value}rem`);
+      canvas.style.setProperty('--pv-card-title-w', document.getElementById('cardTitleWeight').value);
+      canvas.style.setProperty('--pv-pcheading', document.getElementById('pcHeadingColor').value);
+      canvas.style.setProperty('--pv-pctext', document.getElementById('pcTextColor').value);
+      canvas.style.setProperty('--pv-pcmuted', document.getElementById('pcMutedColor').value);
+
+      canvas.style.setProperty('--pv-price-s', `${document.getElementById('priceSize').value}rem`);
+      canvas.style.setProperty('--pv-price-w', document.getElementById('priceWeight').value);
+      canvas.style.setProperty('--pv-bdg-bg', document.getElementById('badgeBgColor').value);
+      canvas.style.setProperty('--pv-bdg-text', document.getElementById('badgeTextColor').value);
+
+      canvas.style.setProperty('--pv-btn-radius', `${document.getElementById('btnPrimaryRadius').value / 16}rem`);
+      canvas.style.setProperty('--pv-btn-px', `${document.getElementById('btnPrimaryPx').value}rem`);
+      canvas.style.setProperty('--pv-btn-py', `${document.getElementById('btnPrimaryPy').value}rem`);
+      canvas.style.setProperty('--pv-btn-primary-text', document.getElementById('btnPrimaryTextColor').value);
+      canvas.style.setProperty('--pv-btn-secondary-text', document.getElementById('btnSecondaryTextColor').value);
+      canvas.style.setProperty('--pv-btn-accent-text', document.getElementById('btnAccentTextColor').value);
+
+      const prodEl = document.getElementById('mockProduct');
+      if (prodEl) prodEl.classList.toggle('lift', pLift);
+    }
+
+    async function loadSettings() {
+      try {
+        const { data } = await _supabase.from('site_settings').select('*').eq('id', 'global').maybeSingle();
+        if (data) {
+          if (data.product_card_glass_enabled !== undefined) setCheck('productGlassEnabled', data.product_card_glass_enabled);
+          if (data.product_card_tint) setVal('productTint', data.product_card_tint), setVal('productTintHex', data.product_card_tint);
+          if (data.product_card_opacity) setVal('productOpacity', Math.round(data.product_card_opacity * 100));
+          if (data.product_card_radius) setVal('productRadius', Math.round(parseFloat(data.product_card_radius) * 16));
+          if (data.product_card_padding) setVal('productPadding', parseFloat(data.product_card_padding));
+          if (data.card_title_size) setVal('cardTitleSize', parseFloat(data.card_title_size));
+          if (data.card_title_weight) setVal('cardTitleWeight', data.card_title_weight);
+          if (data.product_card_heading_color) setVal('pcHeadingColor', data.product_card_heading_color), setVal('pcHeadingHex', data.product_card_heading_color);
+          if (data.product_card_text_color) setVal('pcTextColor', data.product_card_text_color), setVal('pcTextHex', data.product_card_text_color);
+          if (data.product_card_muted_color) setVal('pcMutedColor', data.product_card_muted_color), setVal('pcMutedHex', data.product_card_muted_color);
+          if (data.price_size) setVal('priceSize', parseFloat(data.price_size));
+          if (data.price_weight) setVal('priceWeight', data.price_weight);
+          if (data.badge_bg) setVal('badgeBgColor', data.badge_bg), setVal('badgeBgHex', data.badge_bg);
+          if (data.badge_text) setVal('badgeTextColor', data.badge_text), setVal('badgeTextHex', data.badge_text);
+        }
+      } catch (e) { console.warn(e); }
+      updateLabels();
+      updatePreview();
+    }
+
+    function setVal(id, val) { const el = document.getElementById(id); if (el) el.value = val; }
+    function setCheck(id, val) { const el = document.getElementById(id); if (el) el.checked = !!val; }
+
+    function bindActions() {
+      document.getElementById('saveBtn').addEventListener('click', async () => {
+        const payload = {
+          product_card_glass_enabled: document.getElementById('productGlassEnabled').checked,
+          product_card_tint: document.getElementById('productTint').value,
+          product_card_opacity: (parseFloat(document.getElementById('productOpacity').value) / 100).toFixed(2),
+          product_card_radius: (parseFloat(document.getElementById('productRadius').value) / 16).toFixed(3) + 'rem',
+          product_card_padding: document.getElementById('productPadding').value + 'rem',
+          product_card_aspect: document.querySelector('input[name="productAspect"]:checked')?.value || '1 / 1',
+          product_card_hover_lift: document.getElementById('productHoverLift').checked,
+
+          card_title_size: document.getElementById('cardTitleSize').value + 'rem',
+          card_title_weight: document.getElementById('cardTitleWeight').value,
+          product_card_heading_color: document.getElementById('pcHeadingColor').value,
+          product_card_text_color: document.getElementById('pcTextColor').value,
+          product_card_muted_color: document.getElementById('pcMutedColor').value,
+
+          price_size: document.getElementById('priceSize').value + 'rem',
+          price_weight: document.getElementById('priceWeight').value,
+          badge_bg: document.getElementById('badgeBgColor').value,
+          badge_text: document.getElementById('badgeTextColor').value,
+
+          btn_primary_radius: (parseFloat(document.getElementById('btnPrimaryRadius').value) / 16).toFixed(3) + 'rem',
+          btn_primary_px: document.getElementById('btnPrimaryPx').value + 'rem',
+          btn_primary_py: document.getElementById('btnPrimaryPy').value + 'rem',
+          btn_primary_text: document.getElementById('btnPrimaryTextColor').value,
+          btn_secondary_text: document.getElementById('btnSecondaryTextColor').value,
+          btn_accent_text: document.getElementById('btnAccentTextColor').value
+        };
+
+        try {
+          await _supabase.from('site_settings').update(payload).eq('id', 'global');
+          showToast('✅ Tarjetas de producto guardadas exitosamente');
+        } catch (e) { showToast('❌ Error al guardar en Supabase'); }
+      });
+
+      document.getElementById('resetBtn').addEventListener('click', loadSettings);
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2500);
+    }
+  </script>
+</body>
+</html>

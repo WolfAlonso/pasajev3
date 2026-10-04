@@ -1,0 +1,394 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reportes · Admin</title>
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="../js/theme-loader.js?v=2"></script>
+  <script src="../js/admin-utils.js"></script>
+  <script src="../js/admin-sidebar.js?v=1"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-7xl mx-auto p-4">
+    <div id="adminTabs"></div>
+
+    <div id="loadingState" class="bg-white rounded-xl shadow-sm border p-8 text-center text-sm text-gray-500">Cargando reportes...</div>
+
+    <section id="content" class="hidden space-y-4">
+      <div class="flex gap-2 overflow-x-auto no-scrollbar">
+        <button data-report-filter="pending"   class="report-chip whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold bg-amber-500 text-white">⏳ Pendientes</button>
+        <button data-report-filter="resolved"  class="report-chip whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold bg-white border text-gray-700">✅ Resueltos</button>
+        <button data-report-filter="dismissed" class="report-chip whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold bg-white border text-gray-700">🗑️ Descartados</button>
+        <button data-report-filter="all"       class="report-chip whitespace-nowrap px-3 py-1.5 rounded-full text-xs font-bold bg-white border text-gray-700">📋 Todos</button>
+      </div>
+
+      <div id="reportsList" class="bg-white rounded-xl shadow-sm border overflow-hidden divide-y">
+        <p class="p-8 text-center text-sm text-gray-500">Cargando reportes...</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="caseModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto">
+      <div id="caseModalContent" class="p-6"></div>
+    </div>
+  </div>
+
+  <script>
+    let allReports = [];
+    let currentReportFilter = 'pending';
+    const modal = document.getElementById('caseModal');
+
+    (async () => {
+      const session = await adminGuardPage();
+      if (!session) return;
+      await initAdminNav({ user: session.user });
+
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+
+      await loadReports();
+
+      document.querySelectorAll('.report-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          document.querySelectorAll('.report-chip').forEach(c => {
+            c.classList.remove('bg-amber-500', 'text-white');
+            c.classList.add('bg-white', 'border', 'text-gray-700');
+          });
+          chip.classList.add('bg-amber-500', 'text-white');
+          chip.classList.remove('bg-white', 'border', 'text-gray-700');
+          currentReportFilter = chip.dataset.reportFilter;
+          renderReports();
+        });
+      });
+    })();
+
+    async function loadReports() {
+      const container = document.getElementById('reportsList');
+      container.innerHTML = '<p class="p-8 text-center text-sm text-gray-500">Cargando reportes...</p>';
+
+      const { data, error } = await _supabase
+        .from('reports')
+        .select(`
+          id, reporter_email, reason, comment, status, created_at, updated_at,
+          admin_response, vendor_response,
+          product_id, store_id,
+          products ( id, title, image_url, is_active, store_id,
+                     stores ( id, name, slug ) ),
+          stores   ( id, name, slug, logo_url, whatsapp, is_suspended )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        container.innerHTML = '<p class="p-8 text-center text-sm text-red-500">Error al cargar reportes.</p>';
+        console.error(error);
+        return;
+      }
+
+      allReports = data || [];
+      renderReports();
+    }
+
+    function renderReports() {
+      const container = document.getElementById('reportsList');
+      const e = adminEscapeHtml;
+
+      let list = allReports;
+      if (currentReportFilter !== 'all') list = allReports.filter(r => r.status === currentReportFilter);
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="p-10 text-center">
+            <div class="text-4xl mb-2">🎉</div>
+            <p class="text-sm text-gray-500">No hay reportes en esta vista.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(r => {
+        const product = r.products;
+        const store = r.stores || product?.stores;
+        const st = adminReportStatus(r);
+        const img = product?.image_url || PLACEHOLDER_IMG;
+
+        const productBlock = product
+          ? `<div class="flex items-center gap-3 mt-2 p-2 bg-gray-50 rounded-lg">
+              <img src="${img}" alt="${e(product.title)}"
+                   onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"
+                   class="w-12 h-12 rounded-lg object-cover bg-white border flex-shrink-0">
+              <div class="min-w-0 flex-1">
+                <p class="text-xs font-bold text-gray-800 truncate">${e(product.title)}</p>
+                <p class="text-[11px] text-gray-500 truncate">
+                  ${store ? e(store.name) : 'Sin tienda'} · ${product.is_active ? '✅ Activo' : '⛔ Oculto'}
+                </p>
+              </div>
+            </div>`
+          : (store ? `<div class="flex items-center gap-3 mt-2 p-2 bg-gray-50 rounded-lg">
+              <img src="${store.logo_url || PLACEHOLDER_IMG}" alt="${e(store.name)}"
+                   onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"
+                   class="w-12 h-12 rounded-full object-cover bg-white border flex-shrink-0">
+              <div class="min-w-0 flex-1">
+                <p class="text-xs font-bold text-gray-800 truncate">${e(store.name)}</p>
+                <p class="text-[11px] text-gray-500">Reporte sobre la tienda</p>
+              </div>
+            </div>` : '<p class="text-xs text-gray-500 mt-2 italic">El producto o tienda ya no existe.</p>');
+
+        return `
+          <div class="p-4 hover:bg-gray-50">
+            <div class="flex items-start justify-between gap-3 flex-wrap">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[10px] ${st.cls} font-bold px-2 py-0.5 rounded-full">${st.label}</span>
+                  <span class="text-[11px] font-semibold text-gray-700">${adminReasonLabel(r.reason)}</span>
+                </div>
+                <p class="text-[11px] text-gray-500 mt-1">
+                  ${adminFormatDate(r.created_at)}
+                  ${r.reporter_email ? ` · 👤 ${e(r.reporter_email)}` : ' · anónimo'}
+                </p>
+              </div>
+              <button data-open-case="${r.id}"
+                class="text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold px-3 py-1.5 rounded-lg flex-shrink-0">
+                Abrir caso
+              </button>
+            </div>
+
+            ${r.comment ? `<p class="text-xs text-gray-700 mt-2 bg-white border border-gray-200 rounded-lg p-3 italic">"${e(r.comment)}"</p>` : ''}
+            ${productBlock}
+
+            ${r.vendor_response ? `<div class="mt-2 p-2 bg-blue-50 border border-blue-200 rounded-lg">
+              <p class="text-[10px] font-bold text-blue-800 uppercase tracking-wider mb-0.5">💬 Aclaración del vendedor</p>
+              <p class="text-xs text-blue-900 whitespace-pre-line line-clamp-3">${e(r.vendor_response)}</p>
+            </div>` : ''}
+
+            ${r.admin_response ? `<div class="mt-2 p-2 bg-amber-50 border border-amber-200 rounded-lg">
+              <p class="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-0.5">📢 Nota enviada al vendedor</p>
+              <p class="text-xs text-amber-900 whitespace-pre-line line-clamp-3">${e(r.admin_response)}</p>
+            </div>` : ''}
+          </div>`;
+      }).join('');
+
+      container.querySelectorAll('button[data-open-case]').forEach(btn => {
+        btn.addEventListener('click', () => openCaseModal(btn.dataset.openCase));
+      });
+    }
+
+    function openCaseModal(reportId) {
+      const r = allReports.find(x => x.id === reportId);
+      if (!r) return;
+      const e = adminEscapeHtml;
+      const product = r.products;
+      const store = r.stores || product?.stores;
+      const st = adminReportStatus(r);
+
+      document.getElementById('caseModalContent').innerHTML = `
+        <div class="flex items-start justify-between mb-4">
+          <div class="min-w-0">
+            <h3 class="text-lg font-extrabold text-gray-800">Resolución de caso</h3>
+            <p class="text-xs text-gray-500 mt-0.5">${adminFormatDate(r.created_at)}</p>
+          </div>
+          <button id="closeCaseModalBtn"
+            class="bg-gray-100 hover:bg-gray-200 text-gray-700 w-9 h-9 rounded-lg flex items-center justify-center transition flex-shrink-0">✕</button>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap mb-3">
+          <span class="text-[10px] ${st.cls} font-bold px-2 py-0.5 rounded-full">${st.label}</span>
+          <span class="text-[11px] font-semibold text-gray-700">${adminReasonLabel(r.reason)}</span>
+        </div>
+
+        ${r.reporter_email ? `<p class="text-[11px] text-gray-500 mb-3">👤 Denunciante: ${e(r.reporter_email)}</p>` : ''}
+
+        ${r.comment ? `<div class="bg-gray-50 border border-gray-200 rounded-lg p-3 mb-3">
+          <p class="text-[10px] font-bold text-gray-500 uppercase tracking-wider mb-1">Comentario del comprador</p>
+          <p class="text-sm text-gray-800 italic">"${e(r.comment)}"</p>
+        </div>` : ''}
+
+        ${product ? `<div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg mb-3">
+          <img src="${product.image_url || PLACEHOLDER_IMG}" alt="${e(product.title)}"
+               onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"
+               class="w-16 h-16 rounded-lg object-cover bg-white border flex-shrink-0">
+          <div class="min-w-0 flex-1">
+            <p class="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Producto reportado</p>
+            <p class="text-sm font-bold text-gray-800 truncate">${e(product.title)}</p>
+            <p class="text-xs text-gray-500">${product.is_active ? '✅ Activo' : '⛔ Ya oculto'}${store ? ` · ${e(store.name)}` : ''}</p>
+          </div>
+        </div>` : (store ? `<div class="flex items-center gap-3 p-3 bg-gray-50 rounded-lg mb-3">
+          <img src="${store.logo_url || PLACEHOLDER_IMG}" alt="${e(store.name)}"
+               onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"
+               class="w-16 h-16 rounded-full object-cover bg-white border flex-shrink-0">
+          <div class="min-w-0 flex-1">
+            <p class="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Reporte sobre la tienda</p>
+            <p class="text-sm font-bold text-gray-800 truncate">${e(store.name)}</p>
+            <p class="text-xs text-gray-500">${store.is_suspended ? '⛔ Suspendida' : '✅ Activa'}</p>
+          </div>
+        </div>` : '')}
+
+        ${r.vendor_response ? `<div class="bg-blue-50 border border-blue-200 rounded-lg p-3 mb-3">
+          <p class="text-[10px] font-bold text-blue-800 uppercase tracking-wider mb-1">💬 Aclaración del vendedor</p>
+          <p class="text-sm text-blue-900 whitespace-pre-line">${e(r.vendor_response)}</p>
+        </div>` : `<div class="bg-gray-50 border border-dashed border-gray-300 rounded-lg p-3 mb-3 text-center">
+          <p class="text-xs text-gray-500">El vendedor aún no ha enviado aclaración.</p>
+        </div>`}
+
+        ${r.admin_response ? `<div class="bg-amber-50 border border-amber-200 rounded-lg p-3 mb-3">
+          <p class="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">📢 Nota actual enviada al vendedor</p>
+          <p class="text-sm text-amber-900 whitespace-pre-line">${e(r.admin_response)}</p>
+        </div>` : ''}
+
+        <div class="border-t pt-3 mt-3">
+          <label class="block text-sm font-medium text-gray-700 mb-1">Nota / instrucción al vendedor</label>
+          <textarea id="adminResponseText" rows="4"
+            placeholder="Ej. Por favor revisa el estado del producto y confirma si sigue disponible."
+            class="w-full border border-gray-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none"></textarea>
+          <div class="flex justify-end mt-2">
+            <button id="saveAdminNoteBtn"
+              class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-sm px-4 py-2 rounded-lg transition disabled:opacity-60">
+              📨 Enviar Nota a Tienda
+            </button>
+          </div>
+        </div>
+
+        <div class="border-t pt-4 mt-4">
+          <p class="text-[11px] font-bold text-gray-500 uppercase tracking-wider mb-2">Acciones de moderación</p>
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-2">
+            <button id="resolveCaseBtn"
+              class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-4 py-2.5 rounded-lg transition disabled:opacity-60">
+              ✅ Marcar como Resuelto
+            </button>
+            <button id="dismissCaseBtn"
+              class="bg-gray-200 hover:bg-gray-300 text-gray-800 font-bold text-sm px-4 py-2.5 rounded-lg transition disabled:opacity-60">
+              🗑️ Descartar Reporte
+            </button>
+            ${product ? `<button id="hideProductBtn"
+              class="bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm px-4 py-2.5 rounded-lg transition disabled:opacity-60">
+              👁️‍🗨️ Ocultar Producto
+            </button>` : ''}
+            ${store ? `<button id="suspendStoreBtn"
+              class="bg-red-600 hover:bg-red-700 text-white font-bold text-sm px-4 py-2.5 rounded-lg transition disabled:opacity-60">
+              ⛔ Suspender Tienda
+            </button>` : ''}
+          </div>
+        </div>
+      `;
+
+      if (r.admin_response) document.getElementById('adminResponseText').value = r.admin_response;
+
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+
+      const closeFn = () => {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+        document.getElementById('caseModalContent').innerHTML = '';
+      };
+
+      document.getElementById('closeCaseModalBtn').addEventListener('click', closeFn);
+      modal.addEventListener('click', (ev) => { if (ev.target === modal) closeFn(); }, { once: true });
+
+      document.getElementById('saveAdminNoteBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('saveAdminNoteBtn');
+        const text = document.getElementById('adminResponseText').value.trim();
+        if (!text) { alert('Escribe una nota antes de enviar.'); return; }
+
+        btn.disabled = true; btn.textContent = 'Enviando...';
+        try {
+          const now = new Date().toISOString();
+          const { error } = await _supabase.from('reports')
+            .update({ admin_response: text, updated_at: now }).eq('id', r.id);
+          if (error) throw error;
+          r.admin_response = text;
+          r.updated_at = now;
+          btn.textContent = '✅ Nota enviada';
+          setTimeout(() => { btn.disabled = false; btn.textContent = '📨 Enviar Nota a Tienda'; }, 1200);
+          await loadReports();
+        } catch (err) {
+          console.error(err);
+          alert('Error: ' + (err.message || 'desconocido'));
+          btn.disabled = false; btn.textContent = '📨 Enviar Nota a Tienda';
+        }
+      });
+
+      document.getElementById('resolveCaseBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('resolveCaseBtn'); btn.disabled = true;
+        try {
+          const now = new Date().toISOString();
+          const { error } = await _supabase.from('reports')
+            .update({ status: 'resolved', updated_at: now }).eq('id', r.id);
+          if (error) throw error;
+          closeFn();
+          await loadReports();
+        } catch (err) {
+          console.error(err); alert('Error: ' + (err.message || 'desconocido')); btn.disabled = false;
+        }
+      });
+
+      document.getElementById('dismissCaseBtn').addEventListener('click', async () => {
+        const btn = document.getElementById('dismissCaseBtn'); btn.disabled = true;
+        try {
+          const now = new Date().toISOString();
+          const { error } = await _supabase.from('reports')
+            .update({ status: 'dismissed', updated_at: now }).eq('id', r.id);
+          if (error) throw error;
+          closeFn();
+          await loadReports();
+        } catch (err) {
+          console.error(err); alert('Error: ' + (err.message || 'desconocido')); btn.disabled = false;
+        }
+      });
+
+      const hideBtn = document.getElementById('hideProductBtn');
+      if (hideBtn && product) {
+        hideBtn.addEventListener('click', async () => {
+          if (!confirm('¿Ocultar el producto?')) return;
+          hideBtn.disabled = true;
+          try {
+            const { error: e1 } = await _supabase.from('products')
+              .update({ is_active: false }).eq('id', product.id);
+            if (e1) throw e1;
+            const now = new Date().toISOString();
+            const { error: e2 } = await _supabase.from('reports')
+              .update({ status: 'resolved', updated_at: now }).eq('id', r.id);
+            if (e2) throw e2;
+            closeFn();
+            await loadReports();
+          } catch (err) {
+            console.error(err); alert('Error: ' + (err.message || 'desconocido')); hideBtn.disabled = false;
+          }
+        });
+      }
+
+      const suspendBtn = document.getElementById('suspendStoreBtn');
+      if (suspendBtn && store) {
+        suspendBtn.addEventListener('click', async () => {
+          if (!confirm(`¿Suspender "${store.name}"?`)) return;
+          suspendBtn.disabled = true;
+          try {
+            const { error: e1 } = await _supabase.from('stores')
+              .update({ is_suspended: true }).eq('id', store.id);
+            if (e1) throw e1;
+            await _supabase.from('products').update({ is_active: false }).eq('store_id', store.id);
+            const now = new Date().toISOString();
+            const { error: e2 } = await _supabase.from('reports')
+              .update({ status: 'resolved', updated_at: now }).eq('id', r.id);
+            if (e2) throw e2;
+            closeFn();
+            await loadReports();
+          } catch (err) {
+            console.error(err); alert('Error: ' + (err.message || 'desconocido')); suspendBtn.disabled = false;
+          }
+        });
+      }
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,826 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <title>Productos · Pasaje de los Altos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=4"></script>
+  <script src="../js/theme-loader.js?v=4"></script>
+  <script src="../js/dashboard-utils.js?v=4"></script>
+  <script src="../js/dashboard-sidebar.js?v=5"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }</style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+  <div id="dashboardHeader"></div>
+
+  <main class="max-w-6xl mx-auto p-4 pb-16">
+    <div id="dashboardTabs"></div>
+
+    <div id="loadingState" class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-8 text-center text-sm text-slate-500 shadow-sm">
+      Cargando productos...
+    </div>
+
+    <section id="content" class="hidden grid lg:grid-cols-5 gap-6">
+
+      <!-- Formulario de Producto -->
+      <div class="lg:col-span-2 space-y-4">
+        
+        <!-- Banner de estado de Plan y Límites -->
+        <div id="planBannerContainer"></div>
+
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 shadow-sm p-5 lg:sticky lg:top-20">
+          <h2 id="formTitle" class="text-lg font-extrabold text-slate-900 mb-4">Publicar nuevo producto</h2>
+
+          <form id="productForm" class="space-y-3">
+            <input type="hidden" id="productId">
+
+            <!-- FOTO PRINCIPAL -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Foto principal del producto *</label>
+              <div id="imgDrop"
+                class="border-2 border-dashed border-slate-300 rounded-xl p-3 text-center cursor-pointer hover:bg-slate-50 transition bg-white/60">
+                <input type="file" id="imgFile" accept="image/*" class="hidden">
+                <div id="imgPreview" class="hidden relative">
+                  <img id="imgPreviewSrc" class="mx-auto max-h-48 rounded-lg object-cover shadow-sm" alt="preview">
+                  <button type="button" id="imgRemove"
+                    class="absolute top-2 right-2 bg-red-500 text-white text-xs font-bold w-7 h-7 rounded-full shadow-lg hover:bg-red-600 transition flex items-center justify-center">✕</button>
+                </div>
+                <div id="imgPlaceholder">
+                  <div class="text-3xl mb-1">🖼️</div>
+                  <p class="text-xs text-slate-600 font-bold">Toca para subir foto principal</p>
+                  <p class="text-[10px] text-slate-400 mt-0.5">JPG, PNG o WEBP · máx 5 MB</p>
+                </div>
+              </div>
+              <details class="mt-2">
+                <summary class="text-xs text-slate-500 cursor-pointer hover:text-blue-700 font-semibold">o pega una URL de imagen</summary>
+                <input type="url" id="imageUrl" placeholder="https://..."
+                  class="w-full border border-slate-200 p-2 rounded-xl mt-1 text-xs focus:ring-2 focus:ring-emerald-500 outline-none bg-white">
+              </details>
+            </div>
+
+            <!-- FOTOS SECUNDARIAS (GALERÍA MULTI-IMAGEN HASTA 4) -->
+            <div class="bg-slate-50/80 border border-slate-200/80 rounded-2xl p-3.5 space-y-3">
+              <div class="flex items-center justify-between">
+                <label class="block text-xs font-extrabold text-slate-800 uppercase">Fotos Secundarias (Galería, máx. 4)</label>
+                <span id="secondaryCountBadge" class="text-[10px] font-extrabold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">0 / 4</span>
+              </div>
+
+              <div id="secondaryThumbsGrid" class="grid grid-cols-4 gap-2"></div>
+
+              <div id="secondaryUploadBox">
+                <label class="border-2 border-dashed border-slate-300 hover:border-emerald-500 rounded-xl p-2.5 text-center cursor-pointer hover:bg-emerald-50/50 transition bg-white flex items-center justify-center gap-2">
+                  <input type="file" id="secondaryImgFiles" accept="image/*" multiple class="hidden">
+                  <span class="text-lg">📷</span>
+                  <span class="text-xs text-slate-700 font-extrabold">Añadir foto(s) secundaria(s)</span>
+                </label>
+              </div>
+
+              <details class="mt-1">
+                <summary class="text-[11px] text-slate-500 cursor-pointer hover:text-blue-700 font-semibold">o agregar URL de foto secundaria</summary>
+                <div class="flex gap-1.5 mt-1.5">
+                  <input type="url" id="secondaryImageUrlInput" placeholder="https://..." class="flex-1 border border-slate-200 p-2 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none bg-white font-mono">
+                  <button type="button" id="addSecondaryUrlBtn" class="bg-slate-800 hover:bg-slate-900 text-white font-extrabold text-xs px-3 py-1.5 rounded-xl transition">Añadir</button>
+                </div>
+              </details>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Categoría *</label>
+              <select id="category" required
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white font-semibold focus:ring-2 focus:ring-emerald-500 outline-none">
+                <option value="">Cargando...</option>
+              </select>
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre del producto *</label>
+              <input type="text" id="title" required placeholder="Ej. Chocoflan Familiar"
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none font-semibold bg-white">
+            </div>
+
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Descripción (opcional)</label>
+              <textarea id="description" rows="2" placeholder="Detalles, tamaño, ingredientes..."
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none bg-white"></textarea>
+            </div>
+
+            <!-- PRECIO NORMAL O REGULAR -->
+            <div>
+              <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Precio Normal / Regular (Q) *</label>
+              <input type="number" step="0.01" min="0" id="price" required placeholder="60.00"
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs focus:ring-2 focus:ring-emerald-500 outline-none font-extrabold text-slate-900 bg-white">
+            </div>
+
+            <!-- VARIANTES (COLORES + TALLAS) -->
+            <div class="bg-indigo-50/70 border border-indigo-200 rounded-2xl p-3.5 space-y-4">
+              <div class="flex items-center justify-between">
+                <label class="block text-xs font-extrabold text-indigo-900 uppercase">🎨 Variantes del Producto</label>
+                <span class="text-[10px] font-bold text-indigo-500 bg-indigo-100 px-2 py-0.5 rounded-full">Opcional</span>
+              </div>
+
+              <!-- COLORES -->
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <label class="block text-[10px] font-bold text-indigo-800 uppercase">🎨 Colores</label>
+                  <button type="button" id="addColorBtn"
+                    class="text-[10px] font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded-lg transition">
+                    + Añadir
+                  </button>
+                </div>
+                <div id="colorsListContainer" class="space-y-2"></div>
+              </div>
+
+              <!-- TALLAS -->
+              <div class="space-y-2">
+                <div class="flex items-center justify-between">
+                  <label class="block text-[10px] font-bold text-indigo-800 uppercase">📏 Tallas / Opciones</label>
+                  <button type="button" id="addSizeBtn"
+                    class="text-[10px] font-extrabold bg-indigo-600 hover:bg-indigo-700 text-white px-2.5 py-1 rounded-lg transition">
+                    + Añadir
+                  </button>
+                </div>
+                <div id="sizesListContainer" class="space-y-2"></div>
+              </div>
+
+              <p class="text-[10px] text-indigo-700/80 italic leading-snug">
+                Los swatches de color se mostrarán en la tarjeta pública. La talla o el color sin precio propio heredan el precio base del producto.
+              </p>
+            </div>
+
+            <!-- CONTROLES DE OFERTA RELÁMPAGO -->
+            <div class="bg-rose-50 border border-rose-200 rounded-2xl p-3.5 space-y-3">
+              <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="isOnSale" class="w-4 h-4 accent-rose-600 rounded">
+                <span class="text-xs font-black text-rose-900 uppercase">🔥 Poner en Oferta Relámpago</span>
+              </label>
+
+              <div id="saleFieldsContainer" class="hidden space-y-3 pt-1">
+                <div>
+                  <label class="block text-[10px] font-bold text-rose-800 uppercase mb-1">Precio con Descuento / Oferta (Q) *</label>
+                  <input type="number" step="0.01" min="0" id="salePrice" placeholder="Ej. 45.00"
+                    class="w-full border border-rose-200 p-2 rounded-xl text-xs bg-white outline-none font-bold text-rose-700">
+                </div>
+
+                <div id="savingsBadge" class="hidden bg-rose-100 border border-rose-300 rounded-xl p-2 text-center text-xs font-black text-rose-800">
+                  Descuento: Q 0.00 (0% OFF)
+                </div>
+
+                <div>
+                  <label class="block text-[10px] font-bold text-rose-800 uppercase mb-1">Fecha y Hora de Vencimiento</label>
+                  <input type="datetime-local" id="saleExpiresAt"
+                    class="w-full border border-rose-200 p-2 rounded-xl text-xs bg-white outline-none font-semibold text-slate-800">
+                </div>
+              </div>
+            </div>
+
+            <div class="flex gap-2 pt-2">
+              <button type="submit" id="saveBtn"
+                class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-xl transition text-xs shadow-sm">
+                Publicar
+              </button>
+              <button type="button" id="cancelBtn"
+                class="hidden bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 px-4 rounded-xl text-xs transition">
+                Cancelar
+              </button>
+            </div>
+          </form>
+        </div>
+      </div>
+
+      <!-- Lista de Productos -->
+      <div class="lg:col-span-3 space-y-3">
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-3.5 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm">
+          <div class="flex items-center gap-2">
+            <h2 class="text-base font-extrabold text-slate-900">Mis productos</h2>
+            <span id="countBadge" class="text-xs bg-blue-100 text-blue-800 px-2.5 py-0.5 rounded-full font-extrabold">0</span>
+          </div>
+          <input type="text" id="productSearch" placeholder="Buscar producto..."
+            class="w-full sm:w-56 border border-slate-200 px-3 py-1.5 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <div id="myProducts" class="space-y-3"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let currentUser = null;
+    let currentStore = null;
+    let myProductsList = [];
+    let pendingProductFile = null;
+    let currentProductImageUrl = null;
+    let productImgUI = null;
+    let secondaryImagesList = [];
+    let colorsList = []; // [{name, hex, image, stock}]
+    let sizesList = [];  // [{name, price, stock}]
+    let productSearchTerm = '';
+
+    const PLAN_LIMITS = { free: 10, pro: 50, advanced: Infinity };
+    const PLAN_NAMES  = { free: 'Gratis', pro: 'Pro', advanced: 'Advanced' };
+
+    const form = document.getElementById('productForm');
+    const productIdEl = document.getElementById('productId');
+    const formTitle = document.getElementById('formTitle');
+    const saveBtn = document.getElementById('saveBtn');
+    const cancelBtn = document.getElementById('cancelBtn');
+    const isOnSaleCheck = document.getElementById('isOnSale');
+    const saleFieldsContainer = document.getElementById('saleFieldsContainer');
+    const priceInput = document.getElementById('price');
+    const salePriceInput = document.getElementById('salePrice');
+    const savingsBadge = document.getElementById('savingsBadge');
+
+    // ============================================================
+    // OFERTA RELÁMPAGO
+    // ============================================================
+    isOnSaleCheck?.addEventListener('change', () => {
+      if (isOnSaleCheck.checked) {
+        saleFieldsContainer.classList.remove('hidden');
+        calculateSavings();
+      } else {
+        saleFieldsContainer.classList.add('hidden');
+      }
+    });
+
+    function calculateSavings() {
+      const normalPrice = parseFloat(priceInput.value) || 0;
+      const salePrice = parseFloat(salePriceInput?.value) || 0;
+
+      if (isOnSaleCheck.checked && normalPrice > salePrice && salePrice > 0) {
+        const diff = normalPrice - salePrice;
+        const pct = Math.round((diff / normalPrice) * 100);
+        savingsBadge.textContent = `⚡ Descuento: Q ${diff.toFixed(2)} (${pct}% OFF)`;
+        savingsBadge.classList.remove('hidden');
+      } else {
+        savingsBadge.classList.add('hidden');
+      }
+    }
+
+    priceInput?.addEventListener('input', calculateSavings);
+    salePriceInput?.addEventListener('input', calculateSavings);
+
+    // ============================================================
+    // FOTOS SECUNDARIAS
+    // ============================================================
+    function renderSecondaryThumbnails() {
+      const gridEl = document.getElementById('secondaryThumbsGrid');
+      const badgeEl = document.getElementById('secondaryCountBadge');
+      const uploadBox = document.getElementById('secondaryUploadBox');
+
+      if (!gridEl || !badgeEl) return;
+
+      badgeEl.textContent = `${secondaryImagesList.length} / 4`;
+
+      if (secondaryImagesList.length >= 4) {
+        if (uploadBox) uploadBox.classList.add('hidden');
+      } else {
+        if (uploadBox) uploadBox.classList.remove('hidden');
+      }
+
+      if (secondaryImagesList.length === 0) {
+        gridEl.innerHTML = '<p class="col-span-4 text-[11px] text-slate-400 text-center py-2 italic">Sin fotos secundarias cargadas</p>';
+        return;
+      }
+
+      gridEl.innerHTML = secondaryImagesList.map((item, idx) => `
+        <div class="relative aspect-square rounded-xl overflow-hidden border border-slate-200 bg-white group shadow-xs">
+          <img src="${item.previewUrl || item.url || window.PLACEHOLDER_IMG}" class="w-full h-full object-cover">
+          <button type="button" data-action="remove-secondary" data-idx="${idx}"
+            class="absolute top-1 right-1 bg-red-500 hover:bg-red-600 text-white text-[10px] font-bold w-5 h-5 rounded-full shadow flex items-center justify-center transition">
+            ✕
+          </button>
+        </div>
+      `).join('');
+
+      gridEl.querySelectorAll('[data-action="remove-secondary"]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          const idx = parseInt(btn.dataset.idx, 10);
+          if (!isNaN(idx) && idx >= 0 && idx < secondaryImagesList.length) {
+            secondaryImagesList.splice(idx, 1);
+            renderSecondaryThumbnails();
+          }
+        };
+      });
+    }
+
+    const secondaryFileInput = document.getElementById('secondaryImgFiles');
+    secondaryFileInput?.addEventListener('change', (e) => {
+      const files = Array.from(e.target.files || []);
+      for (const file of files) {
+        if (secondaryImagesList.length >= 4) {
+          alert('Máximo 4 imágenes secundarias permitidas.');
+          break;
+        }
+        const previewUrl = URL.createObjectURL(file);
+        secondaryImagesList.push({ file: file, url: null, previewUrl: previewUrl });
+      }
+      secondaryFileInput.value = '';
+      renderSecondaryThumbnails();
+    });
+
+    const addSecUrlBtn = document.getElementById('addSecondaryUrlBtn');
+    const secUrlInput = document.getElementById('secondaryImageUrlInput');
+    addSecUrlBtn?.addEventListener('click', () => {
+      const val = secUrlInput ? secUrlInput.value.trim() : '';
+      if (!val) return;
+      if (secondaryImagesList.length >= 4) {
+        alert('Máximo 4 imágenes secundarias permitidas.');
+        return;
+      }
+      secondaryImagesList.push({ file: null, url: val, previewUrl: val });
+      secUrlInput.value = '';
+      renderSecondaryThumbnails();
+    });
+
+    // ============================================================
+    // VARIANTES: COLORES
+    // ============================================================
+    function renderColorsList() {
+      const container = document.getElementById('colorsListContainer');
+      if (!container) return;
+
+      if (colorsList.length === 0) {
+        container.innerHTML = '<p class="text-[10px] text-indigo-400 italic text-center py-1">Sin colores agregados</p>';
+        return;
+      }
+
+      container.innerHTML = colorsList.map((c, idx) => `
+        <div class="flex items-center gap-1.5 bg-white rounded-xl p-1.5 border border-indigo-100">
+          <input type="color" value="${c.hex || '#4f46e5'}" data-color-field="hex" data-idx="${idx}"
+            class="w-8 h-8 rounded-lg border border-slate-200 cursor-pointer flex-shrink-0 p-0 bg-white">
+          <input type="text" placeholder="Nombre" value="${dashEscapeHtml(c.name || '')}" data-color-field="name" data-idx="${idx}"
+            class="flex-1 min-w-0 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-semibold outline-none focus:ring-1 focus:ring-indigo-500 bg-white">
+          <input type="number" min="0" placeholder="Stock" value="${c.stock === null || c.stock === undefined ? '' : c.stock}" data-color-field="stock" data-idx="${idx}"
+            class="w-14 border border-slate-200 rounded-lg px-1.5 py-1 text-[11px] font-semibold outline-none focus:ring-1 focus:ring-indigo-500 bg-white">
+          <button type="button" data-color-remove="${idx}" class="text-rose-500 hover:text-rose-700 text-xs font-bold px-1">✕</button>
+        </div>
+      `).join('');
+
+      container.querySelectorAll('[data-color-field]').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const idx = parseInt(inp.dataset.idx, 10);
+          const field = inp.dataset.colorField;
+          let val = inp.value;
+          if (field === 'stock') val = val === '' ? null : parseInt(val, 10);
+          if (field === 'hex') val = val || '#4f46e5';
+          if (colorsList[idx]) colorsList[idx][field] = val;
+        });
+      });
+
+      container.querySelectorAll('[data-color-remove]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          colorsList.splice(parseInt(btn.dataset.colorRemove, 10), 1);
+          renderColorsList();
+        });
+      });
+    }
+
+    document.getElementById('addColorBtn')?.addEventListener('click', () => {
+      colorsList.push({ name: '', hex: '#4f46e5', image: null, stock: null });
+      renderColorsList();
+    });
+
+    // ============================================================
+    // VARIANTES: TALLAS
+    // ============================================================
+    function renderSizesList() {
+      const container = document.getElementById('sizesListContainer');
+      if (!container) return;
+
+      if (sizesList.length === 0) {
+        container.innerHTML = '<p class="text-[10px] text-indigo-400 italic text-center py-1">Sin tallas agregadas</p>';
+        return;
+      }
+
+      container.innerHTML = sizesList.map((s, idx) => `
+        <div class="flex items-center gap-1.5 bg-white rounded-xl p-1.5 border border-indigo-100">
+          <input type="text" placeholder="Ej. M" value="${dashEscapeHtml(s.name || '')}" data-size-field="name" data-idx="${idx}"
+            class="flex-1 min-w-0 border border-slate-200 rounded-lg px-2 py-1 text-[11px] font-semibold outline-none focus:ring-1 focus:ring-indigo-500 bg-white">
+          <input type="number" step="0.01" min="0" placeholder="Precio" value="${s.price === null || s.price === undefined ? '' : s.price}" data-size-field="price" data-idx="${idx}"
+            class="w-20 border border-slate-200 rounded-lg px-1.5 py-1 text-[11px] font-semibold outline-none focus:ring-1 focus:ring-indigo-500 bg-white">
+          <input type="number" min="0" placeholder="Stock" value="${s.stock === null || s.stock === undefined ? '' : s.stock}" data-size-field="stock" data-idx="${idx}"
+            class="w-14 border border-slate-200 rounded-lg px-1.5 py-1 text-[11px] font-semibold outline-none focus:ring-1 focus:ring-indigo-500 bg-white">
+          <button type="button" data-size-remove="${idx}" class="text-rose-500 hover:text-rose-700 text-xs font-bold px-1">✕</button>
+        </div>
+      `).join('');
+
+      container.querySelectorAll('[data-size-field]').forEach(inp => {
+        inp.addEventListener('input', () => {
+          const idx = parseInt(inp.dataset.idx, 10);
+          const field = inp.dataset.sizeField;
+          let val = inp.value;
+          if (field === 'price' || field === 'stock') val = val === '' ? null : parseFloat(val);
+          if (sizesList[idx]) sizesList[idx][field] = val;
+        });
+      });
+
+      container.querySelectorAll('[data-size-remove]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          sizesList.splice(parseInt(btn.dataset.sizeRemove, 10), 1);
+          renderSizesList();
+        });
+      });
+    }
+
+    document.getElementById('addSizeBtn')?.addEventListener('click', () => {
+      sizesList.push({ name: '', price: null, stock: null });
+      renderSizesList();
+    });
+
+    // ============================================================
+    // LÍMITES DEL PLAN
+    // ============================================================
+    function checkPlanLimits() {
+      if (!currentStore) return;
+      let rawPlan = String(currentStore.plan_type || 'free').trim().toLowerCase();
+      const expiresAt = currentStore.plan_expires_at ? new Date(currentStore.plan_expires_at) : null;
+      if (expiresAt && expiresAt < new Date()) rawPlan = 'free';
+
+      const maxLimit = PLAN_LIMITS[rawPlan] || 10;
+      const currentCount = myProductsList.length;
+      const limitReached = currentCount >= maxLimit;
+      const isEditing = !!productIdEl.value;
+      const bannerContainer = document.getElementById('planBannerContainer');
+      const planName = PLAN_NAMES[rawPlan] || 'Gratis';
+
+      if (limitReached && !isEditing) {
+        saveBtn.disabled = true;
+        saveBtn.innerHTML = '🚫 Límite de catálogo alcanzado';
+        bannerContainer.innerHTML = `
+          <div class="bg-gradient-to-r from-amber-500 to-amber-600 text-white rounded-2xl p-4 shadow-md space-y-2">
+            <div class="flex items-center justify-between">
+              <span class="text-xs font-black uppercase tracking-wider bg-white/20 px-2.5 py-0.5 rounded-full">Plan ${planName}</span>
+              <span class="text-xs font-extrabold">${currentCount} / ${maxLimit === Infinity ? '∞' : maxLimit} productos</span>
+            </div>
+            <p class="text-xs font-bold leading-relaxed">Has alcanzado el límite máximo de productos de tu Plan ${planName}.</p>
+          </div>`;
+      } else {
+        saveBtn.disabled = false;
+        saveBtn.textContent = isEditing ? 'Actualizar' : 'Publicar';
+        bannerContainer.innerHTML = `
+          <div class="bg-slate-800 text-white rounded-2xl p-3 shadow-sm flex items-center justify-between text-xs">
+            <div>
+              <span class="font-extrabold text-emerald-400 uppercase tracking-wider">Plan ${planName}</span>
+              <p class="text-[11px] text-slate-300">Catálogo: <span class="font-bold text-white">${currentCount}</span> de <span class="font-bold text-white">${maxLimit === Infinity ? 'Ilimitado' : maxLimit}</span> productos</p>
+            </div>
+          </div>`;
+      }
+    }
+
+    // ============================================================
+    // CARGA DE PRODUCTOS
+    // ============================================================
+    async function loadMyProducts() {
+      const container = document.getElementById('myProducts');
+      const { data, error } = await _supabase
+        .from('products')
+        .select('*, categories(name, icon)')
+        .eq('store_id', currentStore.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        container.innerHTML = '<p class="text-red-500 text-sm py-8 text-center">Error al cargar productos.</p>';
+        return;
+      }
+
+      myProductsList = (data || []).map(p => {
+        if (p.is_on_sale && p.sale_expires_at) {
+          if (new Date(p.sale_expires_at) < new Date()) {
+            p.is_on_sale = false;
+            if (p.original_price && p.original_price > p.price) {
+              p.price = p.original_price;
+              p.original_price = null;
+            }
+            _supabase.from('products').update({ is_on_sale: false, price: p.price, original_price: null }).eq('id', p.id).then(() => {}).catch(() => {});
+          }
+        }
+        return p;
+      });
+
+      renderMyProducts();
+      checkPlanLimits();
+    }
+
+    (async () => {
+      try {
+        const guardRes = await guardDashboardPage();
+        if (!guardRes || !guardRes.session || !guardRes.store) return;
+
+        currentUser = guardRes.session.user;
+        const { data: freshStore } = await _supabase.from('stores').select('*').eq('id', guardRes.store.id).single();
+        currentStore = freshStore || guardRes.store;
+
+        await initDashboardNav({ store: currentStore, user: currentUser });
+        await loadCategories();
+        initProductImageDrop();
+        renderSecondaryThumbnails();
+        renderColorsList();
+        renderSizesList();
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+
+        document.getElementById('productSearch').addEventListener('input', (e) => {
+          productSearchTerm = e.target.value.toLowerCase().trim();
+          renderMyProducts();
+        });
+
+        await loadMyProducts();
+      } catch(err) {
+        console.error(err);
+      }
+    })();
+
+    async function loadCategories() {
+      const { data } = await _supabase.from('categories').select('*').order('sort_order');
+      document.getElementById('category').innerHTML = '<option value="">Selecciona categoría...</option>' + (data || []).map(c => `<option value="${c.id}">${c.icon || ''} ${c.name}</option>`).join('');
+    }
+
+    function initProductImageDrop() {
+      productImgUI = dashSetupDropzone({
+        dropId: 'imgDrop', inputId: 'imgFile', previewId: 'imgPreview', imgId: 'imgPreviewSrc', placeholderId: 'imgPlaceholder', removeId: 'imgRemove',
+        onFile: (f) => { pendingProductFile = f; if (!f) currentProductImageUrl = null; }
+      });
+    }
+
+    // ============================================================
+    // SUBMIT DEL FORMULARIO
+    // ============================================================
+    form.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      saveBtn.disabled = true; saveBtn.textContent = 'Guardando...';
+
+      try {
+        let image_url = document.getElementById('imageUrl').value.trim() || currentProductImageUrl;
+        if (pendingProductFile) {
+          image_url = await uploadImage(pendingProductFile, 'products', currentUser.id);
+        }
+
+        const finalSecondaryUrls = [];
+        for (const item of secondaryImagesList) {
+          if (item.file) {
+            const uploadedUrl = await uploadImage(item.file, 'products', currentUser.id);
+            if (uploadedUrl) finalSecondaryUrls.push(uploadedUrl);
+          } else if (item.url) {
+            finalSecondaryUrls.push(item.url);
+          }
+        }
+
+        const normalPrice = parseFloat(document.getElementById('price').value);
+        let isOnSale = isOnSaleCheck?.checked || false;
+        const expiresAtInput = document.getElementById('saleExpiresAt');
+
+        let salePrice = isOnSale && salePriceInput && salePriceInput.value ? parseFloat(salePriceInput.value) : null;
+        let expiresAt = isOnSale && expiresAtInput && expiresAtInput.value ? new Date(expiresAtInput.value).toISOString() : null;
+
+        if (isOnSale && (!salePrice || salePrice >= normalPrice)) {
+          alert('El precio de oferta debe ser menor al precio normal del producto.');
+          saveBtn.disabled = false; saveBtn.textContent = 'Publicar';
+          return;
+        }
+
+        if (isOnSale && expiresAt && new Date(expiresAt) < new Date()) {
+          isOnSale = false;
+          salePrice = null;
+          expiresAt = null;
+        }
+
+        let finalPrice = normalPrice;
+        let finalOriginalPrice = null;
+
+        if (isOnSale) {
+          finalPrice = salePrice;
+          finalOriginalPrice = normalPrice;
+        }
+
+        // ---- Variantes (colores + tallas) ----
+        const cleanColors = colorsList
+          .filter(c => c && c.name && String(c.name).trim() !== '')
+          .map(c => ({
+            name: String(c.name).trim(),
+            hex: c.hex || null,
+            image: c.image || null,
+            price: (c.price === undefined || c.price === null || c.price === '') ? null : parseFloat(c.price),
+            stock: (c.stock === undefined || c.stock === null || c.stock === '') ? null : parseInt(c.stock, 10)
+          }));
+
+        const cleanSizes = sizesList
+          .filter(s => s && s.name && String(s.name).trim() !== '')
+          .map(s => ({
+            name: String(s.name).trim(),
+            price: (s.price === undefined || s.price === null || s.price === '') ? null : parseFloat(s.price),
+            stock: (s.stock === undefined || s.stock === null || s.stock === '') ? null : parseInt(s.stock, 10)
+          }));
+
+        const payload = {
+          store_id: currentStore.id,
+          category_id: parseInt(document.getElementById('category').value, 10) || null,
+          title: document.getElementById('title').value.trim(),
+          description: document.getElementById('description').value.trim() || null,
+          price: finalPrice,
+          original_price: finalOriginalPrice,
+          image_url: image_url || (finalSecondaryUrls.length > 0 ? finalSecondaryUrls[0] : null),
+          image_urls: finalSecondaryUrls,
+          is_on_sale: isOnSale,
+          sale_expires_at: expiresAt,
+          colors: cleanColors,
+          sizes: cleanSizes,
+          variant_matrix: {}
+        };
+
+        const id = productIdEl.value;
+        if (id) {
+          await _supabase.from('products').update(payload).eq('id', id);
+        } else {
+          await _supabase.from('products').insert([payload]);
+        }
+
+        form.reset();
+        productIdEl.value = '';
+        secondaryImagesList = [];
+        colorsList = [];
+        sizesList = [];
+        renderSecondaryThumbnails();
+        renderColorsList();
+        renderSizesList();
+
+        if (saleFieldsContainer) saleFieldsContainer.classList.add('hidden');
+        if (savingsBadge) savingsBadge.classList.add('hidden');
+        if (productImgUI) productImgUI.clearPreview();
+        await loadMyProducts();
+      } catch (err) {
+        alert('Error al guardar: ' + err.message);
+      } finally {
+        saveBtn.disabled = false; saveBtn.textContent = 'Publicar';
+      }
+    });
+
+    // ============================================================
+    // RENDER LISTA
+    // ============================================================
+    function renderMyProducts() {
+      const container = document.getElementById('myProducts');
+      let list = myProductsList;
+      if (productSearchTerm) {
+        list = myProductsList.filter(p => p.title.toLowerCase().includes(productSearchTerm));
+      }
+      document.getElementById('countBadge').textContent = list.length;
+
+      if (list.length === 0) {
+        container.innerHTML = '<div class="bg-white rounded-2xl p-8 text-center"><p class="text-slate-500 text-xs font-semibold">Sin productos registrados.</p></div>';
+        return;
+      }
+
+      container.innerHTML = list.map(p => {
+        let secUrls = [];
+        if (Array.isArray(p.image_urls)) secUrls = p.image_urls;
+        else if (typeof p.image_urls === 'string') {
+          try { secUrls = JSON.parse(p.image_urls); } catch(e){}
+        }
+        const secCount = secUrls.length;
+
+        let displayImg = p.image_url;
+        if (!displayImg && secUrls.length > 0) displayImg = secUrls[0];
+        displayImg = displayImg || window.PLACEHOLDER_IMG;
+
+        const normalP = (p.is_on_sale && p.original_price) ? p.original_price : p.price;
+        const saleP = p.is_on_sale ? p.price : null;
+
+        const colorsCount = Array.isArray(p.colors) ? p.colors.length : 0;
+        const sizesCount  = Array.isArray(p.sizes)  ? p.sizes.length  : 0;
+        const variantsBadge = (colorsCount + sizesCount) > 0
+          ? `<span class="text-[10px] bg-indigo-50 text-indigo-700 px-2 py-0.5 rounded-full font-bold">🎨 ${colorsCount}C · ${sizesCount}T</span>`
+          : '';
+
+        return `
+        <article class="bg-white rounded-2xl shadow-sm border p-3 flex gap-3 items-center">
+          <img src="${displayImg}" class="w-16 h-16 rounded-xl object-cover bg-slate-100 flex-shrink-0" onerror="this.onerror=null;this.src='${window.PLACEHOLDER_IMG}'">
+          <div class="flex-1 min-w-0">
+            <h3 class="font-bold text-slate-800 text-xs truncate">${dashEscapeHtml(p.title)}</h3>
+            <div class="flex items-center gap-2 mt-0.5 flex-wrap">
+              ${p.is_on_sale
+                ? `<span class="text-xs font-black text-rose-600">Q ${parseFloat(saleP).toFixed(2)}</span>
+                   <span class="text-[10px] text-slate-400 line-through">Q ${parseFloat(normalP).toFixed(2)}</span>
+                   <span class="text-[10px] bg-rose-100 text-rose-700 px-2 py-0.5 rounded-full font-extrabold">🔥 Oferta</span>`
+                : `<span class="text-xs font-black text-emerald-600">Q ${parseFloat(normalP).toFixed(2)}</span>`
+              }
+              ${secCount > 0 ? `<span class="text-[10px] bg-blue-50 text-blue-700 px-2 py-0.5 rounded-full font-bold">📷 +${secCount} fotos</span>` : ''}
+              ${variantsBadge}
+            </div>
+          </div>
+          <button data-action="edit" data-id="${p.id}" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-1.5 rounded-xl transition">Editar</button>
+        </article>`;
+      }).join('');
+
+      container.querySelectorAll('[data-action="edit"]').forEach(btn => {
+        btn.onclick = () => {
+          const p = myProductsList.find(x => String(x.id) === String(btn.dataset.id));
+          if (!p) return;
+          productIdEl.value = p.id;
+          document.getElementById('category').value = p.category_id || '';
+          document.getElementById('title').value = p.title || '';
+          document.getElementById('description').value = p.description || '';
+
+          let mainImg = p.image_url;
+          let secUrls = [];
+          if (Array.isArray(p.image_urls)) secUrls = [...p.image_urls];
+          else if (typeof p.image_urls === 'string') {
+            try { secUrls = JSON.parse(p.image_urls); } catch(e){}
+          }
+
+          if (!mainImg && secUrls.length > 0) {
+            mainImg = secUrls.shift();
+          }
+
+          currentProductImageUrl = mainImg || null;
+          if (mainImg && productImgUI) productImgUI.showPreview(mainImg);
+          else if (productImgUI) productImgUI.clearPreview();
+
+          secondaryImagesList = [];
+          if (Array.isArray(secUrls)) {
+            secUrls.filter(Boolean).forEach(u => {
+              if (secondaryImagesList.length < 4 && u !== mainImg) {
+                secondaryImagesList.push({ file: null, url: u, previewUrl: u });
+              }
+            });
+          }
+          renderSecondaryThumbnails();
+
+          // ---- Variantes ----
+          colorsList = Array.isArray(p.colors) ? p.colors.map(c => ({
+            name: c.name || '',
+            hex: c.hex || '#4f46e5',
+            image: c.image || null,
+            price: (c.price === undefined || c.price === null) ? null : parseFloat(c.price),
+            stock: (c.stock === undefined || c.stock === null) ? null : parseInt(c.stock, 10)
+          })) : [];
+
+          sizesList = Array.isArray(p.sizes) ? p.sizes.map(s => ({
+            name: s.name || '',
+            price: (s.price === undefined || s.price === null) ? null : parseFloat(s.price),
+            stock: (s.stock === undefined || s.stock === null) ? null : parseInt(s.stock, 10)
+          })) : [];
+
+          renderColorsList();
+          renderSizesList();
+
+          // ---- Oferta relámpago ----
+          let isOfferActive = !!p.is_on_sale;
+          if (isOfferActive && p.sale_expires_at && new Date(p.sale_expires_at) < new Date()) {
+            isOfferActive = false;
+            p.is_on_sale = false;
+          }
+
+          const normalPrice = (p.is_on_sale && p.original_price) ? p.original_price : p.price;
+          const offerPrice = p.is_on_sale ? p.price : '';
+
+          document.getElementById('price').value = normalPrice || '';
+
+          if (isOnSaleCheck) isOnSaleCheck.checked = isOfferActive;
+          if (isOfferActive) {
+            if (saleFieldsContainer) saleFieldsContainer.classList.remove('hidden');
+            if (salePriceInput) salePriceInput.value = offerPrice;
+            if (document.getElementById('saleExpiresAt') && p.sale_expires_at) {
+              document.getElementById('saleExpiresAt').value = p.sale_expires_at.substring(0, 16);
+            }
+            calculateSavings();
+          } else {
+            if (saleFieldsContainer) saleFieldsContainer.classList.add('hidden');
+            if (savingsBadge) savingsBadge.classList.add('hidden');
+            if (salePriceInput) salePriceInput.value = '';
+            if (document.getElementById('saleExpiresAt')) document.getElementById('saleExpiresAt').value = '';
+          }
+
+          saveBtn.textContent = 'Actualizar';
+          cancelBtn.classList.remove('hidden');
+          window.scrollTo({ top: 0, behavior: 'smooth' });
+        };
+      });
+    }
+
+    cancelBtn.onclick = () => {
+      form.reset();
+      productIdEl.value = '';
+      cancelBtn.classList.add('hidden');
+      saveBtn.textContent = 'Publicar';
+      secondaryImagesList = [];
+      colorsList = [];
+      sizesList = [];
+      renderSecondaryThumbnails();
+      renderColorsList();
+      renderSizesList();
+      if (saleFieldsContainer) saleFieldsContainer.classList.add('hidden');
+      if (savingsBadge) savingsBadge.classList.add('hidden');
+      if (productImgUI) productImgUI.clearPreview();
+    };
+  </script>
+</body>
+</html>

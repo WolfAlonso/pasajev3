@@ -1,0 +1,920 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title class="theme-title">Ofertas Relámpago y Descuentos · Pasaje de los Altos</title>
+  <meta name="description" content="Descubre ofertas relámpago, promociones por tiempo limitado y descuentos de comercios y emprendedores locales en Quetzaltenango.">
+  <meta name="theme-color" content="#1e3a8a">
+  
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=4"></script>
+
+  <script>
+    (function () {
+      if (typeof window.PLACEHOLDER_IMG === 'undefined') {
+        window.PLACEHOLDER_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#f1f5f9"/><text x="50%" y="50%" text-anchor="middle" dy=".35em" fill="#94a3b8" font-family="sans-serif" font-size="20">Sin imagen</text></svg>'
+        );
+      }
+      if (typeof window.cleanPhone === 'undefined') {
+        window.cleanPhone = function (raw) { return String(raw || '').replace(/\D/g, ''); };
+      }
+      if (typeof window.heartSVG === 'undefined') {
+        window.heartSVG = function (filled) {
+          var fill = filled ? 'currentColor' : 'none';
+          return '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="' + fill + '" stroke="' + (filled ? '#ef4444' : 'currentColor') + '" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+        };
+      }
+      if (typeof window.Favorites === 'undefined') {
+        var _favs = [];
+        try { _favs = JSON.parse(localStorage.getItem('pasaje_favorites') || '[]'); } catch (e) { _favs = []; }
+        function persistFavs() { try { localStorage.setItem('pasaje_favorites', JSON.stringify(_favs)); } catch (e) {} }
+        window.Favorites = {
+          getAll: function () { return _favs.slice(); },
+          has: function (id) { return _favs.indexOf(String(id)) >= 0; },
+          count: function () { return _favs.length; },
+          add: function (id) { var s = String(id); if (_favs.indexOf(s) < 0) { _favs.push(s); persistFavs(); } },
+          remove: function (id) { _favs = _favs.filter(function (x) { return x !== String(id); }); persistFavs(); },
+          toggle: function (id) {
+            var s = String(id); var i = _favs.indexOf(s);
+            if (i >= 0) { _favs.splice(i, 1); persistFavs(); return false; }
+            _favs.push(s); persistFavs(); return true;
+          }
+        };
+      }
+    })();
+  </script>
+
+  <script src="../js/theme-loader.js?v=9"></script>
+  <script src="../js/cart.js?v=9"></script>
+  <script src="../js/footer.js?v=4"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+  <script src="../js/services/products-service.js?v=5"></script>
+  <script src="../js/ui/product-card.js?v=5"></script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; }
+
+    /* Estilos Liquid Glass */
+    .glass-container {
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+
+    .glass-card-product {
+      background: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      border: 1px solid rgba(226, 232, 240, 0.9);
+      transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+
+    .glass-card-product:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 12px 25px -5px rgba(225, 29, 72, 0.15), 0 8px 10px -6px rgba(0, 0, 0, 0.05);
+      border-color: rgba(244, 63, 94, 0.4);
+    }
+
+    .cat-item-active {
+      background-color: rgba(244, 63, 94, 0.12) !important;
+      color: #e11d48 !important;
+      font-weight: 800 !important;
+      border-left: 4px solid #f43f5e !important;
+    }
+
+    .fav-btn { color: #94a3b8; transition: color .15s ease; }
+    .fav-btn:hover, .fav-btn.fav-active { color: #ef4444 !important; }
+    .no-click { cursor: default; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col text-slate-800">
+
+  <!-- HEADER NAVEGACIÓN GLOBAL -->
+  <header class="glass-header text-white shadow-lg sticky top-0 z-40 border-b border-white/10 theme-header">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <button id="sidebarToggleBtn" type="button"
+          class="bg-white/10 hover:bg-white/20 p-2 rounded-xl transition flex items-center justify-center border border-white/15 text-white"
+          title="Menú / Categorías de Ofertas" aria-label="Abrir categorías de ofertas">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6"  x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+
+        <a href="index.html" class="flex items-center gap-2 text-lg sm:text-xl font-extrabold tracking-tight min-w-0">
+          <img class="theme-logo hidden w-8 h-8 rounded-full object-cover bg-white/10 border border-white/20" src="" alt="logo">
+          <span class="theme-title truncate text-white">Pasaje de los <span class="text-emerald-400">Altos</span></span>
+        </a>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <a href="index.html" class="bg-white/10 hover:bg-white/20 text-white font-bold text-xs px-3 py-2 rounded-xl border border-white/15 flex items-center gap-1.5 transition">
+          <span>🏠</span>
+          <span class="hidden sm:inline">Inicio</span>
+        </a>
+
+        <a href="ofertas.html" class="bg-rose-500/90 hover:bg-rose-600 text-white font-bold text-xs px-3 py-2 rounded-xl border border-rose-300/30 flex items-center gap-1.5 shadow-sm transition">
+          <span>🔥</span>
+          <span class="hidden sm:inline">Ofertas</span>
+        </a>
+
+        <a href="categorias.html" class="bg-white/10 hover:bg-white/20 text-white font-bold text-xs px-3 py-2 rounded-xl border border-white/15 flex items-center gap-1.5 transition">
+          <span>🏷️</span>
+          <span class="hidden sm:inline">Categorías</span>
+        </a>
+
+        <button type="button" onclick="if(window.PasajeCart) window.PasajeCart.openDrawer();"
+           class="relative bg-white/10 hover:bg-white/20 p-2 rounded-xl transition border border-white/15 text-white flex items-center justify-center" title="Carrito">
+          🛒
+          <span class="cart-count-badge hidden absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow">0</span>
+        </button>
+
+        <a id="favBtn" href="favoritos.html"
+           class="relative bg-white/10 hover:bg-white/20 p-2 rounded-xl transition border border-white/15 text-white" title="Mis favoritos">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span id="favCount" class="hidden absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow">0</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- DRAWER MÓVIL DEDICADO DE CATEGORÍAS EN OFERTA -->
+  <div id="offerDrawerBackdrop" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 lg:hidden transition-opacity"></div>
+  <aside id="offerDrawerPanel" class="hidden fixed inset-y-0 left-0 w-80 max-w-[85vw] bg-white z-50 lg:hidden shadow-2xl flex flex-col transition-transform">
+    <div class="p-4 border-b border-slate-100 flex items-center justify-between bg-rose-50/50">
+      <div class="flex items-center gap-2">
+        <span class="text-xl">🔥</span>
+        <h2 class="font-extrabold text-slate-900 text-sm">Sectores con Oferta</h2>
+      </div>
+      <button id="offerDrawerCloseBtn" type="button" class="w-8 h-8 rounded-full bg-slate-200 text-slate-700 font-bold text-xs flex items-center justify-center">✕</button>
+    </div>
+
+    <div class="p-3 border-b border-slate-100 bg-slate-50/50 flex gap-2">
+      <a href="index.html" class="flex-1 bg-white border border-slate-200 text-slate-700 font-bold text-xs py-2 px-3 rounded-xl text-center shadow-sm">🏠 Inicio</a>
+      <a href="categorias.html" class="flex-1 bg-white border border-slate-200 text-slate-700 font-bold text-xs py-2 px-3 rounded-xl text-center shadow-sm">🏷️ Categorías</a>
+    </div>
+
+    <div class="p-3 border-b border-slate-100 bg-white">
+      <div class="relative">
+        <input type="text" id="mobileOfferCatSearchInput" placeholder="Filtrar sectores en oferta..."
+          class="w-full pl-8 pr-3 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-rose-500 outline-none bg-slate-50">
+        <span class="absolute left-2.5 top-2.5 text-xs text-slate-400">🔍</span>
+      </div>
+    </div>
+
+    <div id="mobileOfferCategoryTreeMount" class="flex-1 overflow-y-auto p-3 space-y-1">
+      <!-- Se inyecta dinámicamente -->
+    </div>
+  </aside>
+
+  <!-- CONTENEDOR PRINCIPAL: SIDEBAR OFERTAS + GRILLA -->
+  <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-1 flex flex-col lg:flex-row gap-6">
+
+    <!-- 1. SIDEBAR LATERAL INDEPENDIENTE DE OFERTAS (DESKTOP) -->
+    <aside class="hidden lg:block w-72 flex-shrink-0 space-y-4">
+      <div class="glass-container p-4 rounded-3xl shadow-sm border border-slate-200/80 sticky top-20">
+        
+        <!-- Accesos Rápidos -->
+        <div class="mb-4 pb-3 border-b border-slate-100 space-y-1">
+          <a href="index.html" class="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition">
+            <span class="flex items-center gap-2"><span>🏠</span><span>Página Principal</span></span>
+            <span class="text-slate-400">→</span>
+          </a>
+          <a href="categorias.html" class="flex items-center justify-between px-3 py-2 rounded-xl text-xs font-bold text-slate-700 hover:bg-slate-100 transition">
+            <span class="flex items-center gap-2"><span>🏷️</span><span>Todas las Categorías</span></span>
+            <span class="text-slate-400">→</span>
+          </a>
+        </div>
+
+        <!-- Encabezado Directorio -->
+        <div class="flex items-center justify-between gap-2 mb-3">
+          <div class="flex items-center gap-2">
+            <span class="text-lg">🔥</span>
+            <h2 class="font-extrabold text-slate-900 text-sm">Sectores en Oferta</h2>
+          </div>
+          <button id="btnClearCategoryFilter" type="button" class="text-[11px] font-bold text-rose-600 hover:text-rose-700 hover:underline">
+            Todas
+          </button>
+        </div>
+
+        <!-- Buscador de Categorías con Oferta -->
+        <div class="mb-3 relative">
+          <input type="text" id="desktopOfferCatSearchInput" placeholder="Filtrar sectores..."
+            class="w-full pl-8 pr-7 py-2 border border-slate-200 rounded-xl text-xs font-medium focus:ring-2 focus:ring-rose-500 outline-none bg-white/90">
+          <span class="absolute left-2.5 top-2 text-xs text-slate-400">🔍</span>
+          <button id="btnClearCatSearch" type="button" class="hidden absolute right-2.5 top-2 text-xs text-slate-400 hover:text-slate-600 font-bold">✕</button>
+        </div>
+
+        <!-- Lista de Categorías con Oferta -->
+        <div id="desktopOfferCategoryTreeMount" class="space-y-1 max-h-[calc(100vh-260px)] overflow-y-auto pr-1">
+          <p class="p-4 text-center text-xs text-slate-400 font-medium">Cargando sectores en oferta...</p>
+        </div>
+      </div>
+    </aside>
+
+    <!-- 2. ÁREA PRINCIPAL DINÁMICA DE OFERTAS -->
+    <section class="flex-1 min-w-0 space-y-5">
+
+      <!-- HERO BANNER ENCABEZADO -->
+      <div id="offerHeaderBanner" class="bg-gradient-to-br from-rose-600 via-red-500 to-amber-500 text-white p-6 sm:p-8 rounded-3xl relative overflow-hidden shadow-xl">
+        <div class="absolute -right-8 -bottom-8 text-white/10 text-9xl font-black pointer-events-none select-none">⚡</div>
+        <div class="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 relative z-10">
+          <div class="flex items-center gap-3">
+            <span id="offerHeaderIcon" class="text-4xl p-3 bg-white/10 backdrop-blur-md rounded-2xl border border-white/20 flex-shrink-0">🔥</span>
+            <div>
+              <div class="flex items-center gap-2 flex-wrap">
+                <h1 id="offerHeaderTitle" class="text-2xl sm:text-3xl font-black tracking-tight text-white">Ofertas Relámpago y Descuentos en Xela</h1>
+              </div>
+              <p id="offerHeaderDesc" class="text-xs sm:text-sm font-medium text-rose-100 mt-1">
+                Aprovecha precios especiales de nuestros comercios y emprendedores locales en Quetzaltenango antes de que expiren.
+              </p>
+            </div>
+          </div>
+
+          <div class="flex items-center gap-2 bg-black/20 backdrop-blur-md px-3.5 py-2 rounded-2xl border border-white/20 shadow-sm flex-shrink-0">
+            <span class="text-xs font-bold text-rose-100">Ofertas activas:</span>
+            <span id="offerHeaderCount" class="text-sm font-black text-amber-300">0</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- FILTROS Y CONTROLES -->
+      <div class="glass-container p-4 rounded-2xl flex flex-col sm:flex-row items-center justify-between gap-3 shadow-sm border border-slate-200/80">
+        <!-- Buscador dentro de ofertas -->
+        <div class="relative w-full sm:w-72">
+          <input type="text" id="offerProductSearch" placeholder="Buscar oferta..."
+            class="w-full pl-8 pr-4 py-2 border border-slate-200 rounded-xl text-xs font-semibold focus:ring-2 focus:ring-rose-500 outline-none bg-white">
+          <span class="absolute left-2.5 top-2.5 text-xs text-slate-400">🔍</span>
+        </div>
+
+        <!-- Ordenamiento -->
+        <div class="flex items-center gap-2 w-full sm:w-auto justify-end">
+          <label for="offerSortBy" class="text-xs font-bold text-slate-600 whitespace-nowrap">Ordenar por:</label>
+          <select id="offerSortBy" class="border border-slate-200 rounded-xl px-3 py-2 text-xs font-bold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-rose-500 cursor-pointer">
+            <option value="recent">✨ Más recientes</option>
+            <option value="expires">⏳ Próximas a vencer</option>
+            <option value="popular">🔥 Más populares</option>
+            <option value="price-asc">💵 Menor precio</option>
+            <option value="price-desc">💎 Mayor precio</option>
+          </select>
+        </div>
+      </div>
+
+      <!-- GRILLA RESPONSIVA DE PRODUCTOS EN OFERTA -->
+      <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+        <!-- Estado inicial de carga -->
+        <div class="col-span-full py-16 text-center text-slate-400 font-semibold text-sm">
+          <div class="text-3xl mb-2 animate-bounce">⚡</div>
+          Cargando ofertas relámpago...
+        </div>
+      </div>
+
+      <!-- PAGINACIÓN / BOTÓN DE CARGAR MÁS -->
+      <div id="paginationContainer" class="hidden text-center pt-4">
+        <button id="btnLoadMore" type="button"
+          class="bg-slate-900 hover:bg-rose-600 text-white font-extrabold text-xs px-6 py-3 rounded-2xl shadow-md transition-all duration-200">
+          Cargar más ofertas
+        </button>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- FOOTER GLOBAL -->
+  <div id="pasajeFooter"></div>
+
+  <!-- MODAL VISTA RÁPIDA DE PRODUCTOS -->
+  <div id="productModal" class="hidden fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-6">
+    <div class="relative w-full max-w-2xl">
+      <div id="modalProductNavWrapper"></div>
+
+      <div class="bg-white rounded-3xl shadow-2xl max-h-[88vh] overflow-y-auto">
+        <div id="productModalContent"></div>
+      </div>
+    </div>
+  </div>
+
+  <!-- LÓGICA DE CONTROLADORES Y TEMPORIZADOR EN VIVO -->
+  <script>
+    let offerCategories = [];
+    let offerCounts = {};
+    let activeCategorySlug = 'todas';
+    
+    const loadedProductsMap = new Map();
+    let currentProducts = [];
+    let currentPage = 0;
+    const PAGE_SIZE = 12;
+    let hasMoreProducts = false;
+    
+    let categorySearchTerm = '';
+    let productSearchTerm = '';
+    let currentSortBy = 'recent';
+
+    // ESTADO MODAL VISTA RÁPIDA
+    let activeModalProducts = [];
+    let activeProductIndex = -1;
+    let activeGalleryIndex = 0;
+
+    // INTERVALO DE CUENTA REGRESIVA
+    let liveCountdownInterval = null;
+
+    // ELEMENTOS DOM
+    const desktopTreeMount = document.getElementById('desktopOfferCategoryTreeMount');
+    const mobileTreeMount = document.getElementById('mobileOfferCategoryTreeMount');
+    const desktopOfferCatSearch = document.getElementById('desktopOfferCatSearchInput');
+    const mobileOfferCatSearch = document.getElementById('mobileOfferCatSearchInput');
+    const btnClearCatSearch = document.getElementById('btnClearCatSearch');
+    
+    const productsGrid = document.getElementById('productsGrid');
+    const offerProductSearch = document.getElementById('offerProductSearch');
+    const offerSortBy = document.getElementById('offerSortBy');
+    const btnLoadMore = document.getElementById('btnLoadMore');
+    const paginationContainer = document.getElementById('paginationContainer');
+    const favCountEl = document.getElementById('favCount');
+
+    // MODAL DOM
+    const productModal = document.getElementById('productModal');
+    const productModalContent = document.getElementById('productModalContent');
+    const modalProductNavWrapper = document.getElementById('modalProductNavWrapper');
+
+    // DRAWER MÓVIL
+    const sidebarToggleBtn = document.getElementById('sidebarToggleBtn');
+    const offerDrawerCloseBtn = document.getElementById('offerDrawerCloseBtn');
+    const offerDrawerPanel = document.getElementById('offerDrawerPanel');
+    const offerDrawerBackdrop = document.getElementById('offerDrawerBackdrop');
+
+    document.addEventListener('DOMContentLoaded', async () => {
+      updateFavCount();
+
+      const urlParams = new URLSearchParams(window.location.search);
+      activeCategorySlug = urlParams.get('cat') || urlParams.get('sub') || 'todas';
+
+      await fetchOfferCategories();
+      renderSidebarTrees();
+      await loadProducts(true);
+
+      startLiveCountdownTimer();
+
+      desktopOfferCatSearch?.addEventListener('input', debounce((e) => {
+        categorySearchTerm = e.target.value.trim();
+        btnClearCatSearch.classList.toggle('hidden', !categorySearchTerm);
+        renderSidebarTrees();
+      }, 250));
+
+      mobileOfferCatSearch?.addEventListener('input', debounce((e) => {
+        categorySearchTerm = e.target.value.trim();
+        renderSidebarTrees();
+      }, 250));
+
+      btnClearCatSearch?.addEventListener('click', () => {
+        desktopOfferCatSearch.value = '';
+        categorySearchTerm = '';
+        btnClearCatSearch.classList.add('hidden');
+        renderSidebarTrees();
+      });
+
+      document.getElementById('btnClearCategoryFilter')?.addEventListener('click', () => {
+        selectCategory('todas');
+      });
+
+      offerProductSearch?.addEventListener('input', debounce((e) => {
+        productSearchTerm = e.target.value.trim();
+        loadProducts(true);
+      }, 250));
+
+      offerSortBy?.addEventListener('change', (e) => {
+        currentSortBy = e.target.value;
+        loadProducts(true);
+      });
+
+      btnLoadMore?.addEventListener('click', () => {
+        if (hasMoreProducts) {
+          currentPage++;
+          loadProducts(false);
+        }
+      });
+
+      const toggleOfferDrawer = (show) => {
+        if (show) {
+          offerDrawerBackdrop.classList.remove('hidden');
+          offerDrawerPanel.classList.remove('hidden');
+        } else {
+          offerDrawerBackdrop.classList.add('hidden');
+          offerDrawerPanel.classList.add('hidden');
+        }
+      };
+
+      sidebarToggleBtn?.addEventListener('click', () => toggleOfferDrawer(true));
+      offerDrawerCloseBtn?.addEventListener('click', () => toggleOfferDrawer(false));
+      offerDrawerBackdrop?.addEventListener('click', () => toggleOfferDrawer(false));
+
+      window.addEventListener('popstate', () => {
+        const params = new URLSearchParams(window.location.search);
+        activeCategorySlug = params.get('cat') || params.get('sub') || 'todas';
+        renderSidebarTrees();
+        loadProducts(true);
+      });
+
+      productsGrid.addEventListener('click', handleProductActionClick);
+      attachModalEvents();
+    });
+
+    function debounce(fn, delay = 250) {
+      let timer = null;
+      return function (...args) {
+        clearTimeout(timer);
+        timer = setTimeout(() => fn.apply(this, args), delay);
+      };
+    }
+
+    function updateFavCount() {
+      if (!favCountEl || !window.Favorites) return;
+      const n = window.Favorites.count();
+      if (n === 0) favCountEl.classList.add('hidden');
+      else { favCountEl.textContent = n; favCountEl.classList.remove('hidden'); }
+    }
+
+    async function fetchOfferCategories() {
+      try {
+        if (window.ProductsService && typeof window.ProductsService.getSaleCategories === 'function') {
+          const res = await window.ProductsService.getSaleCategories();
+          offerCategories = res.categories || [];
+          offerCounts = res.counts || {};
+        }
+      } catch (err) {
+        console.error('[Ofertas] Error cargando categorías de ofertas:', err);
+      }
+    }
+
+    function renderSidebarTrees() {
+      const treeHTML = buildCategoryTreeHTML();
+      if (desktopTreeMount) desktopTreeMount.innerHTML = treeHTML;
+      if (mobileTreeMount) mobileTreeMount.innerHTML = treeHTML;
+
+      bindSidebarEvents(desktopTreeMount);
+      bindSidebarEvents(mobileTreeMount);
+    }
+
+    function buildCategoryTreeHTML() {
+      const isTodasActive = activeCategorySlug === 'todas';
+      const totalSaleCount = offerCounts['todas'] || 0;
+
+      let html = `
+        <button type="button" data-cat-slug="todas"
+          class="w-full text-left px-3 py-2 rounded-2xl text-xs font-bold transition flex items-center justify-between gap-2 ${isTodasActive ? 'cat-item-active' : 'hover:bg-slate-100 text-slate-700'}">
+          <span class="flex items-center gap-2 truncate">
+            <span>🔥</span>
+            <span class="truncate">Todas las Ofertas</span>
+          </span>
+          <span class="text-[10px] bg-rose-100 text-rose-700 font-extrabold px-2 py-0.5 rounded-full">
+            ${totalSaleCount}
+          </span>
+        </button>
+      `;
+
+      if (offerCategories.length === 0) {
+        html += '<p class="p-4 text-center text-xs text-slate-400">No hay otras categorías con oferta.</p>';
+        return html;
+      }
+
+      const term = categorySearchTerm.toLowerCase();
+      let matches = 0;
+
+      offerCategories.forEach(cat => {
+        const catCount = offerCounts[String(cat.id)] || 0;
+        if (catCount === 0) return;
+
+        const catName = cat.name || 'General';
+        if (term && !catName.toLowerCase().includes(term) && !cat.slug.toLowerCase().includes(term)) {
+          return;
+        }
+
+        matches++;
+        const isActive = activeCategorySlug === cat.slug;
+
+        html += `
+          <button type="button" data-cat-slug="${cat.slug}"
+            class="w-full text-left px-3 py-2 rounded-2xl text-xs font-bold transition flex items-center justify-between gap-2 ${isActive ? 'cat-item-active' : 'hover:bg-slate-100 text-slate-700'}">
+            <span class="flex items-center gap-2 truncate">
+              <span>${cat.icon || '📌'}</span>
+              <span class="truncate">${catName}</span>
+            </span>
+            <span class="text-[10px] bg-slate-100 text-slate-600 font-bold px-2 py-0.5 rounded-full">
+              ${catCount} ${catCount === 1 ? 'oferta' : 'ofertas'}
+            </span>
+          </button>
+        `;
+      });
+
+      if (term && matches === 0) {
+        html += `<p class="p-4 text-center text-xs text-slate-400">Sin coincidencia con "${term}".</p>`;
+      }
+
+      return html;
+    }
+
+    function bindSidebarEvents(container) {
+      if (!container) return;
+
+      container.querySelectorAll('[data-cat-slug]').forEach(btn => {
+        btn.onclick = (e) => {
+          e.preventDefault();
+          selectCategory(btn.dataset.catSlug);
+          offerDrawerBackdrop.classList.add('hidden');
+          offerDrawerPanel.classList.add('hidden');
+        };
+      });
+    }
+
+    function selectCategory(slug) {
+      activeCategorySlug = slug || 'todas';
+
+      const url = new URL(window.location.href);
+      if (activeCategorySlug === 'todas') {
+        url.searchParams.delete('cat');
+        url.searchParams.delete('sub');
+      } else {
+        url.searchParams.set('cat', activeCategorySlug);
+      }
+      window.history.pushState({}, '', url.toString());
+
+      renderSidebarTrees();
+      loadProducts(true);
+    }
+
+    async function loadProducts(reset = true) {
+      if (reset) {
+        currentPage = 0;
+        currentProducts = [];
+        loadedProductsMap.clear();
+        productsGrid.innerHTML = `
+          <div class="col-span-full py-16 text-center text-slate-400 font-semibold text-sm">
+            <div class="text-3xl mb-2 animate-bounce">⚡</div>
+            Cargando ofertas relámpago...
+          </div>`;
+      }
+
+      updateHeaderUI();
+
+      try {
+        const res = await window.ProductsService.getSaleProducts({
+          page: currentPage,
+          limit: PAGE_SIZE,
+          categorySlug: activeCategorySlug,
+          searchTerm: productSearchTerm,
+          sortBy: currentSortBy
+        });
+
+        const normalized = res.products || [];
+        normalized.forEach(p => loadedProductsMap.set(String(p.id), p));
+
+        if (reset) {
+          currentProducts = normalized;
+        } else {
+          currentProducts = [...currentProducts, ...normalized];
+        }
+
+        hasMoreProducts = res.hasMore;
+
+        document.getElementById('offerHeaderCount').textContent = res.totalCount || 0;
+
+        renderProductsGrid();
+        updateAllCountdowns();
+      } catch (err) {
+        console.error('[Ofertas] Error al cargar productos en oferta:', err);
+        productsGrid.innerHTML = `
+          <div class="col-span-full py-12 text-center text-rose-500 font-bold text-sm">
+            Ocurrió un error al cargar las ofertas de esta categoría.
+          </div>`;
+      }
+    }
+
+    function updateHeaderUI() {
+      const titleEl = document.getElementById('offerHeaderTitle');
+      const iconEl = document.getElementById('offerHeaderIcon');
+      const descEl = document.getElementById('offerHeaderDesc');
+
+      if (activeCategorySlug === 'todas') {
+        titleEl.textContent = 'Ofertas Relámpago y Descuentos en Xela';
+        iconEl.textContent = '🔥';
+        descEl.textContent = 'Aprovecha precios especiales de nuestros comercios y emprendedores locales en Quetzaltenango antes de que expiren.';
+        return;
+      }
+
+      const selectedCat = offerCategories.find(c => c.slug === activeCategorySlug);
+      if (selectedCat) {
+        titleEl.textContent = `Ofertas en ${selectedCat.name}`;
+        iconEl.textContent = selectedCat.icon || '🔥';
+        descEl.textContent = `Promociones y descuentos relámpago activos en la categoría de ${selectedCat.name}.`;
+      }
+    }
+
+    function renderProductsGrid() {
+      if (currentProducts.length === 0) {
+        productsGrid.innerHTML = `
+          <div class="col-span-full glass-container p-12 text-center rounded-3xl">
+            <span class="text-4xl block mb-2">⚡</span>
+            <h3 class="font-extrabold text-slate-800 text-base">No hay ofertas disponibles</h3>
+            <p class="text-xs text-slate-500 mt-1 max-w-sm mx-auto">
+              En este momento no encontramos promociones activas en esta categoría o filtro de búsqueda.
+            </p>
+            <button onclick="selectCategory('todas')" class="mt-4 bg-rose-600 text-white font-bold text-xs px-4 py-2 rounded-xl hover:bg-rose-700 transition">
+              Ver todas las ofertas
+            </button>
+          </div>`;
+        paginationContainer.classList.add('hidden');
+        return;
+      }
+
+      productsGrid.innerHTML = currentProducts.map(p => window.ProductCardUI.render(p)).join('');
+
+      if (hasMoreProducts) {
+        paginationContainer.classList.remove('hidden');
+      } else {
+        paginationContainer.classList.add('hidden');
+      }
+    }
+
+    // RELOJ DE CUENTA REGRESIVA EN VIVO
+    function startLiveCountdownTimer() {
+      if (liveCountdownInterval) clearInterval(liveCountdownInterval);
+      liveCountdownInterval = setInterval(updateAllCountdowns, 1000);
+    }
+
+    function updateAllCountdowns() {
+      const elements = document.querySelectorAll('[data-countdown-target]');
+      const now = new Date().getTime();
+
+      elements.forEach(el => {
+        const targetStr = el.dataset.countdownTarget;
+        if (!targetStr || targetStr === 'null' || targetStr === 'undefined') {
+          el.textContent = '⚡ Oferta activa';
+          return;
+        }
+
+        const target = new Date(targetStr).getTime();
+        const diff = target - now;
+
+        if (diff <= 0) {
+          el.textContent = '⛔ Oferta finalizada';
+          el.className = 'block text-[10px] font-black text-slate-400 mt-1';
+        } else {
+          const hours = Math.floor(diff / (1000 * 60 * 60));
+          const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+          const secs = Math.floor((diff % (1000 * 60)) / 1000);
+
+          const hStr = String(hours).padStart(2, '0');
+          const mStr = String(mins).padStart(2, '0');
+          const sStr = String(secs).padStart(2, '0');
+
+          el.textContent = `⏱️ Vence en ${hStr}:${mStr}:${sStr}`;
+        }
+      });
+    }
+
+    function handleProductActionClick(e) {
+      const favBtn = e.target.closest('[data-action="toggle-fav"]');
+      if (favBtn) {
+        e.preventDefault(); e.stopPropagation();
+        const pid = favBtn.dataset.productId;
+        const nowFav = window.Favorites.toggle(pid);
+        document.querySelectorAll(`[data-action="toggle-fav"][data-product-id="${pid}"]`).forEach(btn => {
+          btn.classList.toggle('fav-active', nowFav);
+          btn.style.color = nowFav ? '#ef4444' : '';
+          btn.innerHTML = window.heartSVG(nowFav);
+        });
+        updateFavCount();
+        return;
+      }
+
+      const cartBtn = e.target.closest('[data-action="add-cart"]');
+      if (cartBtn) {
+        e.preventDefault(); e.stopPropagation();
+        const pid = cartBtn.dataset.productId;
+        const product = loadedProductsMap.get(String(pid));
+        if (product && window.PasajeCart) {
+          window.PasajeCart.addToCart({
+            id: product.id,
+            title: product.title,
+            price: product.price,
+            image_url: product.image_url,
+            storeId: product.store_id,
+            storeName: product.store_name,
+            storeWhatsapp: product.store_whatsapp
+          });
+        }
+        return;
+      }
+
+      const noClick = e.target.closest('.no-click, a');
+      if (noClick) {
+        return;
+      }
+
+      const card = e.target.closest('.product-card');
+      if (card) {
+        const product = loadedProductsMap.get(String(card.dataset.productId));
+        if (product) openProductModal(product);
+      }
+    }
+
+    function attachModalEvents() {
+      productModal?.addEventListener('click', (e) => {
+        const prevProdBtn = e.target.closest('#modalPrevProductBtn');
+        if (prevProdBtn) { navigateModalProduct(-1); return; }
+
+        const nextProdBtn = e.target.closest('#modalNextProductBtn');
+        if (nextProdBtn) { navigateModalProduct(1); return; }
+
+        const p = activeModalProducts[activeProductIndex];
+        if (!p) return;
+
+        const imgs = Array.isArray(p.images) && p.images.length > 0 ? p.images : [window.PLACEHOLDER_IMG];
+
+        const thumbBtn = e.target.closest('[data-gallery-thumb]');
+        if (thumbBtn) {
+          activeGalleryIndex = parseInt(thumbBtn.dataset.galleryIndex || '0', 10);
+          updateModalGalleryView(imgs);
+          return;
+        }
+
+        const prevImgBtn = e.target.closest('[data-gallery-nav="prev"]');
+        if (prevImgBtn) {
+          activeGalleryIndex = (activeGalleryIndex - 1 + imgs.length) % imgs.length;
+          updateModalGalleryView(imgs);
+          return;
+        }
+
+        const nextImgBtn = e.target.closest('[data-gallery-nav="next"]');
+        if (nextImgBtn) {
+          activeGalleryIndex = (activeGalleryIndex + 1) % imgs.length;
+          updateModalGalleryView(imgs);
+          return;
+        }
+      });
+
+      document.addEventListener('keydown', (e) => {
+        const isModalOpen = productModal && !productModal.classList.contains('hidden');
+
+        if (e.key === 'Escape') {
+          if (isModalOpen) { productModal.classList.add('hidden'); document.body.style.overflow = ''; }
+          if (window.PasajeCart && typeof window.PasajeCart.closeDrawer === 'function') { window.PasajeCart.closeDrawer(); }
+          return;
+        }
+
+        if (!isModalOpen) return;
+
+        const p = activeModalProducts[activeProductIndex];
+        const imgs = (p && Array.isArray(p.images) && p.images.length > 0) ? p.images : [window.PLACEHOLDER_IMG];
+
+        if (e.key === 'ArrowUp' || (e.altKey && e.key === 'ArrowLeft')) { e.preventDefault(); navigateModalProduct(-1); return; }
+        if (e.key === 'ArrowDown' || (e.altKey && e.key === 'ArrowRight')) { e.preventDefault(); navigateModalProduct(1); return; }
+
+        if (e.key === 'ArrowLeft') {
+          e.preventDefault();
+          if (imgs.length > 1) { activeGalleryIndex = (activeGalleryIndex - 1 + imgs.length) % imgs.length; updateModalGalleryView(imgs); }
+          else { navigateModalProduct(-1); }
+          return;
+        }
+
+        if (e.key === 'ArrowRight') {
+          e.preventDefault();
+          if (imgs.length > 1) { activeGalleryIndex = (activeGalleryIndex + 1) % imgs.length; updateModalGalleryView(imgs); }
+          else { navigateModalProduct(1); }
+          return;
+        }
+      });
+    }
+
+    function updateModalGalleryView(imgs) {
+      const url = imgs[activeGalleryIndex];
+      const mainImg = productModalContent.querySelector('#mainGalleryViewer');
+      const idxBadge = productModalContent.querySelector('#galleryCurrentIdx');
+
+      if (mainImg && url) {
+        mainImg.src = url;
+        if (idxBadge) idxBadge.textContent = activeGalleryIndex + 1;
+
+        productModalContent.querySelectorAll('.gallery-thumb').forEach((b, idx) => {
+          if (idx === activeGalleryIndex) {
+            b.classList.remove('border-transparent', 'opacity-70', 'hover:opacity-100');
+            b.classList.add('border-rose-500', 'scale-95', 'shadow-sm');
+          } else {
+            b.classList.remove('border-rose-500', 'scale-95', 'shadow-sm');
+            b.classList.add('border-transparent', 'opacity-70', 'hover:opacity-100');
+          }
+        });
+      }
+    }
+
+    function navigateModalProduct(dir) {
+      if (!activeModalProducts || activeModalProducts.length === 0) return;
+      const nextIdx = activeProductIndex + dir;
+      if (nextIdx >= 0 && nextIdx < activeModalProducts.length) {
+        openProductModal(activeModalProducts[nextIdx], activeModalProducts, nextIdx);
+      }
+    }
+
+    async function openProductModal(p, list = null, index = -1) {
+      if (list && Array.isArray(list) && list.length > 0) {
+        activeModalProducts = list;
+        activeProductIndex = index >= 0 ? index : list.findIndex(x => String(x.id) === String(p.id));
+      } else {
+        activeModalProducts = Array.from(loadedProductsMap.values());
+        activeProductIndex = activeModalProducts.findIndex(x => String(x.id) === String(p.id));
+      }
+
+      if (activeProductIndex === -1) {
+        activeModalProducts.push(p);
+        activeProductIndex = activeModalProducts.length - 1;
+      }
+
+      activeGalleryIndex = 0;
+
+      const hasPrevProduct = activeProductIndex > 0;
+      const hasNextProduct = activeProductIndex < activeModalProducts.length - 1;
+
+      if (modalProductNavWrapper) {
+        modalProductNavWrapper.innerHTML = `
+          ${hasPrevProduct ? `
+            <button type="button" id="modalPrevProductBtn"
+              class="absolute -left-3 sm:-left-12 top-1/2 -translate-y-1/2 z-50 bg-white hover:bg-slate-100 text-slate-900 w-11 h-11 rounded-full shadow-2xl border border-slate-200 flex items-center justify-center font-black text-2xl transition transform hover:scale-110 active:scale-95"
+              title="Producto Anterior (Alt + ← / ↑)">‹</button>` : ''}
+
+          ${hasNextProduct ? `
+            <button type="button" id="modalNextProductBtn"
+              class="absolute -right-3 sm:-right-12 top-1/2 -translate-y-1/2 z-50 bg-white hover:bg-slate-100 text-slate-900 w-11 h-11 rounded-full shadow-2xl border border-slate-200 flex items-center justify-center font-black text-2xl transition transform hover:scale-110 active:scale-95"
+              title="Producto Siguiente (Alt + → / ↓)">›</button>` : ''}
+        `;
+      }
+
+      const galleryHTML = window.ProductCardUI ? window.ProductCardUI.renderGalleryHTML(p.images, p.title, 0) : '';
+      const variantsHTML = window.ProductCardUI ? window.ProductCardUI.renderVariantsHTML(p.variants) : '';
+      const waUrl = window.ProductCardUI ? window.ProductCardUI.buildWAUrl(p, null, p.price) : `https://wa.me/${p.store_whatsapp}?text=${encodeURIComponent('Hola, me interesa: ' + p.title)}`;
+
+      productModalContent.innerHTML = `
+        <div class="relative">
+          <button id="closeProductModalBtn" class="absolute top-3 right-3 z-20 bg-white/90 hover:bg-white text-slate-800 w-8 h-8 rounded-full shadow flex items-center justify-center font-bold text-xs transition">✕</button>
+          <div class="p-4 sm:p-5 pb-0">${galleryHTML}</div>
+        </div>
+        <div class="p-5">
+          <div class="flex items-center gap-2">
+            <span class="text-[10px] uppercase font-extrabold text-rose-700 bg-rose-50 px-2 py-0.5 rounded">
+              ${p.category_icon || '📌'} ${window.ProductCardUI ? window.ProductCardUI.escapeHtml(p.category_name || 'General') : (p.category_name || 'General')}
+            </span>
+            <span class="text-[10px] font-black text-white bg-rose-600 px-2 py-0.5 rounded-full">
+              ⚡ OFERTA
+            </span>
+          </div>
+          <h2 class="text-lg font-extrabold text-slate-900 mt-1.5">${window.ProductCardUI ? window.ProductCardUI.escapeHtml(p.title) : p.title}</h2>
+          
+          <div class="flex items-baseline gap-2 mt-2">
+            <span class="text-2xl font-black text-rose-600">Q ${parseFloat(p.price).toFixed(2)}</span>
+            ${p.original_price ? `<span class="text-xs text-slate-400 line-through">Q ${parseFloat(p.original_price).toFixed(2)}</span>` : ''}
+          </div>
+
+          ${p.description ? `<p class="text-xs text-slate-600 mt-2 leading-relaxed">${window.ProductCardUI ? window.ProductCardUI.escapeHtml(p.description) : p.description}</p>` : ''}
+          ${variantsHTML}
+          <div class="mt-5 space-y-2">
+            <button type="button" id="modalAddToCartBtn" class="w-full bg-slate-900 hover:bg-rose-600 text-white font-bold py-3 rounded-xl text-xs transition">🛒 Añadir al carrito</button>
+            <a href="${waUrl}" target="_blank" rel="noopener noreferrer"
+               class="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-bold py-3 rounded-xl text-xs transition shadow flex items-center justify-center gap-2">Pedir por WhatsApp</a>
+          </div>
+        </div>`;
+
+      productModal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+
+      document.getElementById('closeProductModalBtn').onclick = () => { productModal.classList.add('hidden'); document.body.style.overflow = ''; };
+      document.getElementById('modalAddToCartBtn').onclick = () => {
+        if (window.PasajeCart) {
+          window.PasajeCart.addToCart({
+            id: p.id,
+            title: p.title,
+            price: p.price,
+            image_url: p.image_url,
+            storeId: p.store_id,
+            storeName: p.store_name,
+            storeWhatsapp: p.store_whatsapp
+          });
+          productModal.classList.add('hidden');
+          document.body.style.overflow = '';
+        }
+      };
+    }
+  </script>
+</body>
+</html>

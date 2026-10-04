@@ -1,0 +1,690 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Detalle de Propiedad · Pasaje Inmuebles</title>
+  <meta name="description" content="Detalle completo de la propiedad: fotos, especificaciones, mapa y contacto directo con el propietario.">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Leaflet -->
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script src="../js/supabase.js?v=8"></script>
+  <script src="../js/theme-loader.js?v=9"></script>
+  <script src="../js/footer.js?v=4"></script>
+  <script src="../js/inmuebles-sidebar.js?v=3"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background-color: #eef2ff; }
+
+    .gallery-main {
+      aspect-ratio: 16 / 10;
+      background: #f1f5f9;
+      overflow: hidden;
+      border-radius: 20px;
+      cursor: zoom-in;
+      position: relative;
+    }
+    .gallery-main img {
+      width: 100%; height: 100%; object-fit: cover;
+      transition: transform .3s ease;
+    }
+    .gallery-main:hover img { transform: scale(1.03); }
+
+    .gallery-thumbs {
+      display: flex; gap: 8px;
+      overflow-x: auto;
+      padding-bottom: 4px;
+    }
+    .gallery-thumbs::-webkit-scrollbar { height: 4px; }
+    .gallery-thumbs::-webkit-scrollbar-thumb {
+      background: #cbd5e1; border-radius: 9999px;
+    }
+    .gallery-thumb {
+      flex-shrink: 0;
+      width: 72px; height: 72px;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 2px solid transparent;
+      cursor: pointer;
+      transition: all .15s;
+    }
+    .gallery-thumb img {
+      width: 100%; height: 100%; object-fit: cover;
+    }
+    .gallery-thumb:hover { border-color: #c7d2fe; }
+    .gallery-thumb.active { border-color: #4f46e5; box-shadow: 0 4px 12px -4px rgba(79,70,229,.4); }
+
+    #detailMap { height: 320px; border-radius: 16px; z-index: 1; }
+    .leaflet-container { font-family: 'Inter', sans-serif; }
+
+    .lightbox {
+      position: fixed; inset: 0; z-index: 9999;
+      background: rgba(15, 23, 42, 0.95);
+      display: flex; align-items: center; justify-content: center;
+      padding: 24px;
+      opacity: 0; pointer-events: none;
+      transition: opacity .2s ease;
+    }
+    .lightbox.open { opacity: 1; pointer-events: auto; }
+    .lightbox img {
+      max-width: 100%; max-height: 100%;
+      object-fit: contain;
+      border-radius: 12px;
+    }
+    .lightbox-close {
+      position: absolute; top: 16px; right: 16px;
+      width: 44px; height: 44px;
+      background: rgba(255,255,255,.1); color: #fff;
+      border-radius: 50%; font-size: 20px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background .15s;
+      border: 1px solid rgba(255,255,255,.2);
+    }
+    .lightbox-close:hover { background: rgba(255,255,255,.2); }
+    .lightbox-nav {
+      position: absolute; top: 50%; transform: translateY(-50%);
+      width: 52px; height: 52px;
+      background: rgba(255,255,255,.1); color: #fff;
+      border-radius: 50%; font-size: 26px; font-weight: 800;
+      display: flex; align-items: center; justify-content: center;
+      cursor: pointer; transition: background .15s;
+      border: 1px solid rgba(255,255,255,.2);
+      user-select: none;
+    }
+    .lightbox-nav:hover { background: rgba(255,255,255,.2); }
+    .lightbox-nav.prev { left: 16px; }
+    .lightbox-nav.next { right: 16px; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+  <div id="inmueblesSidebar"></div>
+
+  <!-- HEADER -->
+  <header class="glass-header text-white shadow-lg sticky top-0 z-40 border-b border-white/10">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <button id="sidebarToggleBtn" type="button"
+          onclick="if (window.PasajeInmueblesSidebar) window.PasajeInmueblesSidebar.toggle();"
+          class="bg-white/10 hover:bg-white/20 p-2 rounded-xl border border-white/15 text-white lg:hidden"
+          aria-label="Menú">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <a href="index.html" class="text-lg font-extrabold text-white tracking-tight">
+          ← Pasaje <span class="text-indigo-300">Inmuebles</span>
+        </a>
+      </div>
+      <a href="index.html" class="bg-white/10 hover:bg-white/20 text-white font-bold text-xs px-3 py-2 rounded-xl border border-white/15 transition">
+        🔍 Buscar más
+      </a>
+    </div>
+  </header>
+
+  <!-- LOADING -->
+  <div id="loadingState" class="max-w-6xl mx-auto p-8 w-full">
+    <div class="bg-white rounded-3xl border border-slate-200 p-12 text-center">
+      <div class="text-5xl mb-3 animate-pulse">🏠</div>
+      <p class="text-sm font-bold text-slate-500">Cargando propiedad...</p>
+    </div>
+  </div>
+
+  <!-- ERROR -->
+  <div id="errorState" class="hidden max-w-6xl mx-auto p-8 w-full">
+    <div class="bg-white rounded-3xl border border-slate-200 p-12 text-center">
+      <div class="text-5xl mb-3">🚫</div>
+      <p class="font-black text-slate-700">Propiedad no disponible</p>
+      <p class="text-xs text-slate-500 mt-1">Es posible que haya sido pausada o eliminada.</p>
+      <a href="index.html" class="inline-block mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl">
+        ← Volver al listado
+      </a>
+    </div>
+  </div>
+
+  <!-- CONTENIDO -->
+  <main id="content" class="hidden max-w-6xl mx-auto p-4 w-full flex-1 space-y-5 pb-12">
+
+    <!-- BREADCRUMB -->
+    <nav class="flex items-center gap-2 text-xs font-bold text-slate-500">
+      <a href="index.html" class="hover:text-indigo-600">Inicio</a>
+      <span>/</span>
+      <a id="breadcrumbZone" href="index.html" class="hover:text-indigo-600">Zona</a>
+      <span>/</span>
+      <span id="breadcrumbTitle" class="text-slate-700 truncate">Propiedad</span>
+    </nav>
+
+    <!-- HEADER PROPIEDAD -->
+    <section class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-6 flex flex-col sm:flex-row sm:items-start justify-between gap-4">
+      <div class="min-w-0 flex-1">
+        <div class="flex items-center gap-2 flex-wrap mb-1">
+          <span id="chipTransaction" class="text-[10px] font-black uppercase tracking-wide bg-indigo-100 text-indigo-700 px-2.5 py-1 rounded-full">—</span>
+          <span id="chipPropertyType" class="text-[10px] font-black uppercase tracking-wide bg-slate-100 text-slate-600 px-2.5 py-1 rounded-full">—</span>
+          <span id="chipFeatured" class="hidden text-[10px] font-black uppercase tracking-wide bg-amber-100 text-amber-800 px-2.5 py-1 rounded-full">⭐ Destacado</span>
+        </div>
+        <h1 id="detailTitle" class="text-xl sm:text-2xl font-black text-slate-900 leading-tight">—</h1>
+        <p id="detailZoneLine" class="text-xs text-slate-500 mt-2">📍 —</p>
+      </div>
+      <div class="text-right flex-shrink-0">
+        <p class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Precio</p>
+        <p id="detailPrice" class="text-2xl sm:text-3xl font-black text-indigo-600">Q—</p>
+      </div>
+    </section>
+
+    <!-- GALERÍA -->
+    <section class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-4 sm:p-5">
+      <div id="galleryMain" class="gallery-main">
+        <img id="galleryMainImg" src="../img/placeholder.png" alt="Foto principal">
+      </div>
+      <div id="galleryThumbs" class="gallery-thumbs mt-3"></div>
+    </section>
+
+    <!-- LAYOUT 2 COLUMNAS -->
+    <div class="grid grid-cols-1 lg:grid-cols-3 gap-5">
+
+      <!-- COLUMNA PRINCIPAL -->
+      <div class="lg:col-span-2 space-y-5">
+
+        <!-- ESPECIFICACIONES -->
+        <section class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-5 space-y-4">
+          <h2 class="font-black text-sm text-slate-900 flex items-center gap-2">📐 Especificaciones</h2>
+          <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+            <div class="bg-slate-50 rounded-2xl p-3 text-center">
+              <p class="text-2xl mb-1">🛏️</p>
+              <p id="specBedrooms" class="font-black text-sm text-slate-900">—</p>
+              <p class="text-[10px] font-bold text-slate-500 uppercase">Habitaciones</p>
+            </div>
+            <div class="bg-slate-50 rounded-2xl p-3 text-center">
+              <p class="text-2xl mb-1">🚿</p>
+              <p id="specBathrooms" class="font-black text-sm text-slate-900">—</p>
+              <p class="text-[10px] font-bold text-slate-500 uppercase">Baños</p>
+            </div>
+            <div class="bg-slate-50 rounded-2xl p-3 text-center">
+              <p class="text-2xl mb-1">🚗</p>
+              <p id="specParking" class="font-black text-sm text-slate-900">—</p>
+              <p class="text-[10px] font-bold text-slate-500 uppercase">Parqueos</p>
+            </div>
+            <div class="bg-slate-50 rounded-2xl p-3 text-center">
+              <p class="text-2xl mb-1">📏</p>
+              <p id="specArea" class="font-black text-sm text-slate-900">—</p>
+              <p class="text-[10px] font-bold text-slate-500 uppercase">Área m²</p>
+            </div>
+          </div>
+        </section>
+
+        <!-- DESCRIPCIÓN -->
+        <section class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-5 space-y-3">
+          <h2 class="font-black text-sm text-slate-900 flex items-center gap-2">📝 Descripción</h2>
+          <p id="detailDescription" class="text-xs text-slate-600 leading-relaxed whitespace-pre-line">—</p>
+        </section>
+
+        <!-- MAPA -->
+        <section class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-5 space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <h2 class="font-black text-sm text-slate-900 flex items-center gap-2">🗺️ Ubicación aproximada</h2>
+            <span id="detailZoneChip" class="text-[10px] font-black bg-indigo-50 text-indigo-700 px-3 py-1 rounded-full">📍 —</span>
+          </div>
+          <div class="rounded-2xl overflow-hidden border-2 border-slate-200">
+            <div id="detailMap"></div>
+          </div>
+          <p class="text-[10px] text-slate-400 text-center">🔒 La dirección exacta se comparte con el propietario al contactar.</p>
+        </section>
+
+      </div>
+
+      <!-- COLUMNA LATERAL -->
+      <div class="space-y-5">
+
+        <!-- CARD CONTACTO -->
+        <section class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-5 space-y-4 sticky top-20">
+          <div class="text-center">
+            <div class="w-14 h-14 mx-auto rounded-full bg-indigo-100 text-indigo-700 flex items-center justify-center text-2xl font-black">🏠</div>
+            <p class="text-[10px] font-black text-slate-500 uppercase tracking-wider mt-2">Contacta al propietario</p>
+            <p id="contactWhatsappDisplay" class="text-sm font-bold text-slate-900 mt-0.5">—</p>
+          </div>
+
+          <a id="whatsappBtn" href="#" target="_blank" rel="noopener noreferrer"
+            class="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-extrabold py-3 rounded-2xl text-sm transition shadow-md flex items-center justify-center gap-2">
+            💬 Preguntar por WhatsApp
+          </a>
+
+          <div class="border-t border-slate-100 pt-4">
+            <p class="text-[11px] font-black text-slate-700 mb-2">📩 O envía un mensaje</p>
+            <form id="leadForm" class="space-y-3">
+              <div>
+                <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Tu nombre *</label>
+                <input id="leadName" type="text" required maxlength="80" placeholder="Ej. María López"
+                  class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Tu WhatsApp *</label>
+                <input id="leadPhone" type="tel" required maxlength="20" placeholder="50255551234"
+                  class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500">
+              </div>
+              <div>
+                <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Mensaje</label>
+                <textarea id="leadMessage" rows="3" maxlength="500" placeholder="Estoy interesado en esta propiedad..."
+                  class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-medium bg-slate-50 outline-none focus:ring-2 focus:ring-indigo-500 resize-none"></textarea>
+              </div>
+              <button type="submit" id="leadSubmitBtn"
+                class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3 rounded-2xl text-xs transition shadow-md">
+                📩 Enviar mensaje
+              </button>
+              <p id="leadFeedback" class="hidden text-[11px] font-bold text-center"></p>
+            </form>
+          </div>
+        </section>
+      </div>
+    </div>
+
+  </main>
+
+  <div id="pasajeFooter"></div>
+
+  <!-- LIGHTBOX -->
+  <div id="lightbox" class="lightbox">
+    <button id="lightboxClose" class="lightbox-close" aria-label="Cerrar">✕</button>
+    <button id="lightboxPrev" class="lightbox-nav prev" aria-label="Anterior">‹</button>
+    <img id="lightboxImg" src="" alt="Vista previa">
+    <button id="lightboxNext" class="lightbox-nav next" aria-label="Siguiente">›</button>
+  </div>
+
+  <script>
+    // =============================================================
+    // /inmuebles/detalle.html — Ficha de propiedad
+    // =============================================================
+    (function () {
+      'use strict';
+
+      const ZONE_COORDS = {
+        'Zona 1':       [14.8347, -91.5186],
+        'Zona 2':       [14.8398, -91.5221],
+        'Zona 3':       [14.8289, -91.5156],
+        'Zona 4':       [14.8451, -91.5203],
+        'Zona 5':       [14.8512, -91.5278],
+        'Zona 6':       [14.8435, -91.5312],
+        'Zona 7':       [14.8531, -91.5189],
+        'Zona 8':       [14.8408, -91.5098],
+        'Zona 9':       [14.8465, -91.4945],
+        'Zona 10':      [14.8567, -91.5102],
+        'Zona 11':      [14.8654, -91.5218],
+        'Salcajá':      [14.8833, -91.4500],
+        'La Esperanza': [14.8667, -91.5667],
+        'San Mateo':    [14.8667, -91.6000]
+      };
+
+      let listing = null;
+      let currentImageIdx = 0;
+      let mapInstance = null;
+
+      // ---------------------------------------------------------
+      // Utilidades
+      // ---------------------------------------------------------
+      function esc(s) {
+        return String(s ?? '')
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+
+      function fmtMoney(n) {
+        const v = parseFloat(n || 0);
+        return new Intl.NumberFormat('es-GT', {
+          style: 'currency', currency: 'GTQ',
+          maximumFractionDigits: 0
+        }).format(v);
+      }
+
+      function transactionLabel(t) {
+        if (t === 'rent')      return '🏢 Alquiler';
+        if (t === 'sale')      return '🏡 Venta';
+        if (t === 'usufruct')  return '📜 Usufructo';
+        return t || '—';
+      }
+
+      function propertyTypeLabel(p) {
+        const map = {
+          casa: '🏠 Casa',
+          apartamento: '🏢 Apartamento',
+          habitacion: '🛏️ Habitación',
+          local: '🏬 Local comercial',
+          terreno: '🌳 Terreno'
+        };
+        return map[p] || p || '—';
+      }
+
+      function cleanPhone(raw) {
+        return String(raw || '').replace(/\D/g, '');
+      }
+
+      function getListingIdFromUrl() {
+        const params = new URLSearchParams(window.location.search);
+        return params.get('id') || '';
+      }
+
+      // ---------------------------------------------------------
+      // Cargar listing
+      // ---------------------------------------------------------
+      async function loadListing() {
+        const id = getListingIdFromUrl();
+        if (!id) { showError(); return; }
+
+        const c = window._supabase || initSupabaseClient();
+        if (!c) { showError(); return; }
+
+        const { data, error } = await c
+          .from('real_estate_listings')
+          .select('*')
+          .eq('id', id)
+          .eq('is_active', true)
+          .maybeSingle();
+
+        if (error || !data) { showError(); return; }
+
+        listing = data;
+        renderListing();
+      }
+
+      function showError() {
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('errorState').classList.remove('hidden');
+      }
+
+      // ---------------------------------------------------------
+      // Render
+      // ---------------------------------------------------------
+      function renderListing() {
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+
+        document.title = listing.title + ' · Pasaje Inmuebles';
+
+        // Breadcrumb
+        document.getElementById('breadcrumbZone').textContent = listing.zone || 'Xela';
+        document.getElementById('breadcrumbTitle').textContent = listing.title;
+        document.getElementById('breadcrumbZone').href = 'index.html?zone=' + encodeURIComponent(listing.zone || '');
+
+        // Header
+        document.getElementById('chipTransaction').textContent = transactionLabel(listing.transaction_type);
+        document.getElementById('chipPropertyType').textContent = propertyTypeLabel(listing.property_type);
+        document.getElementById('chipFeatured').classList.toggle('hidden', !listing.is_featured);
+        document.getElementById('detailTitle').textContent = listing.title;
+        document.getElementById('detailZoneLine').textContent = `📍 ${listing.zone || 'Xela'}${listing.address || listing.address_details ? ' · ' + (listing.address || listing.address_details) : ''}`;
+        document.getElementById('detailPrice').textContent = fmtMoney(listing.price);
+
+        // Especificaciones
+        document.getElementById('specBedrooms').textContent = listing.bedrooms || '—';
+        document.getElementById('specBathrooms').textContent = listing.bathrooms || '—';
+        document.getElementById('specParking').textContent = listing.parking_spaces || '—';
+        document.getElementById('specArea').textContent = listing.area_sqm || '—';
+
+        // Descripción
+        document.getElementById('detailDescription').textContent = listing.description || 'Sin descripción adicional.';
+
+        // Zona
+        document.getElementById('detailZoneChip').textContent = '📍 ' + (listing.zone || 'Xela');
+
+        // Galería
+        renderGallery();
+
+        // Mapa
+        renderMap();
+
+        // Contacto
+        renderContact();
+
+        // Bind formulario de lead
+        bindLeadForm();
+      }
+
+      // ---------------------------------------------------------
+      // Galería
+      // ---------------------------------------------------------
+      function renderGallery() {
+        const images = Array.isArray(listing.image_urls) && listing.image_urls.length > 0
+          ? listing.image_urls
+          : ['../img/placeholder.png'];
+
+        currentImageIdx = 0;
+
+        // Imagen principal
+        const mainImg = document.getElementById('galleryMainImg');
+        mainImg.src = images[0];
+        mainImg.alt = listing.title;
+
+        // Thumbs
+        const thumbsEl = document.getElementById('galleryThumbs');
+        if (images.length > 1) {
+          thumbsEl.innerHTML = images.map((url, idx) => `
+            <div class="gallery-thumb ${idx === 0 ? 'active' : ''}" data-idx="${idx}">
+              <img src="${esc(url)}" alt="Miniatura ${idx + 1}" loading="lazy">
+            </div>
+          `).join('');
+
+          thumbsEl.querySelectorAll('.gallery-thumb').forEach(thumb => {
+            thumb.addEventListener('click', () => {
+              const idx = parseInt(thumb.dataset.idx, 10);
+              setGalleryImage(idx);
+            });
+          });
+        } else {
+          thumbsEl.innerHTML = '';
+        }
+
+        // Click en la principal → lightbox
+        document.getElementById('galleryMain').addEventListener('click', () => {
+          openLightbox(currentImageIdx);
+        });
+      }
+
+      function setGalleryImage(idx) {
+        const images = listing.image_urls || ['../img/placeholder.png'];
+        if (idx < 0 || idx >= images.length) return;
+        currentImageIdx = idx;
+        document.getElementById('galleryMainImg').src = images[idx];
+        document.querySelectorAll('.gallery-thumb').forEach((t, i) => {
+          t.classList.toggle('active', i === idx);
+        });
+      }
+
+      // ---------------------------------------------------------
+      // Lightbox
+      // ---------------------------------------------------------
+      function openLightbox(idx) {
+        const images = listing.image_urls || ['../img/placeholder.png'];
+        currentImageIdx = idx;
+        document.getElementById('lightboxImg').src = images[idx];
+        document.getElementById('lightbox').classList.add('open');
+        document.body.style.overflow = 'hidden';
+      }
+
+      function closeLightbox() {
+        document.getElementById('lightbox').classList.remove('open');
+        document.body.style.overflow = '';
+      }
+
+      function nextLightbox() {
+        const images = listing.image_urls || ['../img/placeholder.png'];
+        currentImageIdx = (currentImageIdx + 1) % images.length;
+        document.getElementById('lightboxImg').src = images[currentImageIdx];
+        setGalleryImage(currentImageIdx);
+      }
+
+      function prevLightbox() {
+        const images = listing.image_urls || ['../img/placeholder.png'];
+        currentImageIdx = (currentImageIdx - 1 + images.length) % images.length;
+        document.getElementById('lightboxImg').src = images[currentImageIdx];
+        setGalleryImage(currentImageIdx);
+      }
+
+      // ---------------------------------------------------------
+      // Mapa
+      // ---------------------------------------------------------
+      function renderMap() {
+        const zoneCoords = ZONE_COORDS[listing.zone] || [14.8347, -91.5186];
+        const el = document.getElementById('detailMap');
+        if (!el) return;
+
+        if (mapInstance) {
+          try { mapInstance.remove(); } catch (e) {}
+          mapInstance = null;
+        }
+
+        mapInstance = L.map('detailMap', { zoomControl: true, attributionControl: false })
+          .setView(zoneCoords, 14);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          maxZoom: 19
+        }).addTo(mapInstance);
+
+        const icon = L.divIcon({
+          className: '',
+          html: `<div style="width:40px;height:40px;background:#4f46e5;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:18px;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,0.35)">🏠</div>`,
+          iconSize: [40, 40], iconAnchor: [20, 20]
+        });
+
+        L.marker(zoneCoords, { icon })
+          .addTo(mapInstance)
+          .bindPopup(`<b>${esc(listing.title)}</b><br>📍 ${esc(listing.zone)}`);
+
+        // Círculo aproximado para no revelar dirección exacta
+        L.circle(zoneCoords, {
+          radius: 400,
+          color: '#4f46e5',
+          fillColor: '#4f46e5',
+          fillOpacity: 0.08,
+          weight: 1.5,
+          dashArray: '6,6'
+        }).addTo(mapInstance);
+
+        setTimeout(() => { if (mapInstance) mapInstance.invalidateSize(); }, 250);
+      }
+
+      // ---------------------------------------------------------
+      // Contacto
+      // ---------------------------------------------------------
+      function renderContact() {
+        const raw = listing.contact_whatsapp || listing.contact_phone || '';
+        const phone = cleanPhone(raw);
+
+        document.getElementById('contactWhatsappDisplay').textContent = raw || 'No disponible';
+
+        const msg = `Hola, vi tu propiedad "${listing.title}" en Pasaje Inmuebles y deseo más información.`;
+        const waUrl = phone
+          ? `https://wa.me/${phone}?text=${encodeURIComponent(msg)}`
+          : '#';
+
+        const btn = document.getElementById('whatsappBtn');
+        btn.href = waUrl;
+
+        if (!phone) {
+          btn.classList.add('opacity-50', 'pointer-events-none');
+        }
+      }
+
+      // ---------------------------------------------------------
+      // Lead form
+      // ---------------------------------------------------------
+      function bindLeadForm() {
+        const form = document.getElementById('leadForm');
+        const feedback = document.getElementById('leadFeedback');
+        const submitBtn = document.getElementById('leadSubmitBtn');
+
+        form.addEventListener('submit', async (e) => {
+          e.preventDefault();
+          feedback.classList.add('hidden');
+
+          const name = document.getElementById('leadName').value.trim();
+          const phone = document.getElementById('leadPhone').value.trim();
+          const message = document.getElementById('leadMessage').value.trim();
+
+          if (!name || !phone) {
+            feedback.className = 'text-[11px] font-bold text-center text-rose-600';
+            feedback.textContent = '⚠️ Completa nombre y WhatsApp.';
+            feedback.classList.remove('hidden');
+            return;
+          }
+
+          submitBtn.disabled = true;
+          submitBtn.textContent = 'Enviando...';
+
+          try {
+            const c = window._supabase || initSupabaseClient();
+
+            // Insertar lead
+            const { error } = await c.from('real_estate_leads').insert([{
+              listing_id: listing.id,
+              owner_user_id: listing.user_id,
+              customer_name: name,
+              customer_phone: phone,
+              message: message || `Interesado en ${listing.title}`
+            }]);
+
+            if (error) throw error;
+
+            feedback.className = 'text-[11px] font-bold text-center text-emerald-600';
+            feedback.textContent = '✅ Mensaje enviado. El propietario te contactará pronto.';
+            feedback.classList.remove('hidden');
+
+            form.reset();
+          } catch (err) {
+            console.error('[Detalle] lead error:', err);
+            feedback.className = 'text-[11px] font-bold text-center text-rose-600';
+            feedback.textContent = '❌ Error al enviar. Intenta de nuevo.';
+            feedback.classList.remove('hidden');
+          } finally {
+            submitBtn.disabled = false;
+            submitBtn.textContent = '📩 Enviar mensaje';
+          }
+        });
+      }
+
+      // ---------------------------------------------------------
+      // Bind lightbox
+      // ---------------------------------------------------------
+      function bindLightbox() {
+        document.getElementById('lightboxClose').addEventListener('click', closeLightbox);
+        document.getElementById('lightboxNext').addEventListener('click', (e) => { e.stopPropagation(); nextLightbox(); });
+        document.getElementById('lightboxPrev').addEventListener('click', (e) => { e.stopPropagation(); prevLightbox(); });
+        document.getElementById('lightbox').addEventListener('click', (e) => {
+          if (e.target.id === 'lightbox') closeLightbox();
+        });
+        document.addEventListener('keydown', (e) => {
+          if (!document.getElementById('lightbox').classList.contains('open')) return;
+          if (e.key === 'Escape') closeLightbox();
+          if (e.key === 'ArrowRight') nextLightbox();
+          if (e.key === 'ArrowLeft') prevLightbox();
+        });
+      }
+
+      // ---------------------------------------------------------
+      // Init
+      // ---------------------------------------------------------
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', () => {
+          bindLightbox();
+          loadListing();
+        });
+      } else {
+        bindLightbox();
+        loadListing();
+      }
+    })();
+  </script>
+</body>
+</html>

@@ -1,0 +1,923 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mis Favoritos · Pasaje de los Altos</title>
+  <meta name="theme-color" content="#1e3a8a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="manifest.json">
+  <link rel="icon" href="img/favicon.ico">
+  <link rel="apple-touch-icon" href="img/apple-touch-icon.png">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="js/supabase.js?v=4"></script>
+
+  <!-- ============================================================
+       FALLBACKS GLOBALES (evitan que el script falle si algún
+       módulo no define estos helpers)
+       ============================================================ -->
+  <script>
+    (function () {
+      if (typeof window.PLACEHOLDER_IMG === 'undefined') {
+        window.PLACEHOLDER_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#f3f4f6"/><text x="50%" y="50%" text-anchor="middle" dy=".35em" fill="#6b7280" font-family="sans-serif" font-size="20">Sin imagen</text></svg>'
+        );
+      }
+      if (typeof window.cleanPhone === 'undefined') {
+        window.cleanPhone = function (raw) { return String(raw || '').replace(/\D/g, ''); };
+      }
+      if (typeof window.logWhatsAppClick === 'undefined') {
+        window.logWhatsAppClick = async function (productId, storeId, source) {
+          try {
+            if (typeof _supabase === 'undefined') return;
+            await _supabase.from('whatsapp_clicks').insert([{
+              product_id: productId || null,
+              store_id:   storeId   || null,
+              source:     source    || 'unknown'
+            }]);
+          } catch (e) { /* silencioso */ }
+        };
+      }
+      if (typeof window.heartSVG === 'undefined') {
+        window.heartSVG = function (filled) {
+          var fill = filled ? 'currentColor' : 'none';
+          return '<svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="' + fill + '" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>';
+        };
+      }
+      if (typeof window.Favorites === 'undefined') {
+        var _favs = [];
+        try { _favs = JSON.parse(localStorage.getItem('pasaje_favorites') || '[]'); } catch (e) { _favs = []; }
+        if (!Array.isArray(_favs)) _favs = [];
+
+        function persistFavs() {
+          try { localStorage.setItem('pasaje_favorites', JSON.stringify(_favs)); } catch (e) {}
+        }
+
+        window.Favorites = {
+          getAll: function () { return _favs.slice(); },
+          has:    function (id) { return _favs.indexOf(String(id)) >= 0; },
+          count:  function () { return _favs.length; },
+          add:    function (id) { var s = String(id); if (_favs.indexOf(s) < 0) { _favs.push(s); persistFavs(); } },
+          remove: function (id) { _favs = _favs.filter(function (x) { return x !== String(id); }); persistFavs(); },
+          toggle: function (id) {
+            var s = String(id); var i = _favs.indexOf(s);
+            if (i >= 0) { _favs.splice(i, 1); persistFavs(); return false; }
+            _favs.push(s); persistFavs(); return true;
+          },
+          clear:  function () { _favs = []; persistFavs(); }
+        };
+      } else if (typeof window.Favorites.clear !== 'function') {
+        // Agregar clear() si el objeto existe pero no tiene el método
+        window.Favorites.clear = function () {
+          try { localStorage.setItem('pasaje_favorites', '[]'); } catch (e) {}
+        };
+      }
+      if (typeof window.toggleFavoriteWithCount === 'undefined') {
+        window.toggleFavoriteWithCount = function (id) { return window.Favorites.toggle(id); };
+      }
+    })();
+  </script>
+
+  <script src="js/theme-loader.js?v=3"></script>
+  <script src="js/cart.js?v=8"></script>
+  <script src="js/footer.js?v=1"></script>
+  <script src="js/public-sidebar.js?v=2"></script>
+  <script src="js/liquid-glass.js?v=1"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+    .product-card { cursor: pointer; }
+    .product-card .no-click { cursor: default; }
+
+    .fav-btn { color: #9ca3af; transition: color .15s ease; }
+    .fav-btn:hover { color: #ef4444; }
+    .fav-btn.fav-active { color: #ef4444 !important; }
+
+    .glass-card {
+      background-color: rgba(255,255,255,.92) !important;
+      backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+      border: 1px solid rgba(255,255,255,.65);
+      box-shadow: 0 6px 22px -4px rgba(15,23,42,.08);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col text-slate-800">
+
+  <!-- ═══════════════════════════════════════════════════
+       HEADER
+       ═══════════════════════════════════════════════════ -->
+  <header class="bg-blue-900/95 backdrop-blur-md text-white shadow-md sticky top-0 z-30 border-b border-white/10">
+    <div class="max-w-6xl mx-auto px-4 py-3.5 flex justify-between items-center gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <button id="sidebarToggleBtn" type="button"
+          class="bg-blue-800/80 hover:bg-blue-700 p-2 rounded-xl transition flex items-center justify-center border border-white/10"
+          title="Menú" aria-label="Abrir menú">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6"  x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+        <a href="index.html" class="flex items-center gap-2 text-xl sm:text-2xl font-extrabold tracking-tight min-w-0">
+          <img class="theme-logo hidden w-9 h-9 rounded-full object-cover bg-white/10 border border-white/20" src="" alt="logo">
+          <span class="theme-title truncate">Pasaje de los <span class="text-emerald-400">Altos</span></span>
+        </a>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <a id="favBtn" href="favoritos.html"
+           class="relative bg-emerald-600 hover:bg-emerald-700 p-2 rounded-xl transition border border-white/10" title="Mis favoritos">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="currentColor" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+            <path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/>
+          </svg>
+          <span id="favCount" class="hidden absolute -top-1 -right-1 bg-red-500 text-white text-[10px] font-bold w-5 h-5 rounded-full flex items-center justify-center shadow">0</span>
+        </a>
+        <a href="index.html"
+           class="text-xs sm:text-sm bg-blue-800 hover:bg-blue-700 px-3 py-2 rounded-xl font-semibold transition border border-white/10">
+          ← Catálogo
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto px-4 py-6 w-full flex-1">
+
+    <div class="flex items-center justify-between mb-5 flex-wrap gap-3">
+      <div>
+        <h1 class="text-2xl font-extrabold text-gray-800 flex items-center gap-2">
+          <span class="text-red-500">❤️</span> Mis Favoritos
+        </h1>
+        <p class="text-sm text-gray-500 mt-1">
+          Productos que guardaste en este dispositivo.
+          <span id="favTotal" class="font-bold text-gray-800"></span>
+        </p>
+      </div>
+      <button id="clearBtn" class="hidden text-xs bg-red-50 hover:bg-red-100 text-red-600 font-semibold px-3 py-2 rounded-xl transition">
+        🗑️ Vaciar lista
+      </button>
+    </div>
+
+    <div id="favGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-5"></div>
+  </main>
+
+  <div id="pasajeFooter"></div>
+
+  <!-- ═══════════════════════════════════════════════════
+       MODAL · Quick View Producto
+       ═══════════════════════════════════════════════════ -->
+  <div id="productModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto">
+      <div id="productModalContent"></div>
+    </div>
+  </div>
+
+  <!-- ═══════════════════════════════════════════════════
+       MODAL · Reportar
+       ═══════════════════════════════════════════════════ -->
+  <div id="reportModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-end sm:items-center justify-center p-0 sm:p-4">
+    <div class="bg-white rounded-t-2xl sm:rounded-2xl shadow-2xl max-w-md w-full max-h-[92vh] overflow-y-auto">
+      <div class="p-5 border-b flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h3 class="text-lg font-extrabold text-gray-800">🚨 Reportar</h3>
+          <p id="reportTargetLabel" class="text-xs text-gray-500 mt-0.5 truncate">Cuéntanos qué pasa</p>
+        </div>
+        <button id="closeReportModalBtn"
+          class="bg-gray-100 hover:bg-gray-200 text-gray-700 w-9 h-9 rounded-lg flex items-center justify-center transition flex-shrink-0">
+          ✕
+        </button>
+      </div>
+
+      <form id="reportForm" class="p-5 space-y-4">
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Motivo *</label>
+          <select id="reportReason" required
+            class="w-full border border-gray-300 p-2.5 rounded-lg mt-1 bg-white focus:ring-2 focus:ring-red-500 outline-none">
+            <option value="">Selecciona un motivo...</option>
+            <option value="spam">🚫 Spam / Publicidad engañosa</option>
+            <option value="ofensivo">⚠️ Contenido ofensivo</option>
+            <option value="inexistente">🔍 Producto inexistente / Agotado</option>
+            <option value="otro">💬 Otro</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Comentario (opcional)</label>
+          <textarea id="reportComment" rows="3"
+            placeholder="Cuéntanos más sobre el problema..."
+            class="w-full border border-gray-300 p-2.5 rounded-lg mt-1 focus:ring-2 focus:ring-red-500 outline-none"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-sm font-medium text-gray-700">Tu correo (opcional)</label>
+          <input type="email" id="reportEmail" placeholder="tucorreo@ejemplo.com"
+            class="w-full border border-gray-300 p-2.5 rounded-lg mt-1 focus:ring-2 focus:ring-red-500 outline-none">
+          <p class="text-xs text-gray-400 mt-1">Solo si deseas que te contactemos para dar seguimiento.</p>
+        </div>
+
+        <div class="flex gap-2 pt-1">
+          <button type="button" id="cancelReportBtn"
+            class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2.5 rounded-lg transition">
+            Cancelar
+          </button>
+          <button type="submit" id="submitReportBtn"
+            class="flex-1 bg-red-600 hover:bg-red-700 text-white font-bold py-2.5 rounded-lg transition disabled:opacity-60">
+            Enviar reporte
+          </button>
+        </div>
+
+        <p class="text-[11px] text-gray-400 text-center">
+          Los reportes son revisados por el equipo de administración.
+        </p>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    // ═════════════════════════════════════════════════════════════
+    // FAVORITOS · página completa
+    // ═════════════════════════════════════════════════════════════
+
+    const grid = document.getElementById('favGrid');
+    const clearBtn = document.getElementById('clearBtn');
+    const favTotal = document.getElementById('favTotal');
+    const favCountEl = document.getElementById('favCount');
+    const productModal = document.getElementById('productModal');
+    const productModalContent = document.getElementById('productModalContent');
+    const reportModal = document.getElementById('reportModal');
+
+    let favoriteProducts = [];
+    let pendingReportStoreId = null;
+    let pendingReportProductId = null;
+
+    // ─── Sidebar toggle (usa public-sidebar.js) ───
+    (function () {
+      const btn = document.getElementById('sidebarToggleBtn');
+      if (!btn) return;
+      btn.addEventListener('click', () => {
+        if (typeof window.togglePublicSidebar === 'function') {
+          try { window.togglePublicSidebar(); return; } catch (e) { console.warn(e); }
+        }
+        if (window.PasajePublicSidebar && typeof window.PasajePublicSidebar.toggle === 'function') {
+          try { window.PasajePublicSidebar.toggle(); return; } catch (e) { console.warn(e); }
+        }
+      });
+    })();
+
+    // ═══════════════════════════════════════════════════════════
+    // UTILIDADES
+    // ═══════════════════════════════════════════════════════════
+    function escapeHtml(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#39;');
+    }
+
+    function getStockStatus(p) {
+      if (!p.is_active) return { key: 'inactive',  label: '⛔ No disponible',     style: 'bg-gray-200 text-gray-700' };
+      if (p.stock_quantity === null) return { key: 'unlimited', label: '♾️ Disponible', style: 'bg-emerald-50 text-emerald-700' };
+      if (p.stock_quantity === 0) return { key: 'out', label: '⛔ Agotado',        style: 'bg-red-100 text-red-700' };
+      if (p.stock_quantity <= 3) return { key: 'low', label: `⚡ ¡Quedan solo ${p.stock_quantity}!`, style: 'bg-amber-100 text-amber-800' };
+      return { key: 'in', label: `📦 Stock: ${p.stock_quantity}`, style: 'bg-emerald-100 text-emerald-700' };
+    }
+
+    function isOutOfStock(p) {
+      if (!p.is_active) return true;
+      if (p.stock_quantity === 0) return true;
+      return false;
+    }
+
+    function buildWA(p) {
+      const phone = cleanPhone(p.store_whatsapp || '');
+      const priceStr = parseFloat(p.price).toFixed(2);
+      const msg = encodeURIComponent(`Hola, vi tu producto *${p.title}* (Q ${priceStr}) en Pasaje de los Altos y me interesa.`);
+      return `https://wa.me/${phone}?text=${msg}`;
+    }
+
+    function updateFavCountBadge() {
+      if (!favCountEl) return;
+      const n = Favorites.count();
+      if (n === 0) {
+        favCountEl.classList.add('hidden');
+        favCountEl.textContent = '';
+      } else {
+        favCountEl.textContent = n > 99 ? '99+' : String(n);
+        favCountEl.classList.remove('hidden');
+      }
+      if (favTotal) {
+        favTotal.textContent = n > 0 ? `(${n})` : '';
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // CARGA DE FAVORITOS
+    // ═══════════════════════════════════════════════════════════
+    async function loadFavorites() {
+      updateFavCountBadge();
+
+      const ids = Favorites.getAll();
+      if (ids.length === 0) {
+        renderEmpty();
+        return;
+      }
+
+      clearBtn.classList.remove('hidden');
+      grid.innerHTML = `
+        <div class="col-span-full flex flex-col items-center py-16 gap-3">
+          <div class="w-10 h-10 border-4 border-emerald-500 border-t-transparent rounded-full animate-spin"></div>
+          <p class="text-sm text-gray-500">Cargando favoritos…</p>
+        </div>`;
+
+      if (typeof _supabase === 'undefined') {
+        grid.innerHTML = '<p class="col-span-full text-center text-red-500 py-10">Sin conexión a la base de datos.</p>';
+        return;
+      }
+
+      const { data, error } = await _supabase
+        .from('products')
+        .select(`
+          id, title, description, price, image_url, is_active,
+          stock_quantity, badge_tag, prep_time, min_order_qty, favorites_count,
+          store_id,
+          stores ( id, name, whatsapp, slug, logo_url, address ),
+          categories ( name, icon )
+        `)
+        .in('id', ids);
+
+      if (error) {
+        console.error('[Favoritos] loadFavorites:', error);
+        grid.innerHTML = `<p class="col-span-full text-center text-red-500 py-10">Error al cargar favoritos: ${escapeHtml(error.message)}</p>`;
+        return;
+      }
+
+      const map = new Map((data || []).map(p => [p.id, p]));
+      const ordered = ids.map(id => map.get(id)).filter(Boolean);
+
+      // Limpiar IDs de favoritos que ya no existen en la BD
+      const validIds = new Set(ordered.map(p => p.id));
+      const staleIds = ids.filter(id => !validIds.has(id));
+      if (staleIds.length > 0) {
+        staleIds.forEach(id => Favorites.remove(id));
+        updateFavCountBadge();
+      }
+
+      if (ordered.length === 0) {
+        renderEmpty('Los productos guardados ya no están disponibles.');
+        return;
+      }
+
+      favoriteProducts = ordered.map(p => ({
+        id: p.id,
+        title: p.title,
+        description: p.description || '',
+        price: parseFloat(p.price),
+        image_url: p.image_url,
+        is_active: p.is_active !== false,
+        stock_quantity: (p.stock_quantity === null || p.stock_quantity === undefined) ? null : parseInt(p.stock_quantity, 10),
+        badge_tag: p.badge_tag || null,
+        prep_time: p.prep_time || null,
+        min_order_qty: p.min_order_qty || 1,
+        favorites_count: p.favorites_count || 0,
+        store_id: p.stores?.id || p.store_id || null,
+        store_name: p.stores?.name || 'Tienda local',
+        store_slug: p.stores?.slug || null,
+        store_whatsapp: p.stores?.whatsapp || '',
+        store_logo: p.stores?.logo_url || null,
+        store_address: p.stores?.address || null,
+        category_name: p.categories?.name || 'General',
+        category_icon: p.categories?.icon || '📦',
+      }));
+
+      renderFavorites();
+    }
+
+    function renderEmpty(customMessage) {
+      grid.innerHTML = `
+        <div class="col-span-full text-center py-16">
+          <div class="text-6xl mb-3">💔</div>
+          <p class="text-gray-600 font-semibold">${customMessage || 'Aún no tienes favoritos.'}</p>
+          <p class="text-xs text-gray-400 mt-1">Guarda productos con el ❤️ para verlos aquí.</p>
+          <a href="index.html" class="inline-block mt-5 bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-5 py-2.5 rounded-xl transition">
+            Explorar catálogo →
+          </a>
+        </div>`;
+      clearBtn.classList.add('hidden');
+      favoriteProducts = [];
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // RENDER GRILLA
+    // ═══════════════════════════════════════════════════════════
+    function renderFavorites() {
+      if (favoriteProducts.length === 0) { renderEmpty(); return; }
+
+      grid.innerHTML = favoriteProducts.map(p => {
+        const img = p.image_url || PLACEHOLDER_IMG;
+        const out = isOutOfStock(p);
+        const stock = getStockStatus(p);
+        const catName = `${p.category_icon} ${p.category_name}`.trim();
+
+        const badges = [];
+        if (p.badge_tag) badges.push(`<span class="text-[10px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full">${escapeHtml(p.badge_tag)}</span>`);
+        if (stock.key === 'low') badges.push(`<span class="text-[10px] ${stock.style} font-bold px-2 py-0.5 rounded-full">${stock.label}</span>`);
+        if (out) badges.push(`<span class="text-[10px] bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full">⛔ Agotado</span>`);
+
+        const metaLine = [];
+        if (p.prep_time) metaLine.push(`<span class="text-[10px] text-gray-500 font-semibold">⏳ ${escapeHtml(p.prep_time)}</span>`);
+        if (p.min_order_qty > 1) metaLine.push(`<span class="text-[10px] text-gray-500 font-semibold">📦 Mín. ${p.min_order_qty} uds.</span>`);
+
+        const storeLine = p.store_slug
+          ? `Por <a href="tienda.html?slug=${p.store_slug}" class="font-semibold text-blue-700 hover:underline no-click">${escapeHtml(p.store_name)}</a>`
+          : `Por <strong class="text-gray-700">${escapeHtml(p.store_name)}</strong>`;
+
+        return `
+          <article class="product-card glass-card rounded-2xl overflow-hidden flex flex-col relative transition duration-200 hover:shadow-xl hover:-translate-y-0.5 ${out ? 'opacity-75' : ''}"
+                   data-product-id="${p.id}">
+
+            <button data-report-product="${p.id}"
+              class="report-product-btn no-click absolute top-2 left-2 z-10 bg-white/95 hover:bg-white w-8 h-8 rounded-full shadow flex items-center justify-center text-gray-500 hover:text-red-600 transition"
+              title="Reportar este producto">🚨</button>
+
+            <button data-fav="${p.id}"
+              class="fav-btn no-click absolute top-2 right-2 z-10 bg-white/95 hover:bg-white w-8 h-8 rounded-full shadow flex items-center justify-center transition fav-active"
+              style="color:#ef4444;"
+              title="Quitar de favoritos">
+              ${heartSVG(true)}
+            </button>
+
+            <div class="aspect-square bg-gray-100 overflow-hidden relative">
+              <img src="${img}" alt="${escapeHtml(p.title)}" loading="lazy"
+                   onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"
+                   class="w-full h-full object-cover">
+              ${out ? `<div class="absolute inset-0 bg-black/40 flex items-center justify-center"><span class="bg-white text-red-700 font-extrabold text-xs px-3 py-1.5 rounded-full shadow">⛔ AGOTADO</span></div>` : ''}
+            </div>
+
+            <div class="p-4 flex-1 flex flex-col">
+              <span class="text-[10px] uppercase tracking-wider font-bold text-blue-800 bg-blue-50 px-2 py-1 rounded self-start">
+                ${escapeHtml(catName)}
+              </span>
+
+              ${badges.length > 0 ? `<div class="flex flex-wrap gap-1 mt-1.5">${badges.join('')}</div>` : ''}
+
+              <h3 class="text-base font-bold text-gray-900 mt-2 line-clamp-2">${escapeHtml(p.title)}</h3>
+              <p class="text-xs text-gray-600 mt-1">${storeLine}</p>
+
+              ${metaLine.length > 0 ? `<div class="flex flex-wrap gap-2 mt-1.5">${metaLine.join('')}</div>` : ''}
+
+              <div class="mt-auto pt-3 flex items-center justify-between gap-2">
+                <span class="text-lg font-extrabold text-emerald-700">Q ${p.price.toFixed(2)}</span>
+                ${out
+                  ? `<button disabled class="bg-gray-300 text-gray-700 text-xs font-bold px-3 py-2 rounded-lg cursor-not-allowed no-click">Agotado</button>`
+                  : `<div class="flex gap-1">
+                       <button type="button" data-cart-add="${p.id}"
+                         class="no-click bg-emerald-100 hover:bg-emerald-200 text-emerald-800 text-xs font-bold px-2.5 py-2 rounded-lg transition"
+                         title="Añadir al carrito">🛒</button>
+                       <a href="${buildWA(p)}" target="_blank" rel="noopener noreferrer"
+                          data-wa-product="${p.id}" data-wa-source="favoritos"
+                          class="wa-order-btn no-click inline-flex items-center gap-1 bg-[#25D366] hover:bg-[#128C7E] text-white text-xs font-bold px-3 py-2 rounded-lg transition shadow">
+                          Pedir
+                        </a>
+                     </div>`}
+              </div>
+            </div>
+          </article>`;
+      }).join('');
+
+      bindFavButtons();
+      bindWaOrderButtons();
+      bindReportProductButtons();
+      bindCardClicks();
+      bindCartAddButtons();
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // BINDINGS
+    // ═══════════════════════════════════════════════════════════
+    function bindFavButtons() {
+      document.querySelectorAll('.fav-btn').forEach(btn => {
+        if (btn.dataset.favBound === '1') return;
+        btn.dataset.favBound = '1';
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const id = btn.dataset.fav;
+          Favorites.toggle(id);
+          showToastInline('Producto quitado de favoritos', 'info');
+          loadFavorites();
+        });
+      });
+    }
+
+    function bindWaOrderButtons() {
+      document.querySelectorAll('.wa-order-btn').forEach(a => {
+        if (a.dataset.waBound === '1') return;
+        a.dataset.waBound = '1';
+        a.addEventListener('click', (e) => {
+          // Igual que index: agregar al carrito + abrir drawer
+          e.preventDefault();
+          e.stopPropagation();
+
+          const pid = a.dataset.waProduct;
+          const source = a.dataset.waSource || 'favoritos';
+          const product = favoriteProducts.find(x => x.id === pid);
+          if (!product) return;
+
+          if (productModal && !productModal.classList.contains('hidden')) {
+            closeProductModal();
+          }
+
+          if (typeof PasajeCart !== 'undefined' && typeof PasajeCart.addToCart === 'function') {
+            PasajeCart.addToCart({
+              id: product.id,
+              title: product.title,
+              price: product.price,
+              image_url: product.image_url,
+              storeId: product.store_id,
+              storeName: product.store_name,
+              storeWhatsapp: product.store_whatsapp,
+              storeLogo: product.store_logo,
+              prepTime: product.prep_time,
+              minOrderQty: product.min_order_qty,
+              stockQuantity: product.stock_quantity
+            });
+          }
+
+          if (typeof PasajeCart !== 'undefined' && typeof PasajeCart.openDrawer === 'function') {
+            PasajeCart.openDrawer();
+          }
+
+          try {
+            if (typeof logWhatsAppClick === 'function') {
+              logWhatsAppClick(product.id, product.store_id, 'pedir-click-' + source);
+            }
+          } catch (err) { /* silencioso */ }
+        });
+      });
+    }
+
+    function bindCartAddButtons() {
+      document.querySelectorAll('[data-cart-add]').forEach(btn => {
+        if (btn.dataset.cartBound === '1') return;
+        btn.dataset.cartBound = '1';
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const pid = btn.dataset.cartAdd;
+          const product = favoriteProducts.find(x => x.id === pid);
+          if (!product) return;
+
+          if (typeof PasajeCart !== 'undefined' && typeof PasajeCart.addToCart === 'function') {
+            PasajeCart.addToCart({
+              id: product.id,
+              title: product.title,
+              price: product.price,
+              image_url: product.image_url,
+              storeId: product.store_id,
+              storeName: product.store_name,
+              storeWhatsapp: product.store_whatsapp,
+              storeLogo: product.store_logo,
+              prepTime: product.prep_time,
+              minOrderQty: product.min_order_qty,
+              stockQuantity: product.stock_quantity
+            });
+            // Mostrar toast
+            if (typeof PasajeCart.showToast === 'function') {
+              PasajeCart.showToast(`Añadido: ${product.title}`, 'success');
+            }
+          }
+        });
+      });
+    }
+
+    function bindReportProductButtons() {
+      document.querySelectorAll('.report-product-btn').forEach(btn => {
+        if (btn.dataset.reportBound === '1') return;
+        btn.dataset.reportBound = '1';
+        btn.addEventListener('click', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          const pid = btn.dataset.reportProduct;
+          const product = favoriteProducts.find(x => x.id === pid);
+          if (!product) return;
+          openReportModal({
+            storeId: product.store_id,
+            productId: product.id,
+            label: `Producto: ${product.title}`,
+          });
+        });
+      });
+    }
+
+    function bindCardClicks() {
+      document.querySelectorAll('.product-card').forEach(card => {
+        if (card.dataset.clickBound === '1') return;
+        card.dataset.clickBound = '1';
+        card.addEventListener('click', (e) => {
+          if (e.target.closest('.no-click')) return;
+          if (e.target.closest('button') || e.target.closest('a')) return;
+          const id = card.dataset.productId;
+          const product = favoriteProducts.find(p => p.id === id);
+          if (product) openProductModal(product);
+        });
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // MODAL · Quick View
+    // ═══════════════════════════════════════════════════════════
+    function openProductModal(p) {
+      const img = p.image_url || PLACEHOLDER_IMG;
+      const out = isOutOfStock(p);
+      const stock = getStockStatus(p);
+
+      const badges = [];
+      if (p.badge_tag) badges.push(`<span class="text-xs bg-purple-100 text-purple-700 font-bold px-3 py-1 rounded-full">${escapeHtml(p.badge_tag)}</span>`);
+      if (stock.key === 'low') badges.push(`<span class="text-xs ${stock.style} font-bold px-3 py-1 rounded-full">${stock.label}</span>`);
+      if (stock.key === 'in') badges.push(`<span class="text-xs ${stock.style} font-bold px-3 py-1 rounded-full">${stock.label}</span>`);
+      if (stock.key === 'unlimited') badges.push(`<span class="text-xs ${stock.style} font-bold px-3 py-1 rounded-full">♾️ Disponible</span>`);
+      if (out) badges.push(`<span class="text-xs bg-red-100 text-red-700 font-bold px-3 py-1 rounded-full">⛔ Agotado</span>`);
+
+      const storeLine = p.store_slug
+        ? `<a href="tienda.html?slug=${p.store_slug}" class="font-bold text-blue-700 hover:underline">${escapeHtml(p.store_name)}</a>`
+        : `<span class="font-bold text-gray-800">${escapeHtml(p.store_name)}</span>`;
+
+      productModalContent.innerHTML = `
+        <div class="relative">
+          <button id="closeProductModalBtn"
+            class="absolute top-3 right-3 z-10 bg-white/95 hover:bg-white text-gray-800 w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition font-bold">✕</button>
+          <button id="modalReportProductBtn"
+            class="absolute top-3 left-3 z-10 bg-white/95 hover:bg-white text-gray-600 hover:text-red-600 w-10 h-10 rounded-full shadow-lg flex items-center justify-center transition"
+            title="Reportar este producto">🚨</button>
+
+          <div class="aspect-square sm:aspect-video bg-gray-100 overflow-hidden relative">
+            <img src="${img}" alt="${escapeHtml(p.title)}"
+                 onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"
+                 class="w-full h-full object-cover">
+            ${out ? `<div class="absolute inset-0 bg-black/40 flex items-center justify-center"><span class="bg-white text-red-700 font-extrabold text-lg px-5 py-2 rounded-full shadow">⛔ AGOTADO</span></div>` : ''}
+          </div>
+        </div>
+
+        <div class="p-5 sm:p-6">
+          <div class="flex items-start justify-between gap-3">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center gap-2 flex-wrap mb-2">
+                <span class="text-[10px] uppercase tracking-wider font-bold text-blue-800 bg-blue-50 px-2 py-1 rounded">
+                  ${escapeHtml(p.category_icon)} ${escapeHtml(p.category_name)}
+                </span>
+                ${badges.join('')}
+              </div>
+              <h2 class="text-2xl font-extrabold text-gray-900 leading-tight">${escapeHtml(p.title)}</h2>
+              <p class="text-sm text-gray-600 mt-1">Por ${storeLine}</p>
+            </div>
+            <button data-modal-fav="${p.id}"
+              class="modal-fav-btn flex-shrink-0 bg-gray-50 hover:bg-gray-100 w-11 h-11 rounded-full flex items-center justify-center transition fav-active"
+              style="color:#ef4444;"
+              title="Quitar de favoritos">
+              ${heartSVG(true)}
+            </button>
+          </div>
+
+          <p class="text-3xl font-extrabold text-emerald-700 mt-4">Q ${p.price.toFixed(2)}</p>
+
+          ${p.description ? `
+            <div class="mt-4">
+              <p class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-1">Descripción</p>
+              <p class="text-sm text-gray-800 leading-relaxed whitespace-pre-line">${escapeHtml(p.description)}</p>
+            </div>` : ''}
+
+          ${(p.prep_time || p.min_order_qty > 1) ? `
+            <div class="mt-4 grid grid-cols-1 sm:grid-cols-2 gap-2">
+              ${p.prep_time ? `
+                <div class="bg-amber-50 border border-amber-200 rounded-lg p-3">
+                  <p class="text-[10px] font-bold text-amber-900 uppercase tracking-wider">⏳ Tiempo de entrega</p>
+                  <p class="text-sm text-amber-900 font-semibold mt-0.5">${escapeHtml(p.prep_time)}</p>
+                </div>` : ''}
+              ${p.min_order_qty > 1 ? `
+                <div class="bg-blue-50 border border-blue-200 rounded-lg p-3">
+                  <p class="text-[10px] font-bold text-blue-900 uppercase tracking-wider">📦 Pedido mínimo</p>
+                  <p class="text-sm text-blue-900 font-semibold mt-0.5">${p.min_order_qty} unidades</p>
+                </div>` : ''}
+            </div>` : ''}
+
+          <div class="mt-5 p-4 bg-gray-50 rounded-xl border">
+            <p class="text-xs font-bold text-gray-600 uppercase tracking-wider mb-3">🏪 Sobre la tienda</p>
+            <div class="flex items-center gap-3">
+              <img src="${p.store_logo || PLACEHOLDER_IMG}" alt="${escapeHtml(p.store_name)}"
+                   onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"
+                   class="w-14 h-14 rounded-full object-cover border-2 border-white shadow-sm flex-shrink-0 bg-white">
+              <div class="min-w-0 flex-1">
+                <p class="font-bold text-gray-900 truncate">${escapeHtml(p.store_name)}</p>
+                ${p.store_address ? `<p class="text-xs text-gray-600 mt-0.5 truncate">📍 ${escapeHtml(p.store_address)}</p>` : ''}
+              </div>
+              ${p.store_slug ? `
+                <a href="tienda.html?slug=${p.store_slug}"
+                   class="bg-white hover:bg-gray-100 border border-gray-200 text-gray-800 text-xs font-bold px-3 py-2 rounded-lg transition flex-shrink-0">
+                  Ver tienda
+                </a>` : ''}
+            </div>
+          </div>
+
+          <div class="mt-5 space-y-2">
+            ${out
+              ? `<button disabled class="w-full bg-gray-300 text-gray-700 font-bold py-4 rounded-xl cursor-not-allowed text-lg">
+                   ⛔ Producto agotado
+                 </button>`
+              : `<button type="button" data-cart-add="${p.id}"
+                   class="w-full flex items-center justify-center gap-2 bg-emerald-100 hover:bg-emerald-200 text-emerald-800 font-bold py-3 rounded-xl transition text-base">
+                   🛒 Añadir al carrito
+                 </button>
+                 <a href="${buildWA(p)}" target="_blank" rel="noopener noreferrer"
+                   data-wa-product="${p.id}" data-wa-source="favoritos-modal"
+                   class="wa-order-btn w-full flex items-center justify-center gap-2 bg-[#25D366] hover:bg-[#128C7E] text-white font-bold py-4 rounded-xl transition text-lg shadow-lg">
+                   Pedir por WhatsApp
+                 </a>`}
+          </div>
+
+          <button data-remove-fav="${p.id}"
+            class="mt-3 w-full bg-red-50 hover:bg-red-100 text-red-600 font-semibold py-2.5 rounded-xl transition text-sm">
+            💔 Quitar de favoritos
+          </button>
+
+          <p class="text-[11px] text-gray-500 text-center mt-3">
+            Sin pagos en línea — la conversación se cierra por WhatsApp.
+          </p>
+        </div>
+      `;
+
+      productModal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+
+      document.getElementById('closeProductModalBtn').addEventListener('click', closeProductModal);
+
+      document.getElementById('modalReportProductBtn').addEventListener('click', (e) => {
+        e.stopPropagation();
+        openReportModal({
+          storeId: p.store_id,
+          productId: p.id,
+          label: `Producto: ${p.title}`,
+        });
+      });
+
+      document.querySelector('[data-remove-fav]').addEventListener('click', (e) => {
+        e.stopPropagation();
+        Favorites.toggle(p.id);
+        closeProductModal();
+        loadFavorites();
+      });
+
+      const modalFav = document.querySelector('[data-modal-fav]');
+      if (modalFav) {
+        modalFav.addEventListener('click', (e) => {
+          e.stopPropagation();
+          Favorites.toggle(p.id);
+          closeProductModal();
+          loadFavorites();
+        });
+      }
+
+      bindWaOrderButtons();
+      bindCartAddButtons();
+    }
+
+    function closeProductModal() {
+      productModal.classList.add('hidden');
+      document.body.style.overflow = '';
+      productModalContent.innerHTML = '';
+    }
+
+    productModal.addEventListener('click', (e) => {
+      if (e.target === productModal) closeProductModal();
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // MODAL · Reportar
+    // ═══════════════════════════════════════════════════════════
+    function openReportModal({ storeId, productId, label }) {
+      pendingReportStoreId = storeId || null;
+      pendingReportProductId = productId || null;
+      document.getElementById('reportTargetLabel').textContent = label || 'Cuéntanos qué pasa';
+      document.getElementById('reportForm').reset();
+      reportModal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeReportModal() {
+      reportModal.classList.add('hidden');
+      document.body.style.overflow = '';
+      pendingReportStoreId = null;
+      pendingReportProductId = null;
+    }
+
+    document.getElementById('closeReportModalBtn').addEventListener('click', closeReportModal);
+    document.getElementById('cancelReportBtn').addEventListener('click', closeReportModal);
+    reportModal.addEventListener('click', (e) => {
+      if (e.target === reportModal) closeReportModal();
+    });
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape') {
+        if (!reportModal.classList.contains('hidden')) { closeReportModal(); return; }
+        if (!productModal.classList.contains('hidden')) { closeProductModal(); }
+      }
+    });
+
+    document.getElementById('reportForm').addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const btn = document.getElementById('submitReportBtn');
+      btn.disabled = true;
+      btn.textContent = 'Enviando...';
+
+      try {
+        const reason = document.getElementById('reportReason').value;
+        const comment = document.getElementById('reportComment').value.trim() || null;
+        const reporter_email = document.getElementById('reportEmail').value.trim() || null;
+
+        if (!reason) throw new Error('Selecciona un motivo.');
+        if (!pendingReportStoreId && !pendingReportProductId) {
+          throw new Error('No hay nada que reportar.');
+        }
+
+        const { error } = await _supabase.from('reports').insert([{
+          store_id: pendingReportStoreId || null,
+          product_id: pendingReportProductId || null,
+          reason, comment, reporter_email,
+        }]);
+        if (error) throw error;
+
+        closeReportModal();
+        showToastInline('¡Gracias! Tu reporte fue enviado.', 'success');
+      } catch (err) {
+        console.error(err);
+        showToastInline(err.message || 'No se pudo enviar el reporte.', 'error');
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Enviar reporte';
+      }
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // VACIAR LISTA
+    // ═══════════════════════════════════════════════════════════
+    clearBtn.addEventListener('click', () => {
+      if (typeof PasajeCart !== 'undefined' && typeof PasajeCart.showToast === 'function') {
+        // Usa el modal de confirmación si está disponible
+      }
+      if (!confirm('¿Vaciar toda la lista de favoritos?')) return;
+      Favorites.clear();
+      updateFavCountBadge();
+      loadFavorites();
+    });
+
+    // ═══════════════════════════════════════════════════════════
+    // TOAST LOCAL (fallback si PasajeCart no está cargado)
+    // ═══════════════════════════════════════════════════════════
+    function showToastInline(message, type) {
+      if (typeof PasajeCart !== 'undefined' && typeof PasajeCart.showToast === 'function') {
+        return PasajeCart.showToast(message, type);
+      }
+      const colors = {
+        success: 'bg-emerald-600',
+        error:   'bg-red-600',
+        warning: 'bg-amber-500',
+        info:    'bg-blue-600'
+      };
+      const toast = document.createElement('div');
+      toast.className = `fixed bottom-4 left-1/2 -translate-x-1/2 z-[80] ${colors[type] || colors.info} text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-2xl transition-opacity duration-300 opacity-0 max-w-[90vw] text-center`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+
+      requestAnimationFrame(() => { toast.style.opacity = '1'; });
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 3000);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // INIT
+    // ═══════════════════════════════════════════════════════════
+    updateFavCountBadge();
+    loadFavorites();
+
+    // ═══════════════════════════════════════════════════════════
+    // SERVICE WORKER
+    // ═══════════════════════════════════════════════════════════
+    if ('serviceWorker' in navigator) {
+      const isLocalhost = ['localhost', '127.0.0.1'].includes(location.hostname);
+      const isSecure = location.protocol === 'https:';
+      if (isLocalhost || isSecure) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('sw.js')
+            .then(() => console.log('[PWA] Service Worker registrado ✅'))
+            .catch(err => console.warn('[PWA] SW no registrado:', err));
+        });
+      }
+    }
+  </script>
+</body>
+</html>

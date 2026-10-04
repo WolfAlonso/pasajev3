@@ -1,0 +1,630 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <title>Gestión de Pedidos · Pasaje de los Altos</title>
+  
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <!-- Generador de Canvas e Imágenes -->
+  <script src="https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js"></script>
+  <script src="../js/supabase.js?v=4"></script>
+  <script src="../js/theme-loader.js?v=4"></script>
+  <script src="../js/dashboard-utils.js?v=4"></script>
+  <script src="../js/dashboard-sidebar.js?v=6"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+
+    /* Estilos de Impresión Térmica para Rollos de 58mm y 80mm */
+    @media print {
+      body {
+        background-color: #ffffff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+      }
+      /* Ocultar interfaz del sistema */
+      body > * {
+        display: none !important;
+      }
+      /* Mostrar únicamente el contenedor del ticket */
+      body > #ticketModal {
+        display: flex !important;
+        position: absolute !important;
+        left: 0 !important;
+        top: 0 !important;
+        width: 100% !important;
+        height: auto !important;
+        background: #ffffff !important;
+        padding: 0 !important;
+        margin: 0 !important;
+        box-shadow: none !important;
+        border: none !important;
+        z-index: 99999 !important;
+      }
+      .no-print {
+        display: none !important;
+      }
+      #ticketModalCard {
+        box-shadow: none !important;
+        border: none !important;
+        padding: 0 !important;
+        margin: 0 auto !important;
+        max-width: 100% !important;
+        width: auto !important;
+      }
+      #ticketAreaToCapture {
+        width: 78mm !important; /* Estándar térmico de 80mm/58mm */
+        max-width: 100% !important;
+        margin: 0 auto !important;
+        padding: 4px !important;
+        border: none !important;
+        box-shadow: none !important;
+        color: #000000 !important;
+        background: #ffffff !important;
+        font-size: 11px !important;
+      }
+      @page {
+        size: auto;
+        margin: 1mm;
+      }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+  <div id="dashboardHeader"></div>
+
+  <main class="max-w-6xl mx-auto p-4 pb-16">
+    <div id="dashboardTabs"></div>
+
+    <div id="loadingState" class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-8 text-center text-sm text-slate-500 shadow-sm">
+      Cargando pedidos recibidos...
+    </div>
+
+    <section id="content" class="hidden space-y-6">
+
+      <!-- Barra de Filtros de Estado -->
+      <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div class="flex items-center gap-2">
+          <h2 class="text-base font-black text-slate-900">📦 Pedidos Recibidos</h2>
+          <span id="ordersCountBadge" class="text-xs bg-emerald-100 text-emerald-800 px-2.5 py-0.5 rounded-full font-black">0</span>
+        </div>
+
+        <div class="flex gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+          <button type="button" data-status-filter="all" class="status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-slate-900 text-white border-slate-900 shadow-sm">Todos</button>
+          <button type="button" data-status-filter="sent" class="status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-white text-slate-700 border-slate-200 hover:border-amber-400">🟡 Recibidos</button>
+          <button type="button" data-status-filter="in_progress" class="status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-white text-slate-700 border-slate-200 hover:border-blue-400">⚙️ En Proceso</button>
+          <button type="button" data-status-filter="completed" class="status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-white text-slate-700 border-slate-200 hover:border-emerald-400">🟢 Entregados</button>
+          <button type="button" data-status-filter="cancelled_group" class="status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-white text-slate-700 border-slate-200 hover:border-rose-400">🔴 Cancelados/Rechazados</button>
+        </div>
+      </div>
+
+      <!-- Contenedor de Tarjetas de Pedidos -->
+      <div id="ordersList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+
+    </section>
+  </main>
+
+  <!-- MODAL DE TICKET DE VENTA Y IMPRESIÓN -->
+  <div id="ticketModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div id="ticketModalCard" class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-4 space-y-4 my-8">
+      
+      <!-- Barra superior no imprimible -->
+      <div class="no-print flex items-center justify-between border-b pb-3">
+        <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-1.5">
+          <span>🧾 Ticket de Pedido</span>
+        </h3>
+        <button id="closeTicketModalBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 w-8 h-8 rounded-full font-bold transition flex items-center justify-center">✕</button>
+      </div>
+
+      <!-- ÁREA DE CAPTURA E IMPRESIÓN TÉRMICA -->
+      <div id="ticketAreaToCapture" class="bg-white p-4 text-slate-900 font-mono text-xs border border-dashed border-slate-300 rounded-xl space-y-3">
+        
+        <!-- Encabezado de la Tienda -->
+        <div class="text-center space-y-1">
+          <h2 id="ticketStoreName" class="font-black text-sm uppercase tracking-tight text-slate-900">NOMBRE TIENDA</h2>
+          <p id="ticketStoreWa" class="text-[11px] text-slate-600">📲 WA: 50212345678</p>
+          <p class="text-[10px] text-slate-400 font-sans">Pasaje de los Altos · pasaje.gt</p>
+          <div class="border-b border-dashed border-slate-300 my-2"></div>
+          <p class="font-bold text-[11px] uppercase">COMPROBANTE DE PEDIDO</p>
+          <p id="ticketOrderId" class="text-[10px] text-slate-500">ID: #00000000</p>
+          <p id="ticketDate" class="text-[10px] text-slate-500">22/09/2026, 11:47 PM</p>
+        </div>
+
+        <div class="border-b border-dashed border-slate-300 my-2"></div>
+
+        <!-- Datos del Cliente -->
+        <div class="space-y-1 text-[11px]">
+          <p><strong>CLIENTE:</strong> <span id="ticketCustomerName">Juan Pérez</span></p>
+          <p><strong>TELÉFONO:</strong> <span id="ticketCustomerPhone">55123456</span></p>
+          <p><strong>MÉTODO:</strong> <span id="ticketDeliveryType">🛵 Envío a Domicilio</span></p>
+          <p id="ticketAddressRow"><strong>DIRECCIÓN:</strong> <span id="ticketAddress">14 Av 4-12 Zona 1</span></p>
+          <p id="ticketNotesRow" class="hidden"><strong>NOTAS:</strong> <span id="ticketNotes"></span></p>
+        </div>
+
+        <div class="border-b border-dashed border-slate-300 my-2"></div>
+
+        <!-- Desglose de Productos -->
+        <div>
+          <table class="w-full text-left text-[11px] border-collapse">
+            <thead>
+              <tr class="border-b border-slate-300 text-slate-700">
+                <th class="py-1 pr-1 font-bold">Cant</th>
+                <th class="py-1 pr-1 font-bold">Producto</th>
+                <th class="py-1 text-right font-bold">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody id="ticketItemsTbody" class="divide-y divide-dashed divide-slate-200">
+              <!-- Filas dinámicas -->
+            </tbody>
+          </table>
+        </div>
+
+        <div class="border-b border-dashed border-slate-300 my-2"></div>
+
+        <!-- Total General -->
+        <div class="flex justify-between items-center text-xs font-black pt-1">
+          <span>TOTAL COMPRA:</span>
+          <span id="ticketTotal" class="text-sm">Q 0.00</span>
+        </div>
+
+        <div class="border-b border-dashed border-slate-300 my-2"></div>
+
+        <!-- Pie de página -->
+        <div class="text-center text-[10px] text-slate-500 space-y-0.5">
+          <p class="font-bold text-slate-700">¡Gracias por tu preferencia!</p>
+          <p>Generado desde Pasaje de los Altos</p>
+        </div>
+      </div>
+
+      <!-- Botones de Acción (Ocultos en impresión) -->
+      <div class="no-print space-y-2 pt-2 border-t border-slate-100">
+        <div class="grid grid-cols-2 gap-2">
+          <button id="printTicketBtn" type="button"
+            class="bg-slate-900 hover:bg-black text-white font-extrabold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
+            <span>🖨️ Imprimir Ticket</span>
+          </button>
+
+          <button id="downloadTicketImgBtn" type="button"
+            class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
+            <span>📸 Guardar Imagen</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let currentUser = null;
+    let currentStore = null;
+    let allOrders = [];
+    let activeFilter = 'all';
+    let currentTicketOrder = null;
+
+    const STATUS_MAP = {
+      sent:       { label: '🟡 Recibido / Pendiente', bg: 'bg-amber-100 text-amber-900 border-amber-200' },
+      confirmed:  { label: '🔵 Confirmado', bg: 'bg-blue-100 text-blue-900 border-blue-200' },
+      preparing:  { label: '🟠 En Preparación', bg: 'bg-orange-100 text-orange-900 border-orange-200' },
+      on_the_way: { label: '🛵 En Camino / Listo', bg: 'bg-purple-100 text-purple-900 border-purple-200' },
+      completed:  { label: '🟢 Entregado con Éxito', bg: 'bg-emerald-100 text-emerald-900 border-emerald-200' },
+      cancelled:  { label: '🔴 Cancelado por Cliente', bg: 'bg-rose-100 text-rose-900 border-rose-200' },
+      rejected:   { label: '❌ Rechazado / Sin Stock', bg: 'bg-slate-200 text-slate-800 border-slate-300' }
+    };
+
+    (async () => {
+      try {
+        const guardRes = await guardDashboardPage();
+        if (!guardRes || !guardRes.session || !guardRes.store) return;
+
+        currentUser = guardRes.session.user;
+        currentStore = guardRes.store;
+
+        await initDashboardNav({ store: currentStore, user: currentUser });
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+
+        setupFilterButtons();
+        setupTicketModalEvents();
+        await loadStoreOrders();
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+
+    function setupFilterButtons() {
+      document.querySelectorAll('.status-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeFilter = btn.dataset.statusFilter;
+          document.querySelectorAll('.status-filter-btn').forEach(b => {
+            b.className = 'status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-white text-slate-700 border-slate-200 hover:border-emerald-500';
+          });
+          btn.className = 'status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-slate-900 text-white border-slate-900 shadow-sm';
+          renderOrders();
+        });
+      });
+    }
+
+    function setupTicketModalEvents() {
+      const modal = document.getElementById('ticketModal');
+      const closeBtn = document.getElementById('closeTicketModalBtn');
+      const printBtn = document.getElementById('printTicketBtn');
+      const downloadImgBtn = document.getElementById('downloadTicketImgBtn');
+
+      closeBtn.addEventListener('click', () => modal.classList.add('hidden'));
+
+      modal.addEventListener('click', (e) => {
+        if (e.target === modal) modal.classList.add('hidden');
+      });
+
+      printBtn.addEventListener('click', () => {
+        window.print();
+      });
+
+      downloadImgBtn.addEventListener('click', async () => {
+        const captureArea = document.getElementById('ticketAreaToCapture');
+        const originalText = downloadImgBtn.innerHTML;
+
+        downloadImgBtn.disabled = true;
+        downloadImgBtn.innerHTML = '<span>⏳ Generando...</span>';
+
+        try {
+          const canvas = await html2canvas(captureArea, {
+            scale: 2,
+            backgroundColor: '#ffffff',
+            useCORS: true,
+            logging: false
+          });
+
+          const shortId = currentTicketOrder ? String(currentTicketOrder.id).slice(0, 8) : 'pasaje';
+          const fileName = `ticket-pedido-${shortId}.png`;
+
+          const link = document.createElement('a');
+          link.download = fileName;
+          link.href = canvas.toDataURL('image/png');
+          link.click();
+        } catch (err) {
+          console.error('[Ticket Img Error]', err);
+          alert('No se pudo generar la imagen del ticket: ' + err.message);
+        } finally {
+          downloadImgBtn.disabled = false;
+          downloadImgBtn.innerHTML = originalText;
+        }
+      });
+    }
+
+    async function loadStoreOrders() {
+      const container = document.getElementById('ordersList');
+      const { data, error } = await _supabase
+        .from('cart_orders')
+        .select('*')
+        .eq('store_id', currentStore.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        container.innerHTML = '<p class="col-span-full text-center text-rose-500 text-sm py-12">Error al cargar pedidos.</p>';
+        return;
+      }
+
+      allOrders = data || [];
+      renderOrders();
+    }
+
+    function renderOrders() {
+      const container = document.getElementById('ordersList');
+      const badge = document.getElementById('ordersCountBadge');
+
+      let filtered = allOrders;
+      if (activeFilter !== 'all') {
+        filtered = allOrders.filter(o => {
+          const st = getNormalizedStatus(o.status);
+          if (activeFilter === 'in_progress') return ['confirmed', 'preparing', 'on_the_way'].includes(st);
+          if (activeFilter === 'cancelled_group') return ['cancelled', 'rejected'].includes(st);
+          return st === activeFilter;
+        });
+      }
+
+      badge.textContent = filtered.length;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full bg-white rounded-2xl p-12 text-center border border-slate-200/80 shadow-sm">
+            <p class="text-3xl mb-2">📦</p>
+            <p class="text-xs font-bold text-slate-500">No se encontraron pedidos en esta categoría.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(o => {
+        const statusKey = getNormalizedStatus(o.status);
+        const statusInfo = STATUS_MAP[statusKey] || STATUS_MAP.sent;
+        const items = Array.isArray(o.items) ? o.items : [];
+        const isDelivery = o.delivery_type === 'delivery';
+
+        return `
+          <article class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex flex-col justify-between space-y-4">
+            
+            <div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <span class="text-[10px] font-mono text-slate-400 block truncate max-w-[200px]">ID: ${o.id}</span>
+                <h3 class="font-extrabold text-sm text-slate-900">${dashEscapeHtml(o.customer_name || 'Cliente')}</h3>
+                <p class="text-xs text-slate-500">📞 ${dashEscapeHtml(o.customer_phone || 'Sin teléfono')}</p>
+              </div>
+              <span class="text-[11px] font-black px-2.5 py-1 rounded-full border ${statusInfo.bg}">
+                ${statusInfo.label}
+              </span>
+            </div>
+
+            <div class="space-y-2 text-xs">
+              <div class="bg-slate-50 p-2.5 rounded-xl space-y-1 border border-slate-100">
+                <p class="font-bold text-slate-700">🚚 Método: ${isDelivery ? '🛵 Envío a Domicilio' : '🏪 Recoger en tienda'}</p>
+                ${o.customer_address ? `<p class="text-slate-600">📍 ${dashEscapeHtml(o.customer_address)}</p>` : ''}
+                ${o.notes ? `<p class="text-slate-500 italic">📝 "${dashEscapeHtml(o.notes)}"</p>` : ''}
+              </div>
+
+              <div class="divide-y divide-slate-100 border-t border-b py-2">
+                ${items.map(it => `
+                  <div class="flex justify-between items-center py-1">
+                    <span class="font-semibold text-slate-700">${it.quantity}x ${dashEscapeHtml(it.title)}${it.selectedVariant ? ' (' + dashEscapeHtml(it.selectedVariant) + ')' : ''}</span>
+                    <span class="font-bold text-slate-900">Q ${(parseFloat(it.price || 0) * parseInt(it.quantity || 1)).toFixed(2)}</span>
+                  </div>
+                `).join('')}
+              </div>
+
+              <div class="flex justify-between items-center pt-1">
+                <span class="font-black text-slate-500 text-xs">TOTAL:</span>
+                <span class="font-black text-emerald-600 text-base">Q ${parseFloat(o.total || 0).toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 space-y-2">
+              <label class="block text-[10px] font-black text-slate-500 uppercase">Cambiar Estado del Pedido:</label>
+              <select data-action="update-status" data-order-id="${o.id}"
+                class="w-full border border-slate-200 p-2 rounded-xl text-xs font-bold bg-slate-50 text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500">
+                <option value="sent" ${statusKey === 'sent' ? 'selected' : ''}>🟡 Recibido / Pendiente</option>
+                <option value="confirmed" ${statusKey === 'confirmed' ? 'selected' : ''}>🔵 Confirmado</option>
+                <option value="preparing" ${statusKey === 'preparing' ? 'selected' : ''}>🟠 En Preparación</option>
+                <option value="on_the_way" ${statusKey === 'on_the_way' ? 'selected' : ''}>🛵 En Camino / Listo para entrega</option>
+                <option value="completed" ${statusKey === 'completed' ? 'selected' : ''}>🟢 Entregado con Éxito</option>
+                <option value="cancelled" ${statusKey === 'cancelled' ? 'selected' : ''}>🔴 Cancelado por Cliente</option>
+                <option value="rejected" ${statusKey === 'rejected' ? 'selected' : ''}>❌ Rechazado / Sin Stock</option>
+              </select>
+
+              ${isDelivery ? `
+                <button type="button" data-action="request-delivery" data-order-id="${o.id}"
+                  class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5">
+                  <span>🛵 Solicitar Mensajero de Pasaje</span>
+                </button>
+              ` : ''}
+
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <button type="button" data-action="open-ticket" data-order-id="${o.id}"
+                  class="bg-slate-800 hover:bg-slate-900 text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5">
+                  <span>🧾 Ticket</span>
+                </button>
+
+                <button type="button" data-action="notify-wa" data-order-id="${o.id}"
+                  class="bg-[#25D366] hover:bg-[#128C7E] text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5 truncate">
+                  <span>💬 WhatsApp</span>
+                </button>
+              </div>
+            </div>
+
+          </article>`;
+      }).join('');
+
+      attachEvents();
+    }
+
+    function openTicketModal(order) {
+      currentTicketOrder = order;
+
+      const storeName = currentStore?.name || 'Comercio Local';
+      const storeWa = currentStore?.whatsapp || '';
+
+      document.getElementById('ticketStoreName').textContent = storeName;
+      document.getElementById('ticketStoreWa').textContent = storeWa ? `📲 WA: ${storeWa}` : '';
+      
+      const shortId = String(order.id).slice(0, 8).toUpperCase();
+      document.getElementById('ticketOrderId').textContent = `ORDEN: #${shortId}`;
+
+      let dateFormatted = 'Fecha N/A';
+      if (order.created_at) {
+        try {
+          const d = new Date(order.created_at);
+          dateFormatted = d.toLocaleString('es-GT', {
+            year: 'numeric', month: '2-digit', day: '2-digit',
+            hour: '2-digit', minute: '2-digit', hour12: true
+          });
+        } catch (e) {
+          dateFormatted = order.created_at;
+        }
+      }
+      document.getElementById('ticketDate').textContent = dateFormatted;
+
+      document.getElementById('ticketCustomerName').textContent = order.customer_name || 'Cliente';
+      document.getElementById('ticketCustomerPhone').textContent = order.customer_phone || 'N/A';
+
+      const isDelivery = order.delivery_type === 'delivery';
+      document.getElementById('ticketDeliveryType').textContent = isDelivery ? '🛵 Envío a Domicilio' : '🏪 Pickup en Tienda';
+
+      const addrRow = document.getElementById('ticketAddressRow');
+      if (isDelivery && order.customer_address) {
+        document.getElementById('ticketAddress').textContent = order.customer_address;
+        addrRow.classList.remove('hidden');
+      } else {
+        addrRow.classList.add('hidden');
+      }
+
+      const notesRow = document.getElementById('ticketNotesRow');
+      if (order.notes) {
+        document.getElementById('ticketNotes').textContent = order.notes;
+        notesRow.classList.remove('hidden');
+      } else {
+        notesRow.classList.add('hidden');
+      }
+
+      // Render de Ítems
+      const tbody = document.getElementById('ticketItemsTbody');
+      const items = Array.isArray(order.items) ? order.items : [];
+
+      tbody.innerHTML = items.map(it => {
+        const qty = parseInt(it.quantity || 1, 10);
+        const price = parseFloat(it.price || 0);
+        const subtotal = qty * price;
+        const variantTxt = it.selectedVariant ? `<br><span class="text-[9px] text-slate-500 font-normal">(${dashEscapeHtml(it.selectedVariant)})</span>` : '';
+
+        return `
+          <tr class="align-top border-b border-dashed border-slate-100">
+            <td class="py-1 pr-1 font-bold">${qty}x</td>
+            <td class="py-1 pr-1 font-semibold">${dashEscapeHtml(it.title)}${variantTxt}</td>
+            <td class="py-1 text-right font-bold whitespace-nowrap">Q ${subtotal.toFixed(2)}</td>
+          </tr>`;
+      }).join('');
+
+      document.getElementById('ticketTotal').textContent = `Q ${parseFloat(order.total || 0).toFixed(2)}`;
+
+      const modal = document.getElementById('ticketModal');
+      modal.classList.remove('hidden');
+    }
+
+    function getNormalizedStatus(st) {
+      const s = (st || 'sent').toLowerCase();
+      if (s === 'pending' || s === 'sent') return 'sent';
+      if (s === 'confirmed') return 'confirmed';
+      if (s === 'preparing' || s === 'contacted') return 'preparing';
+      if (s === 'on_the_way' || s === 'ready') return 'on_the_way';
+      if (s === 'completed' || s === 'delivered') return 'completed';
+      if (s === 'cancelled') return 'cancelled';
+      if (s === 'rejected') return 'rejected';
+      return 'sent';
+    }
+
+    function attachEvents() {
+      // Evento Solicitar Mensajero de Pasaje
+      document.querySelectorAll('[data-action="request-delivery"]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const orderId = btn.dataset.orderId;
+          const order = allOrders.find(o => String(o.id) === String(orderId));
+          if (!order) return;
+
+          btn.disabled = true;
+          btn.textContent = '⏳ Enviando solicitud...';
+
+          try {
+            const fee = 15.00; // Tarifa estándar base de envío en Quetzaltenango
+            const { error } = await _supabase
+              .from('delivery_requests')
+              .insert([{
+                order_id: order.id,
+                store_id: currentStore.id,
+                status: 'pending',
+                fee: fee,
+                origin_address: currentStore.name + ' (' + (currentStore.zone || 'Zona 1') + ')',
+                destination_address: order.customer_address || 'Dirección de envío',
+                notes: order.notes || null
+              }]);
+
+            if (error) throw error;
+
+            alert('✅ Solicitud de envío emitida. Los repartidores activos en Quetzaltenango han sido notificados.');
+            btn.textContent = '✔️ Solicitado';
+            btn.classList.replace('bg-emerald-600', 'bg-slate-700');
+          } catch (err) {
+            alert('Error al solicitar delivery: ' + err.message);
+            btn.disabled = false;
+            btn.textContent = '🛵 Solicitar Mensajero de Pasaje';
+          }
+        });
+      });
+
+      // Evento Generar Ticket Modal
+      document.querySelectorAll('[data-action="open-ticket"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const orderId = btn.dataset.orderId;
+          const order = allOrders.find(o => String(o.id) === String(orderId));
+          if (!order) return;
+          openTicketModal(order);
+        });
+      });
+
+      // Evento Cambiar Estado
+      document.querySelectorAll('[data-action="update-status"]').forEach(select => {
+        select.addEventListener('change', async () => {
+          const orderId = select.dataset.orderId;
+          const newStatus = select.value;
+          const nowIso = new Date().toISOString();
+
+          select.disabled = true;
+
+          const { error } = await _supabase
+            .from('cart_orders')
+            .update({ status: newStatus, status_updated_at: nowIso })
+            .eq('id', orderId);
+
+          if (!error) {
+            const order = allOrders.find(o => String(o.id) === String(orderId));
+            if (order) {
+              order.status = newStatus;
+              order.status_updated_at = nowIso;
+            }
+            renderOrders();
+          } else {
+            alert('Error al actualizar el estado: ' + error.message);
+            select.disabled = false;
+          }
+        });
+      });
+
+      // Evento Notificar por WhatsApp
+      document.querySelectorAll('[data-action="notify-wa"]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const orderId = btn.dataset.orderId;
+          const order = allOrders.find(o => String(o.id) === String(orderId));
+          if (!order) return;
+
+          const cleanPhone = window.cleanPhone || (raw => String(raw || '').replace(/\D/g, ''));
+          const phone = cleanPhone(order.customer_phone);
+
+          if (!phone) {
+            alert('El pedido no cuenta con un número de WhatsApp válido.');
+            return;
+          }
+
+          const statusKey = getNormalizedStatus(order.status);
+          const statusLabel = STATUS_MAP[statusKey]?.label || 'Actualizado';
+
+          const origin = window.location.origin.includes('http') ? window.location.origin : 'https://pasajedelosaltos.com';
+          const trackingUrl = `${origin}/rastreo.html?id=${order.id}`;
+
+          let statusDetailMsg = '';
+          if (statusKey === 'cancelled') {
+            statusDetailMsg = 'Entendemos tu solicitud y hemos marcado tu pedido como *CANCELADO*.';
+          } else if (statusKey === 'rejected') {
+            statusDetailMsg = 'Lamentamos informarte que por inconvenientes de inventario/disponibilidad tu pedido ha sido *RECHAZADO*.';
+          } else {
+            statusDetailMsg = 'Tu pedido continúa su proceso con éxito.';
+          }
+
+          const msg = `Hola *${order.customer_name || 'Cliente'}*, te saludamos de *${currentStore.name}* 🏪.\n\n` +
+                      `Tu pedido ha cambiado de estado:\n` +
+                      `📌 *NUEVO ESTADO:* ${statusLabel}\n` +
+                      `${statusDetailMsg}\n\n` +
+                      `📍 *Sigue el progreso en vivo de tu pedido aquí:*\n${trackingUrl}\n\n` +
+                      `¡Gracias por comunicarte con nosotros!`;
+
+          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+        });
+      });
+    }
+  </script>
+</body>
+</html>

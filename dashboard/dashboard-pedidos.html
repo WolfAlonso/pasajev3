@@ -1,0 +1,1651 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <title>Gestión de Pedidos & Delivery · Pasaje de los Altos</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script>
+    if (typeof supabase === 'undefined') {
+      document.write('<script src="https://unpkg.com/@supabase/supabase-js@2"><\/script>');
+    }
+  </script>
+
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+
+  <script src="../js/supabase.js?v=7"></script>
+  <script src="../js/theme-loader.js?v=7"></script>
+  <script src="../js/dashboard-utils.js?v=7"></script>
+  <script src="../js/dashboard-sidebar.js?v=8"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', system-ui, -apple-system, sans-serif; background-color: #f8fafc; }
+
+    @media print {
+      body { background-color: #ffffff !important; padding: 0 !important; margin: 0 !important; }
+      body > * { display: none !important; }
+      body > #ticketModal {
+        display: flex !important; position: absolute !important; left: 0 !important; top: 0 !important;
+        width: 100% !important; height: auto !important; background: #ffffff !important; padding: 0 !important;
+        margin: 0 !important; box-shadow: none !important; border: none !important; z-index: 99999 !important;
+      }
+      .no-print { display: none !important; }
+      #ticketModalCard { box-shadow: none !important; border: none !important; padding: 0 !important; margin: 0 auto !important; max-width: 100% !important; width: auto !important; }
+      #ticketAreaToCapture { width: 78mm !important; max-width: 100% !important; margin: 0 auto !important; padding: 4px !important; border: none !important; box-shadow: none !important; color: #000000 !important; background: #ffffff !important; font-size: 11px !important; }
+      @page { size: auto; margin: 1mm; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+  <div id="dashboardHeader"></div>
+
+  <main class="max-w-6xl mx-auto p-4 pb-16 space-y-6">
+    <div id="dashboardTabs"></div>
+
+    <div id="loadingState" class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-8 text-center text-sm text-slate-500 shadow-sm">
+      Cargando panel de comercio...
+    </div>
+
+    <section id="content" class="hidden space-y-6">
+
+      <div class="bg-white rounded-2xl p-1.5 border border-slate-200/80 shadow-sm grid grid-cols-1 sm:grid-cols-3 gap-2">
+        <button type="button" id="btnModuleOrders" class="py-3 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 bg-slate-900 text-white shadow-sm">
+          <span>📦 Módulo 1: Pedidos & Tickets</span>
+          <span id="ordersBadge" class="bg-emerald-500 text-white px-2 py-0.5 rounded-full text-[10px]">0</span>
+        </button>
+
+        <button type="button" id="btnModuleDelivery" class="py-3 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200">
+          <span>🛵 Módulo 2: Despacho Activo</span>
+          <span id="activeDeliveryBadge" class="hidden bg-blue-600 text-white px-2 py-0.5 rounded-full text-[10px] animate-pulse">0</span>
+        </button>
+
+        <button type="button" id="btnModuleHistory" class="py-3 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200">
+          <span>📜 Módulo 3: Historial</span>
+          <span id="historyDeliveryBadge" class="bg-slate-200 text-slate-700 px-2 py-0.5 rounded-full text-[10px]">0</span>
+        </button>
+      </div>
+
+      <div id="moduleOrders" class="space-y-6">
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+          <div class="flex items-center gap-2">
+            <h2 class="text-base font-black text-slate-900">📋 Pedidos Recibidos</h2>
+          </div>
+
+          <button type="button" id="btnOpenManualDelivery"
+            class="text-xs font-bold bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-3 py-1.5 rounded-xl transition border border-indigo-200 flex items-center gap-1.5">
+            🎯 Nuevo Delivery Externo
+          </button>
+
+          <div class="flex gap-1.5 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+            <button type="button" data-status-filter="all" class="status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-slate-900 text-white border-slate-900 shadow-sm">Todos</button>
+            <button type="button" data-status-filter="sent" class="status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-white text-slate-700 border-slate-200 hover:border-amber-400">🟡 Recibidos</button>
+            <button type="button" data-status-filter="in_progress" class="status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-white text-slate-700 border-slate-200 hover:border-blue-400">⚙️ En Proceso</button>
+            <button type="button" data-status-filter="completed" class="status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-white text-slate-700 border-slate-200 hover:border-emerald-400">🟢 Entregados</button>
+            <button type="button" data-status-filter="cancelled_group" class="status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-white text-slate-700 border-slate-200 hover:border-rose-400">🔴 Cancelados</button>
+          </div>
+        </div>
+
+        <div id="ordersList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+
+      <div id="moduleDeliveryHub" class="hidden space-y-4">
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-black text-slate-900">⚡ Monitor de Entregas Activas</h2>
+            <p class="text-xs text-slate-500">Administra convocatorias, PINs de seguridad, contraofertas de pilotos y chat en tiempo real.</p>
+          </div>
+          <button type="button" onclick="loadStoreOrders()" class="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl transition">
+            🔄 Actualizar
+          </button>
+        </div>
+
+        <div id="deliveryHubList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+
+      <div id="moduleHistoryHub" class="hidden space-y-4">
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-4 shadow-sm flex items-center justify-between">
+          <div>
+            <h2 class="text-base font-black text-slate-900">📜 Historial Finalizado de Delivery</h2>
+            <p class="text-xs text-slate-500">Registro histórico de carreras completadas, rechazadas, canceladas y sus resoluciones de auditoría.</p>
+          </div>
+        </div>
+
+        <div id="deliveryHistoryList" class="grid grid-cols-1 md:grid-cols-2 gap-4"></div>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- MODAL DE SOLICITUD DE DELIVERY -->
+  <div id="deliveryFormModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-xl w-full p-6 space-y-4 my-8 border border-slate-100">
+
+      <div class="flex items-start justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-emerald-100 text-emerald-800 flex items-center justify-center text-xl font-bold">🛵</div>
+          <div>
+            <h3 class="text-base font-black text-slate-900">Coordinación de Delivery</h3>
+            <p class="text-xs text-slate-500 font-medium">Selecciona cómo deseas despachar este pedido</p>
+          </div>
+        </div>
+        <button id="closeDeliveryModalBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 w-8 h-8 rounded-full font-bold transition flex items-center justify-center text-xs">✕</button>
+      </div>
+
+      <div class="grid grid-cols-3 gap-1 bg-slate-100 p-1 rounded-2xl text-xs font-bold text-slate-600">
+        <button type="button" data-delivery-tab="broadcast" class="delivery-tab-btn py-2 rounded-xl bg-white text-slate-900 shadow-sm transition">📢 General</button>
+        <button type="button" data-delivery-tab="direct" class="delivery-tab-btn py-2 rounded-xl transition">🎯 Elegir Piloto</button>
+        <button type="button" data-delivery-tab="external" class="delivery-tab-btn py-2 rounded-xl transition">📱 Mensajero Privado</button>
+      </div>
+
+      <div id="deliveryFormCommon" class="space-y-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200/60">
+        <input type="hidden" id="modalOrderId" />
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Cliente</label>
+            <input type="text" id="modalCustomerName" readonly class="w-full border border-slate-200 p-2 rounded-xl font-semibold bg-white text-slate-800" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Teléfono</label>
+            <input type="text" id="modalCustomerPhone" readonly class="w-full border border-slate-200 p-2 rounded-xl font-semibold bg-white text-slate-800" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Origen (Tienda)</label>
+          <input type="text" id="modalOriginAddress" required class="w-full border border-slate-200 p-2 rounded-xl font-semibold bg-white text-slate-800" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Destino (Cliente)</label>
+          <input type="text" id="modalDestinationAddress" required class="w-full border border-slate-200 p-2 rounded-xl font-semibold bg-white text-slate-800" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Enlace Google Maps (GPS)</label>
+          <input type="url" id="modalMapsUrl" placeholder="https://maps.google.com/..." class="w-full border border-slate-200 p-2 rounded-xl font-semibold bg-white text-slate-800" />
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Sugerencia de Tarifa (Q)</label>
+            <input type="number" step="0.50" min="0" id="modalSuggestedFee" value="15.00" required class="w-full border border-slate-200 p-2 rounded-xl font-black bg-white text-emerald-600 text-sm" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Instrucciones</label>
+            <input type="text" id="modalNotes" placeholder="Ej. Cobrar Q100" class="w-full border border-slate-200 p-2 rounded-xl font-semibold bg-white text-slate-800" />
+          </div>
+        </div>
+      </div>
+
+      <div id="tabContent-broadcast" class="delivery-tab-pane space-y-3">
+        <button type="button" id="btnSubmitBroadcast" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 px-4 rounded-xl transition shadow-sm text-xs">
+          🚀 Publicar y Pasar al Módulo 2
+        </button>
+      </div>
+
+      <div id="tabContent-direct" class="delivery-tab-pane hidden space-y-3">
+        <div id="activeDriversList" class="space-y-2 max-h-48 overflow-y-auto pr-1">
+          <p class="text-center text-xs text-slate-400 py-4">Buscando pilotos activos...</p>
+        </div>
+      </div>
+
+      <div id="tabContent-external" class="delivery-tab-pane hidden space-y-3">
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Teléfono del Mensajero Externo</label>
+          <input type="tel" id="externalDriverPhone" placeholder="502XXXXXXXX" class="w-full border border-slate-200 p-2.5 rounded-xl font-semibold text-xs bg-white text-slate-800" />
+        </div>
+        <button type="button" id="btnSendExternalWa" class="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-extrabold py-3 px-4 rounded-xl transition shadow-sm text-xs flex items-center justify-center gap-1.5">
+          <span>💬 Enviar Datos por WhatsApp</span>
+        </button>
+      </div>
+
+    </div>
+  </div>
+
+  <!-- MODAL DELIVERY MANUAL -->
+  <div id="manualDeliveryModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-xl w-full p-6 space-y-4 my-8 border border-slate-100">
+      <div class="flex items-start justify-between border-b border-slate-100 pb-3">
+        <div class="flex items-center gap-2.5">
+          <div class="w-10 h-10 rounded-2xl bg-indigo-100 text-indigo-800 flex items-center justify-center text-xl font-bold">🎯</div>
+          <div>
+            <h3 class="text-base font-black text-slate-900">Nuevo Delivery Externo</h3>
+            <p class="text-xs text-slate-500 font-medium">Lanza un reparto sin necesidad de un pedido del catálogo</p>
+          </div>
+        </div>
+        <button id="closeManualDeliveryBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 w-8 h-8 rounded-full font-bold transition flex items-center justify-center text-xs">✕</button>
+      </div>
+
+      <div class="space-y-3 text-xs bg-slate-50 p-4 rounded-2xl border border-slate-200/60">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Nombre del cliente *</label>
+            <input type="text" id="manualCustomerName" required placeholder="Ej. Juan Pérez"
+              class="w-full border border-slate-200 p-2 rounded-xl font-semibold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Teléfono *</label>
+            <input type="tel" id="manualCustomerPhone" required placeholder="502XXXXXXXX"
+              class="w-full border border-slate-200 p-2 rounded-xl font-semibold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Origen (Tienda) *</label>
+          <input type="text" id="manualOriginAddress" required
+            class="w-full border border-slate-200 p-2 rounded-xl font-semibold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Destino (Cliente) *</label>
+          <input type="text" id="manualDestinationAddress" required placeholder="Dirección completa"
+            class="w-full border border-slate-200 p-2 rounded-xl font-semibold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" />
+        </div>
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Tarifa sugerida (Q) *</label>
+            <input type="number" step="0.50" min="0" id="manualSuggestedFee" value="15.00" required
+              class="w-full border border-slate-200 p-2 rounded-xl font-black bg-white text-emerald-600 text-sm outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Notas para el piloto</label>
+            <input type="text" id="manualNotes" placeholder="Ej. Cobrar Q50 al recibir"
+              class="w-full border border-slate-200 p-2 rounded-xl font-semibold bg-white text-slate-800 outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+        </div>
+      </div>
+
+      <button type="button" id="btnSubmitManualDelivery"
+        class="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-3 px-4 rounded-xl transition shadow-sm text-xs">
+        🚀 Publicar Solicitud Externa
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL CANCELACIÓN -->
+  <div id="cancelTripModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-slate-100 text-center">
+      <div class="w-12 h-12 bg-rose-100 text-rose-800 rounded-2xl flex items-center justify-center text-2xl mx-auto font-bold shadow-sm">🚫</div>
+      <div>
+        <h3 class="font-black text-slate-900 text-sm">Cancelar Pedido o Delivery</h3>
+        <p class="text-[11px] text-slate-500 mt-1">Indica el motivo obligatorio de la cancelación. La solicitud pasará a revisión de auditoría.</p>
+      </div>
+
+      <input type="hidden" id="cancelOrderId" />
+      <input type="hidden" id="cancelRequestId" />
+
+      <div class="text-left space-y-3">
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Motivo Principal *</label>
+          <select id="cancelReasonSelect" class="w-full border border-slate-300 p-2.5 rounded-xl text-xs font-bold bg-slate-50 outline-none focus:ring-2 focus:ring-rose-500">
+            <option value="Sin stock / Producto no disponible">📦 Sin stock / Producto no disponible</option>
+            <option value="Inconveniente de preparación">🍳 Inconveniente de preparación</option>
+            <option value="Cliente solicitó cancelación">👤 Cliente solicitó cancelación</option>
+            <option value="Sin repartidores disponibles">🛵 Sin repartidores disponibles</option>
+            <option value="Otro motivo">💬 Otro motivo</option>
+          </select>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Explicación / Detalles *</label>
+          <textarea id="cancelNotesInput" rows="2" placeholder="Explica detalladamente la razón de la cancelación..." class="w-full border border-slate-300 p-2.5 rounded-xl text-xs outline-none focus:ring-2 focus:ring-rose-500 bg-slate-50 font-medium"></textarea>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 gap-2 pt-1">
+        <button type="button" onclick="document.getElementById('cancelTripModal').classList.add('hidden')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs">Volver</button>
+        <button type="button" id="btnConfirmCancelTrip" class="bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow">Confirmar Cancelación</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- MODAL CHAT INTERNO -->
+  <div id="sellerChatModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-md w-full p-5 space-y-3 border border-slate-100 flex flex-col h-[520px]">
+
+      <div class="flex items-center justify-between border-b border-slate-100 pb-3 flex-shrink-0">
+        <div class="flex items-center gap-2">
+          <span class="text-xl">💬</span>
+          <div>
+            <h3 class="font-black text-slate-900 text-sm">Chat con Piloto Asignado</h3>
+            <p id="chatDriverName" class="text-[11px] font-bold text-emerald-600">Piloto en camino</p>
+          </div>
+        </div>
+        <button id="closeSellerChatBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 w-7 h-7 rounded-full font-bold text-xs">✕</button>
+      </div>
+
+      <div id="sellerChatMessages" class="flex-1 overflow-y-auto space-y-2 p-2 bg-slate-50 rounded-2xl border border-slate-100 text-xs">
+        <p class="text-center text-slate-400 py-4 font-medium">Inicia la conversación con el piloto...</p>
+      </div>
+
+      <form id="sellerChatForm" class="flex gap-2 pt-2 border-t border-slate-100 flex-shrink-0">
+        <input type="hidden" id="chatRequestId" />
+        <input type="text" id="sellerChatMessageInput" required placeholder="Escribe un mensaje al piloto..." class="flex-1 border border-slate-200 px-3 py-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500" />
+        <button type="submit" class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl text-xs transition">Enviar</button>
+      </form>
+
+    </div>
+  </div>
+
+  <!-- MODAL QUICK VIEW PILOTO -->
+  <div id="driverQuickViewModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-slate-100 relative">
+      <button id="closeDriverQuickViewBtn" type="button" class="absolute top-4 right-4 bg-slate-100 hover:bg-slate-200 text-slate-700 w-8 h-8 rounded-full font-bold flex items-center justify-center text-xs">✕</button>
+      <div class="text-center space-y-2">
+        <div id="quickDriverAvatar" class="w-16 h-16 rounded-full bg-emerald-100 text-emerald-800 flex items-center justify-center text-2xl font-black mx-auto border-2 border-emerald-400 shadow-sm">🛵</div>
+        <h3 id="quickDriverName" class="font-black text-slate-900 text-base">Nombre Piloto</h3>
+        <span id="quickDriverRatingStars" class="inline-block bg-amber-50 text-amber-800 text-xs font-black px-3 py-1 rounded-full border border-amber-200">⭐ 5.0 (0 entregas)</span>
+      </div>
+      <div class="bg-slate-50 p-3 rounded-2xl border border-slate-200/80 space-y-2 text-xs">
+        <div class="flex justify-between border-b pb-1">
+          <span class="text-slate-500 font-medium">📞 Teléfono:</span>
+          <span id="quickDriverPhone" class="font-bold text-slate-800">—</span>
+        </div>
+        <div class="flex justify-between border-b pb-1">
+          <span class="text-slate-500 font-medium">🛵 Vehículo:</span>
+          <span id="quickDriverVehicle" class="font-bold text-slate-800">—</span>
+        </div>
+        <div class="flex justify-between">
+          <span class="text-slate-500 font-medium">🔢 Placa:</span>
+          <span id="quickDriverPlate" class="font-bold text-slate-800">—</span>
+        </div>
+      </div>
+      <button type="button" onclick="document.getElementById('driverQuickViewModal').classList.add('hidden')" class="w-full bg-slate-900 text-white font-bold py-2.5 rounded-xl text-xs shadow-sm">Cerrar</button>
+    </div>
+  </div>
+
+  <!-- MODAL CALIFICAR PILOTO -->
+  <div id="rateDriverModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-slate-100 relative">
+      <button id="closeRateDriverBtn" type="button" class="absolute top-4 right-4 bg-slate-100 hover:bg-slate-200 text-slate-700 w-7 h-7 rounded-full font-bold text-xs">✕</button>
+      <div class="flex items-center gap-2 border-b pb-3">
+        <span class="text-xl">⭐</span>
+        <h3 class="font-black text-slate-900 text-sm">Calificar Servicio del Piloto</h3>
+      </div>
+      <input type="hidden" id="rateDriverReqId" />
+      <p id="rateDriverName" class="text-xs font-bold text-slate-700 text-center">Piloto: —</p>
+
+      <div class="flex justify-center gap-2 text-3xl cursor-pointer py-1" id="driverStarRatingContainer">
+        <span data-star="1" class="driver-star transition-transform hover:scale-125">⭐</span>
+        <span data-star="2" class="driver-star transition-transform hover:scale-125">⭐</span>
+        <span data-star="3" class="driver-star transition-transform hover:scale-125">⭐</span>
+        <span data-star="4" class="driver-star transition-transform hover:scale-125">⭐</span>
+        <span data-star="5" class="driver-star transition-transform hover:scale-125">⭐</span>
+      </div>
+      <input type="hidden" id="selectedDriverScore" value="5" />
+
+      <div>
+        <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Comentario u Observaciones (Opcional)</label>
+        <textarea id="rateDriverComment" rows="2" placeholder="Ej. Excelente puntualidad y trato amable..." class="w-full border border-slate-200 p-2.5 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+      </div>
+
+      <button type="button" id="btnSubmitDriverRating" class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-3 rounded-xl text-xs transition shadow">
+        💾 Guardar Calificación
+      </button>
+    </div>
+  </div>
+
+  <!-- MODAL TICKET IMPRIMIBLE -->
+  <div id="ticketModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
+    <div id="ticketModalCard" class="bg-white rounded-2xl shadow-2xl max-w-sm w-full p-4 space-y-4 my-8">
+
+      <div class="no-print flex items-center justify-between border-b pb-3">
+        <h3 class="text-base font-extrabold text-slate-900 flex items-center gap-1.5">
+          <span>🧾 Ticket de Pedido</span>
+        </h3>
+        <button id="closeTicketModalBtn" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 w-8 h-8 rounded-full font-bold transition flex items-center justify-center">✕</button>
+      </div>
+
+      <div id="ticketAreaToCapture" class="bg-white p-4 text-slate-900 font-mono text-xs border border-dashed border-slate-300 rounded-xl space-y-3">
+        <div class="text-center space-y-1">
+          <h2 id="ticketStoreName" class="font-black text-sm uppercase tracking-tight text-slate-900">NOMBRE TIENDA</h2>
+          <p id="ticketStoreWa" class="text-[11px] text-slate-600">📲 WA: 50212345678</p>
+          <p class="text-[10px] text-slate-400 font-sans">Pasaje de los Altos · pasaje.gt</p>
+          <div class="border-b border-dashed border-slate-300 my-2"></div>
+          <p class="font-bold text-[11px] uppercase">COMPROBANTE DE PEDIDO</p>
+          <p id="ticketOrderId" class="text-[10px] text-slate-500">ID: #00000000</p>
+          <p id="ticketDate" class="text-[10px] text-slate-500">—</p>
+        </div>
+
+        <div class="border-b border-dashed border-slate-300 my-2"></div>
+
+        <div class="space-y-1 text-[11px]">
+          <p><strong>CLIENTE:</strong> <span id="ticketCustomerName">Juan Pérez</span></p>
+          <p><strong>TELÉFONO:</strong> <span id="ticketCustomerPhone">55123456</span></p>
+          <p><strong>MÉTODO:</strong> <span id="ticketDeliveryType">🛵 Envío a Domicilio</span></p>
+          <p id="ticketAddressRow"><strong>DIRECCIÓN:</strong> <span id="ticketAddress">14 Av 4-12 Zona 1</span></p>
+          <p id="ticketNotesRow" class="hidden"><strong>NOTAS:</strong> <span id="ticketNotes"></span></p>
+        </div>
+
+        <div class="border-b border-dashed border-slate-300 my-2"></div>
+
+        <div>
+          <table class="w-full text-left text-[11px] border-collapse">
+            <thead>
+              <tr class="border-b border-slate-300 text-slate-700">
+                <th class="py-1 pr-1 font-bold">Cant</th>
+                <th class="py-1 pr-1 font-bold">Producto</th>
+                <th class="py-1 text-right font-bold">Subtotal</th>
+              </tr>
+            </thead>
+            <tbody id="ticketItemsTbody" class="divide-y divide-dashed divide-slate-200"></tbody>
+          </table>
+        </div>
+
+        <div class="border-b border-dashed border-slate-300 my-2"></div>
+
+        <div class="flex justify-between items-center text-xs font-black pt-1">
+          <span>TOTAL COMPRA:</span>
+          <span id="ticketTotal" class="text-sm">Q 0.00</span>
+        </div>
+      </div>
+
+      <div class="no-print space-y-2 pt-2 border-t border-slate-100">
+        <div class="grid grid-cols-2 gap-2">
+          <button id="printTicketBtn" type="button" class="bg-slate-900 hover:bg-black text-white font-extrabold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
+            <span>🖨️ Imprimir Ticket</span>
+          </button>
+          <button id="downloadTicketImgBtn" type="button" class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2.5 rounded-xl text-xs transition flex items-center justify-center gap-1.5 shadow-sm">
+            <span>📸 Guardar Imagen</span>
+          </button>
+        </div>
+      </div>
+
+    </div>
+  </div>
+
+  <script>
+    let currentUser = null;
+    let currentStore = null;
+    let allOrders = [];
+    let deliveryRequestsList = [];
+    let deliveryRequestsMap = {};
+    let activeFilter = 'all';
+    let currentTicketOrder = null;
+    let sellerRealtimeChannel = null;
+
+    // ============================================================
+    // CAMBIO FASE 22: 'new' es el nuevo estado inicial por defecto
+    // ============================================================
+    const STATUS_MAP = {
+      new:        { label: '🆕 Nuevo (Buzón Interno)',  bg: 'bg-emerald-100 text-emerald-900 border-emerald-300' },
+      sent:       { label: '🟡 Recibido / Pendiente',   bg: 'bg-amber-100 text-amber-900 border-amber-200' },
+      confirmed:  { label: '🔵 Confirmado',             bg: 'bg-blue-100 text-blue-900 border-blue-200' },
+      preparing:  { label: '🟠 En Preparación',         bg: 'bg-orange-100 text-orange-900 border-orange-200' },
+      on_the_way: { label: '🛵 En Camino / Listo',      bg: 'bg-purple-100 text-purple-900 border-purple-200' },
+      completed:  { label: '🟢 Entregado con Éxito',    bg: 'bg-emerald-100 text-emerald-900 border-emerald-200' },
+      cancelled:  { label: '🔴 Cancelado por Cliente',  bg: 'bg-rose-100 text-rose-900 border-rose-200' },
+      rejected:   { label: '❌ Rechazado / Sin Stock',  bg: 'bg-slate-200 text-slate-800 border-slate-300' }
+    };
+
+    // ============================================================
+    // CAMBIO FASE 22: soportar variantes viejas (string) y nuevas ({color,size})
+    // ============================================================
+    function formatItemVariant(item) {
+      if (!item) return '';
+      // Nuevo formato: { color, size }
+      if (item.variant && typeof item.variant === 'object') {
+        const parts = [];
+        if (item.variant.color) parts.push(String(item.variant.color));
+        if (item.variant.size)  parts.push(String(item.variant.size));
+        return parts.length ? ` (${parts.join(' · ')})` : '';
+      }
+      // Legacy: string plano
+      if (typeof item.selectedVariant === 'string' && item.selectedVariant.length > 0) {
+        return ` (${item.selectedVariant})`;
+      }
+      return '';
+    }
+
+    (async () => {
+      try {
+        const guardRes = await guardDashboardPage();
+        if (!guardRes || !guardRes.session || !guardRes.store) return;
+
+        currentUser = guardRes.session.user;
+        currentStore = guardRes.store;
+
+        await initDashboardNav({ store: currentStore, user: currentUser });
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+
+        setupModuleNavigation();
+        setupFilterButtons();
+        setupTicketModalEvents();
+        setupDeliveryModalEvents();
+        setupSellerChatEvents();
+        setupDriverRatingEvents();
+        setupCancelEvents();
+        bindManualDelivery();
+
+        if (document.getElementById('closeDriverQuickViewBtn')) {
+          document.getElementById('closeDriverQuickViewBtn').onclick = () => document.getElementById('driverQuickViewModal').classList.add('hidden');
+        }
+
+        await loadStoreOrders();
+        subscribeRealtime();
+      } catch (err) {
+        console.error(err);
+      }
+    })();
+
+    function adminEscapeHtmlSafe(str) {
+      return String(str ?? '')
+        .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+    }
+
+    function isStoreDeliverySuspended() {
+      if (!currentStore || !currentStore.suspended_until) return false;
+      const until = new Date(currentStore.suspended_until).getTime();
+      return Number.isFinite(until) && until > Date.now();
+    }
+
+    function formatSuspensionDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      const date = d.toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' });
+      const time = d.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: true });
+      return `${date}, ${time}`;
+    }
+
+    function setupModuleNavigation() {
+      const btnOrders = document.getElementById('btnModuleOrders');
+      const btnDelivery = document.getElementById('btnModuleDelivery');
+      const btnHistory = document.getElementById('btnModuleHistory');
+
+      const modOrders = document.getElementById('moduleOrders');
+      const modDelivery = document.getElementById('moduleDeliveryHub');
+      const modHistory = document.getElementById('moduleHistoryHub');
+
+      btnOrders.onclick = () => {
+        btnOrders.className = 'py-3 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 bg-slate-900 text-white shadow-sm';
+        btnDelivery.className = 'py-3 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200';
+        btnHistory.className = 'py-3 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200';
+        modOrders.classList.remove('hidden');
+        modDelivery.classList.add('hidden');
+        modHistory.classList.add('hidden');
+      };
+
+      btnDelivery.onclick = () => {
+        btnDelivery.className = 'py-3 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 bg-slate-900 text-white shadow-sm';
+        btnOrders.className = 'py-3 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200';
+        btnHistory.className = 'py-3 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200';
+        modDelivery.classList.remove('hidden');
+        modOrders.classList.add('hidden');
+        modHistory.classList.add('hidden');
+      };
+
+      btnHistory.onclick = () => {
+        btnHistory.className = 'py-3 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 bg-slate-900 text-white shadow-sm';
+        btnOrders.className = 'py-3 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200';
+        btnDelivery.className = 'py-3 px-3 rounded-xl text-xs font-black transition flex items-center justify-center gap-2 bg-slate-100 text-slate-600 hover:bg-slate-200';
+        modHistory.classList.remove('hidden');
+        modOrders.classList.add('hidden');
+        modDelivery.classList.add('hidden');
+      };
+    }
+
+    function subscribeRealtime() {
+      if (!currentStore?.id) return;
+
+      PasajeRealtime.subscribeToTable(
+        `sync_pedidos_delreq_${currentStore.id}`,
+        'delivery_requests',
+        `store_id=eq.${currentStore.id}`,
+        () => loadStoreOrders()
+      );
+
+      PasajeRealtime.subscribeToTable(
+        `sync_pedidos_cart_${currentStore.id}`,
+        'cart_orders',
+        `store_id=eq.${currentStore.id}`,
+        (payload) => {
+          if (payload.eventType === 'INSERT' && window.PasajeAudio) {
+            window.PasajeAudio.playAlert('order');
+          }
+          loadStoreOrders();
+        }
+      );
+
+      PasajeRealtime.subscribeToTable(
+        `sync_pedidos_store_${currentStore.id}`,
+        'stores',
+        `id=eq.${currentStore.id}`,
+        async () => {
+          const client = window._supabase || initSupabaseClient();
+          const { data } = await client
+            .from('stores').select('*').eq('id', currentStore.id).maybeSingle();
+          if (data) {
+            currentStore = data;
+            renderModule1Orders();
+          }
+        }
+      );
+    }
+
+    async function loadStoreOrders() {
+      const client = window._supabase || initSupabaseClient();
+      if (!client) return;
+
+      const [ordersRes, requestsRes] = await Promise.all([
+        client.from('cart_orders').select('*').eq('store_id', currentStore.id).order('created_at', { ascending: false }),
+        client.from('delivery_requests').select('*').eq('store_id', currentStore.id).order('created_at', { ascending: false })
+      ]);
+
+      allOrders = ordersRes.data || [];
+      const rawRequests = requestsRes.data || [];
+
+      const driverIds = [...new Set(rawRequests.map(r => r.driver_id).filter(Boolean))];
+      let driversMap = {};
+      if (driverIds.length > 0) {
+        const { data: driversData } = await client.from('delivery_drivers').select('id, full_name').in('id', driverIds);
+        (driversData || []).forEach(d => { driversMap[d.id] = d.full_name; });
+      }
+
+      deliveryRequestsList = rawRequests.map(r => ({
+        ...r,
+        driver: { full_name: driversMap[r.driver_id] || 'Piloto Asignado' }
+      }));
+
+      deliveryRequestsMap = {};
+      deliveryRequestsList.forEach(r => {
+        if (!r.order_id) return;
+        const existing = deliveryRequestsMap[r.order_id];
+        if (!existing || new Date(r.created_at).getTime() > new Date(existing.created_at).getTime()) {
+          deliveryRequestsMap[r.order_id] = r;
+        }
+      });
+
+      renderModule1Orders();
+      renderModule2DeliveryHub();
+      renderModule3History();
+
+      if (window.__pasajeRefreshDashBadges) {
+        try { window.__pasajeRefreshDashBadges(); } catch (e) {}
+      }
+    }
+
+    function renderModule1Orders() {
+      const container = document.getElementById('ordersList');
+      const badge = document.getElementById('ordersBadge');
+      const storeSuspended = isStoreDeliverySuspended();
+
+      let filtered = allOrders;
+      if (activeFilter !== 'all') {
+        filtered = allOrders.filter(o => {
+          const st = getNormalizedStatus(o.status);
+          if (activeFilter === 'in_progress') return ['confirmed', 'preparing', 'on_the_way'].includes(st);
+          if (activeFilter === 'cancelled_group') return ['cancelled', 'rejected'].includes(st);
+          return st === activeFilter;
+        });
+      }
+
+      badge.textContent = filtered.length;
+
+      if (filtered.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full bg-white rounded-2xl p-12 text-center border border-slate-200/80 shadow-sm">
+            <p class="text-3xl mb-2">📦</p>
+            <p class="text-xs font-bold text-slate-500">No se encontraron pedidos en esta categoría.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = filtered.map(o => {
+        const statusKey = getNormalizedStatus(o.status);
+        const statusInfo = STATUS_MAP[statusKey] || STATUS_MAP.new;
+        const items = Array.isArray(o.items) ? o.items : [];
+        const isDelivery = o.delivery_type === 'delivery';
+        const delReq = deliveryRequestsMap[o.id];
+
+        let deliveryButtonWidget = '';
+        if (isDelivery) {
+          const isActiveDelivery = delReq && !['cancelled', 'cancelled_pending_review', 'rejected', 'revoked'].includes(delReq.status);
+
+          if (!isActiveDelivery) {
+            if (storeSuspended) {
+              deliveryButtonWidget = `
+                <div class="w-full bg-amber-50 border border-amber-300 rounded-xl p-3 flex items-start gap-2">
+                  <span class="text-base">⚠️</span>
+                  <div class="flex-1 min-w-0">
+                    <p class="text-[11px] font-black text-amber-900 uppercase tracking-wide">Servicio de Delivery Pausado</p>
+                    <p class="text-[10px] text-amber-800 mt-0.5 leading-snug">
+                      Tu tienda tiene el servicio de delivery suspendido por auditoría hasta el
+                      <strong>${formatSuspensionDate(currentStore.suspended_until)}</strong>.
+                      Puedes seguir recibiendo y gestionando pedidos locales con normalidad.
+                    </p>
+                  </div>
+                </div>`;
+            } else {
+              const prevCancelled = delReq && ['cancelled', 'cancelled_pending_review', 'rejected', 'revoked'].includes(delReq.status);
+              const cancelledNotice = prevCancelled ? `
+                <div class="bg-rose-50 border border-rose-200 rounded-xl p-2.5 text-[10px] text-rose-800 flex items-start gap-2">
+                  <span>ℹ️</span>
+                  <p class="leading-snug">La solicitud anterior fue ${delReq.status === 'cancelled_pending_review' ? 'cancelada y está en auditoría' : 'cancelada'}. Puedes lanzar una nueva.</p>
+                </div>` : '';
+
+              deliveryButtonWidget = `
+                ${cancelledNotice}
+                <button type="button" data-action="request-delivery" data-order-id="${o.id}"
+                  class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5">
+                  <span>🛵 ${prevCancelled ? 'Re-lanzar Solicitud de Delivery' : 'Solicitar Delivery Local'}</span>
+                </button>`;
+            }
+          } else {
+            deliveryButtonWidget = `
+              <div class="bg-blue-50 border border-blue-200 p-2.5 rounded-xl text-xs font-bold text-blue-900 flex justify-between items-center">
+                <span>🛵 Delivery (${String(delReq.status).toUpperCase()})</span>
+                <button type="button" onclick="switchToDeliveryHub('${delReq.id}')" class="bg-blue-600 text-white px-2.5 py-1 rounded-lg text-[11px] font-extrabold">Ver en Módulo 2 ➡️</button>
+              </div>`;
+          }
+        }
+
+        return `
+          <article class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-5 flex flex-col justify-between space-y-4">
+
+            <div class="flex items-start justify-between gap-2 border-b border-slate-100 pb-3">
+              <div>
+                <span class="text-[10px] font-mono text-slate-400 block truncate max-w-[200px]">ID: ${o.id}</span>
+                <h3 class="font-extrabold text-sm text-slate-900">${dashEscapeHtml(o.customer_name || 'Cliente')}</h3>
+                <p class="text-xs text-slate-500">📞 ${dashEscapeHtml(o.customer_phone || 'Sin teléfono')}</p>
+              </div>
+              <span class="text-[11px] font-black px-2.5 py-1 rounded-full border ${statusInfo.bg}">
+                ${statusInfo.label}
+              </span>
+            </div>
+
+            <div class="space-y-2 text-xs">
+              <div class="bg-slate-50 p-2.5 rounded-xl space-y-1 border border-slate-100">
+                <p class="font-bold text-slate-700">🚚 Método: ${isDelivery ? '🛵 Envío a Domicilio' : '🏪 Recoger en tienda'}</p>
+                ${o.customer_address ? `<p class="text-slate-600">📍 ${dashEscapeHtml(o.customer_address)}</p>` : ''}
+                ${o.notes ? `<p class="text-slate-500 italic">📝 "${dashEscapeHtml(o.notes)}"</p>` : ''}
+              </div>
+
+              <div class="divide-y divide-slate-100 border-t border-b py-2">
+                ${items.map(it => `
+                  <div class="flex justify-between items-center py-1">
+                    <span class="font-semibold text-slate-700">${it.quantity}x ${dashEscapeHtml(it.title || it.name || 'Producto')}${dashEscapeHtml(formatItemVariant(it))}</span>
+                    <span class="font-bold text-slate-900">Q ${(parseFloat(it.price || 0) * parseInt(it.quantity || it.qty || 1)).toFixed(2)}</span>
+                  </div>
+                `).join('')}
+              </div>
+
+              <div class="flex justify-between items-center pt-1">
+                <span class="font-black text-slate-500 text-xs">TOTAL:</span>
+                <span class="font-black text-emerald-600 text-base">Q ${parseFloat(o.total || 0).toFixed(2)}</span>
+              </div>
+            </div>
+
+            <div class="pt-3 border-t border-slate-100 space-y-2">
+              <label class="block text-[10px] font-black text-slate-500 uppercase">Cambiar Estado del Pedido:</label>
+              <select data-action="update-status" data-order-id="${o.id}"
+                class="w-full border border-slate-200 p-2 rounded-xl text-xs font-bold bg-slate-50 text-slate-800 outline-none cursor-pointer focus:ring-2 focus:ring-emerald-500">
+                <option value="new" ${statusKey === 'new' ? 'selected' : ''}>🆕 Nuevo (Buzón Interno)</option>
+                <option value="sent" ${statusKey === 'sent' ? 'selected' : ''}>🟡 Recibido / Pendiente</option>
+                <option value="confirmed" ${statusKey === 'confirmed' ? 'selected' : ''}>🔵 Confirmado</option>
+                <option value="preparing" ${statusKey === 'preparing' ? 'selected' : ''}>🟠 En Preparación</option>
+                <option value="on_the_way" ${statusKey === 'on_the_way' ? 'selected' : ''}>🛵 En Camino / Listo para entrega</option>
+                <option value="completed" ${statusKey === 'completed' ? 'selected' : ''}>🟢 Entregado con Éxito</option>
+                <option value="cancelled" ${statusKey === 'cancelled' ? 'selected' : ''}>🔴 Cancelado por Cliente</option>
+                <option value="rejected" ${statusKey === 'rejected' ? 'selected' : ''}>❌ Rechazado / Sin Stock</option>
+              </select>
+
+              ${deliveryButtonWidget}
+
+              <button type="button" onclick="openCancelModalForOrder('${o.id}', '${delReq ? delReq.id : ''}')"
+                class="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold py-2 rounded-xl text-xs transition border border-rose-200 shadow-xs flex items-center justify-center gap-1.5">
+                <span>🚫 Cancelar Pedido / Carrera</span>
+              </button>
+
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <button type="button" data-action="open-ticket" data-order-id="${o.id}"
+                  class="bg-slate-800 hover:bg-slate-900 text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5">
+                  <span>🧾 Ticket</span>
+                </button>
+
+                <button type="button" data-action="notify-wa" data-order-id="${o.id}"
+                  class="bg-[#25D366] hover:bg-[#128C7E] text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow-sm flex items-center justify-center gap-1.5 truncate">
+                  <span>💬 WhatsApp</span>
+                </button>
+              </div>
+            </div>
+
+          </article>`;
+      }).join('');
+
+      attachOrderEvents();
+    }
+
+    function renderModule2DeliveryHub() {
+      const container = document.getElementById('deliveryHubList');
+      const badgeAlert = document.getElementById('activeDeliveryBadge');
+
+      const activeRequests = deliveryRequestsList.filter(r =>
+        ['pending', 'counter_offered', 'accepted', 'in_transit', 'on_the_way'].includes(r.status)
+      );
+
+      if (activeRequests.length > 0) {
+        badgeAlert.textContent = activeRequests.length;
+        badgeAlert.classList.remove('hidden');
+      } else {
+        badgeAlert.classList.add('hidden');
+      }
+
+      if (activeRequests.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full bg-white rounded-2xl p-12 text-center border border-slate-200/80 shadow-sm">
+            <p class="text-3xl mb-2">🛵</p>
+            <p class="text-xs font-bold text-slate-500">No hay entregas activas en este momento.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = activeRequests.map(r => {
+        const driverName = r.driver?.full_name || 'Piloto Asignado';
+        const finalPrice = r.final_fee || r.suggested_fee || r.fee || 15.00;
+        const isManual = !r.order_id;
+
+        let statusBox = '';
+        if (r.status === 'counter_offered') {
+          const counterVal = parseFloat(r.counter_fee || 0).toFixed(2);
+          statusBox = `
+            <div class="bg-blue-50 border-2 border-blue-400 p-3 rounded-xl space-y-2">
+              <div class="flex justify-between items-center">
+                <div class="flex items-center gap-1.5">
+                  <span class="font-black text-blue-900">🔄 Contraoferta de ${dashEscapeHtml(driverName)}:</span>
+                  ${r.driver_id ? `<button type="button" onclick="openDriverQuickView('${r.driver_id}')" class="text-[10px] font-black bg-blue-200 text-blue-900 px-2 py-0.5 rounded-md hover:bg-blue-300 transition">🔍 Ver Piloto</button>` : ''}
+                </div>
+                <span class="font-black text-blue-700 text-sm bg-blue-100 px-2 py-0.5 rounded-lg">Q${counterVal}</span>
+              </div>
+              <div class="grid grid-cols-2 gap-2 pt-1">
+                <button type="button" onclick="acceptCounterOffer('${r.id}', ${r.counter_fee})" class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold py-2 rounded-lg text-xs shadow-sm">✅ Aceptar Q${counterVal}</button>
+                <button type="button" onclick="rejectCounterOffer('${r.id}')" class="bg-rose-600 hover:bg-rose-700 text-white font-extrabold py-2 rounded-lg text-xs shadow-sm">🚫 Rechazar</button>
+              </div>
+            </div>`;
+        } else if (r.status === 'pending') {
+          statusBox = `
+            <div class="bg-amber-50 border border-amber-200 p-3 rounded-xl text-xs font-bold text-amber-800 flex justify-between items-center">
+              <span>⌛ Convocatoria Publicada (Tarifa Sugerida: Q${parseFloat(finalPrice).toFixed(2)})</span>
+            </div>`;
+        } else {
+          statusBox = `
+            <div class="bg-emerald-50 border border-emerald-200 p-3 rounded-xl text-xs space-y-2">
+              <div class="flex items-center justify-between">
+                <div>
+                  <div class="flex items-center gap-1.5">
+                    <span class="font-black text-emerald-950 block">🛵 ${dashEscapeHtml(driverName)}</span>
+                    ${r.driver_id ? `<button type="button" onclick="openDriverQuickView('${r.driver_id}')" class="text-[10px] font-black bg-emerald-200 text-emerald-900 px-2 py-0.5 rounded-md hover:bg-emerald-300 transition">🔍 Ver Piloto</button>` : ''}
+                  </div>
+                  <span class="text-emerald-700 font-bold">Tarifa Acordada: Q${parseFloat(finalPrice).toFixed(2)}</span>
+                </div>
+                <button type="button" onclick="openSellerChat('${r.id}', '${dashEscapeHtml(driverName)}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3 py-2 rounded-xl text-xs shadow-sm">
+                  💬 Chat Piloto
+                </button>
+              </div>
+            </div>`;
+        }
+
+        const pinBox = `
+          <div class="grid grid-cols-2 gap-2 pt-1">
+            <div class="bg-amber-50/90 border border-amber-200 p-2 rounded-xl text-center shadow-xs">
+              <span class="text-[9px] font-black text-amber-800 uppercase block tracking-tight">📌 PIN Recolección (Tienda)</span>
+              <span class="text-base font-black font-mono text-amber-950 tracking-widest">${r.pickup_pin || '----'}</span>
+            </div>
+            <div class="bg-emerald-50/90 border border-emerald-200 p-2 rounded-xl text-center shadow-xs">
+              <span class="text-[9px] font-black text-emerald-800 uppercase block tracking-tight">🔑 PIN Entrega (Cliente)</span>
+              <span class="text-base font-black font-mono text-emerald-950 tracking-widest">${r.delivery_pin || '----'}</span>
+            </div>
+          </div>
+        `;
+
+        return `
+          <article class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 space-y-3" id="req_card_${r.id}">
+            <div class="flex justify-between items-start border-b pb-2">
+              <div>
+                <div class="flex items-center gap-2">
+                  <span class="text-[10px] font-mono text-slate-400 block">ID: ${r.id}</span>
+                  ${isManual ? `<span class="text-[9px] font-black bg-indigo-100 text-indigo-800 px-2 py-0.5 rounded-full border border-indigo-200">🎯 DIRECTO</span>` : ''}
+                </div>
+                <p class="font-extrabold text-xs text-slate-900">📍 Origen: ${dashEscapeHtml(r.origin_address || 'Tienda')}</p>
+                <p class="font-extrabold text-xs text-slate-900">📍 Destino: ${dashEscapeHtml(r.destination_address || 'Cliente')}</p>
+              </div>
+              <span class="text-[10px] font-black px-2 py-0.5 rounded-full bg-slate-100 text-slate-700 uppercase">${r.status}</span>
+            </div>
+            ${pinBox}
+            ${statusBox}
+            <button type="button" onclick="openCancelModalForOrder('${r.order_id || ''}', '${r.id}')"
+              class="w-full bg-rose-50 hover:bg-rose-100 text-rose-700 font-extrabold py-2 rounded-xl text-xs transition border border-rose-200 shadow-xs flex items-center justify-center gap-1.5">
+              <span>🚫 Cancelar Carrera</span>
+            </button>
+          </article>`;
+      }).join('');
+    }
+
+    function renderModule3History() {
+      const container = document.getElementById('deliveryHistoryList');
+      const badgeHistory = document.getElementById('historyDeliveryBadge');
+
+      const historyRequests = deliveryRequestsList.filter(r =>
+        ['delivered', 'completed', 'cancelled', 'cancelled_pending_review', 'rejected', 'revoked'].includes(r.status)
+      );
+
+      badgeHistory.textContent = historyRequests.length;
+
+      if (historyRequests.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full bg-white rounded-2xl p-12 text-center border border-slate-200/80 shadow-sm">
+            <p class="text-3xl mb-2">📜</p>
+            <p class="text-xs font-bold text-slate-500">No hay entregas finalizadas en el historial.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = historyRequests.map(r => {
+        const driverName = r.driver?.full_name || 'Piloto Asignado';
+        let statusBadgeCls = 'bg-emerald-100 text-emerald-800';
+        let statusLabel = r.status;
+        if (r.status === 'cancelled_pending_review') {
+          statusBadgeCls = 'bg-amber-100 text-amber-900 border border-amber-300';
+          statusLabel = '⚠️ En Auditoría';
+        } else if (r.status === 'cancelled' || r.status === 'rejected') {
+          statusBadgeCls = 'bg-rose-100 text-rose-800';
+          statusLabel = '🔴 Cancelado';
+        } else if (r.status === 'delivered' || r.status === 'completed') {
+          statusBadgeCls = 'bg-emerald-100 text-emerald-800';
+          statusLabel = '🟢 Entregado';
+        }
+
+        let resolutionBlock = '';
+        const res = r.admin_resolution;
+        if (res && res !== 'pending') {
+          const emisorEsEste = r.cancelled_by_role === 'seller';
+          const targetLabel = r.cancelled_by_role === 'seller'
+            ? (currentStore?.name || 'Esta tienda')
+            : (driverName || 'El piloto');
+
+          if (res === 'approved_no_sanction') {
+            resolutionBlock = `
+              <div class="rounded-xl border-2 border-emerald-300 bg-emerald-50 p-3">
+                <p class="text-[10px] font-black text-emerald-900 uppercase tracking-wider">✅ Resuelto a FAVOR de</p>
+                <p class="text-xs font-black text-emerald-950 mt-0.5">${adminEscapeHtmlSafe(emisorEsEste ? (currentStore?.name || 'Esta tienda') : targetLabel)}</p>
+                <p class="text-[10px] text-emerald-800 mt-1">El administrador determinó que no hubo méritos para sancionar.</p>
+                ${r.admin_resolution_notes ? `<p class="text-[10px] text-emerald-700 mt-1 italic">"${adminEscapeHtmlSafe(r.admin_resolution_notes)}"</p>` : ''}
+              </div>`;
+          } else if (res === 'warning_24h') {
+            resolutionBlock = `
+              <div class="rounded-xl border-2 border-amber-300 bg-amber-50 p-3">
+                <p class="text-[10px] font-black text-amber-900 uppercase tracking-wider">⚠️ Resuelto EN CONTRA de</p>
+                <p class="text-xs font-black text-amber-950 mt-0.5">${adminEscapeHtmlSafe(targetLabel)} — suspensión 24h</p>
+                ${r.admin_resolution_notes ? `<p class="text-[10px] text-amber-800 mt-1 italic">"${adminEscapeHtmlSafe(r.admin_resolution_notes)}"</p>` : ''}
+              </div>`;
+          } else if (res === 'suspension_7d') {
+            resolutionBlock = `
+              <div class="rounded-xl border-2 border-rose-300 bg-rose-50 p-3">
+                <p class="text-[10px] font-black text-rose-900 uppercase tracking-wider">🚨 Resuelto EN CONTRA de</p>
+                <p class="text-xs font-black text-rose-950 mt-0.5">${adminEscapeHtmlSafe(targetLabel)} — suspensión 7d</p>
+                ${r.admin_resolution_notes ? `<p class="text-[10px] text-rose-800 mt-1 italic">"${adminEscapeHtmlSafe(r.admin_resolution_notes)}"</p>` : ''}
+              </div>`;
+          } else if (res === 'revoked') {
+            resolutionBlock = `
+              <div class="rounded-xl border-2 border-slate-300 bg-slate-50 p-3">
+                <p class="text-[10px] font-black text-slate-700 uppercase tracking-wider">🔄 Sanción REVOCADA</p>
+                <p class="text-xs font-black text-slate-900 mt-0.5">${adminEscapeHtmlSafe(targetLabel)} queda activo nuevamente</p>
+                ${r.revoked_reason ? `<p class="text-[10px] text-slate-700 mt-1 italic">"${adminEscapeHtmlSafe(r.revoked_reason)}"</p>` : ''}
+              </div>`;
+          }
+        }
+
+        return `
+          <article class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 space-y-3">
+            <div class="flex justify-between items-center border-b pb-2">
+              <div>
+                <p class="font-extrabold text-xs text-slate-900">📍 Destino: ${dashEscapeHtml(r.destination_address || 'Cliente')}</p>
+                <div class="flex items-center gap-2 mt-0.5">
+                  <p class="text-[11px] text-slate-500 font-medium">Piloto: ${dashEscapeHtml(driverName)}</p>
+                  ${r.driver_id ? `<button type="button" onclick="openDriverQuickView('${r.driver_id}')" class="text-[10px] font-black text-blue-600 hover:underline">🔍 Ver Piloto</button>` : ''}
+                </div>
+                ${r.cancellation_reason ? `<p class="text-[10px] text-rose-600 mt-1 font-semibold">Motivo: ${dashEscapeHtml(r.cancellation_reason)}</p>` : ''}
+              </div>
+              <span class="text-[10px] font-black px-2 py-0.5 rounded-full ${statusBadgeCls} uppercase">
+                ${statusLabel}
+              </span>
+            </div>
+            <div class="flex justify-between items-center text-xs">
+              <span class="font-black text-slate-900">Tarifa Cobrada: Q${parseFloat(r.final_fee || r.suggested_fee || 0).toFixed(2)}</span>
+            </div>
+            ${resolutionBlock}
+          </article>`;
+      }).join('');
+    }
+
+    function switchToDeliveryHub(reqId) {
+      document.getElementById('btnModuleDelivery').click();
+      setTimeout(() => {
+        const el = document.getElementById(`req_card_${reqId}`);
+        if (el) el.scrollIntoView({ behavior: 'smooth' });
+      }, 100);
+    }
+
+    async function acceptCounterOffer(requestId, newFee) {
+      const client = window._supabase || initSupabaseClient();
+      const { error } = await client.from('delivery_requests').update({
+        final_fee: newFee,
+        status: 'accepted',
+        updated_at: new Date().toISOString()
+      }).eq('id', requestId);
+
+      if (error) alert('Error: ' + error.message);
+      else {
+        if (window.__pasajeRefreshDashBadges) window.__pasajeRefreshDashBadges();
+        await loadStoreOrders();
+      }
+    }
+
+    async function rejectCounterOffer(requestId) {
+      const client = window._supabase || initSupabaseClient();
+      const { error } = await client.from('delivery_requests').update({
+        driver_id: null,
+        counter_fee: null,
+        status: 'pending',
+        updated_at: new Date().toISOString()
+      }).eq('id', requestId);
+
+      if (error) alert('Error: ' + error.message);
+      else {
+        alert('Contraoferta rechazada. La carrera regresó al feed general.');
+        if (window.__pasajeRefreshDashBadges) window.__pasajeRefreshDashBadges();
+        await loadStoreOrders();
+      }
+    }
+
+    function openCancelModalForOrder(orderId, requestId = null) {
+      document.getElementById('cancelOrderId').value = orderId || '';
+      document.getElementById('cancelRequestId').value = requestId || '';
+      document.getElementById('cancelNotesInput').value = '';
+      document.getElementById('cancelTripModal').classList.remove('hidden');
+    }
+
+    function setupCancelEvents() {
+      const btn = document.getElementById('btnConfirmCancelTrip');
+      if (!btn) return;
+
+      btn.onclick = async () => {
+        const orderId = document.getElementById('cancelOrderId').value;
+        const requestId = document.getElementById('cancelRequestId').value;
+        const reasonSel = document.getElementById('cancelReasonSelect').value;
+        const notes = document.getElementById('cancelNotesInput').value.trim();
+
+        if (!notes) { alert('Por favor ingresa una explicación para cancelar.'); return; }
+
+        const fullReason = `${reasonSel} - ${notes}`;
+        const order = allOrders.find(o => String(o.id) === String(orderId));
+        const delReq = requestId
+          ? deliveryRequestsList.find(r => String(r.id) === String(requestId))
+          : (orderId ? deliveryRequestsMap[orderId] : null);
+
+        const acceptedStates = ['accepted', 'in_transit', 'on_the_way', 'counter_offered'];
+        const hasBeenAccepted = delReq && acceptedStates.includes(delReq.status);
+
+        const startIso = hasBeenAccepted
+          ? (delReq.updated_at || delReq.created_at)
+          : (delReq?.created_at || order?.created_at || new Date().toISOString());
+
+        const startMs = new Date(startIso).getTime();
+        const elapsedSeconds = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+
+        const client = window._supabase || initSupabaseClient();
+
+        try {
+          if (orderId) {
+            await client.from('cart_orders').update({
+              status: 'cancelled',
+              status_updated_at: new Date().toISOString()
+            }).eq('id', orderId);
+          }
+
+          if (delReq) {
+            await client.from('delivery_requests').update({
+              status: 'cancelled_pending_review',
+              cancelled_at: new Date().toISOString(),
+              cancelled_by_role: 'seller',
+              cancelled_by_user_id: currentUser.id,
+              cancellation_reason: fullReason,
+              time_elapsed_seconds: elapsedSeconds,
+              updated_at: new Date().toISOString()
+            }).eq('id', delReq.id);
+          } else if (orderId) {
+            await client.from('delivery_requests').insert([{
+              order_id: orderId,
+              store_id: currentStore.id,
+              status: 'cancelled_pending_review',
+              cancelled_at: new Date().toISOString(),
+              cancelled_by_role: 'seller',
+              cancelled_by_user_id: currentUser.id,
+              cancellation_reason: fullReason,
+              time_elapsed_seconds: elapsedSeconds,
+              origin_address: currentStore.name || 'Tienda',
+              destination_address: order?.customer_address || order?.delivery_address || 'Cliente'
+            }]);
+          }
+
+          document.getElementById('cancelTripModal').classList.add('hidden');
+          alert('🚫 Pedido cancelado y enviado a Auditoría.');
+
+          if (window.__pasajeRefreshDashBadges) window.__pasajeRefreshDashBadges();
+          await loadStoreOrders();
+        } catch (err) {
+          console.error('[Cancel] ', err);
+          alert('Error al cancelar: ' + (err.message || err));
+        }
+      };
+    }
+
+    async function openDriverQuickView(driverId) {
+      if (!driverId) return;
+      const client = window._supabase || initSupabaseClient();
+      const modal = document.getElementById('driverQuickViewModal');
+
+      const { data: driver } = await client.from('delivery_drivers').select('*').eq('id', driverId).maybeSingle();
+      if (!driver) { alert('No se encontraron detalles del repartidor.'); return; }
+
+      const { data: ratings } = await client.from('delivery_requests').select('driver_rating, status').eq('driver_id', driverId);
+      const validRatings = (ratings || []).filter(r => r.driver_rating > 0);
+      const avgRating = validRatings.length > 0
+        ? (validRatings.reduce((acc, curr) => acc + parseFloat(curr.driver_rating), 0) / validRatings.length).toFixed(1)
+        : '5.0';
+      const completedCount = (ratings || []).filter(r => ['delivered', 'completed'].includes(r.status)).length;
+
+      document.getElementById('quickDriverName').textContent = driver.full_name || 'Piloto Registrado';
+      document.getElementById('quickDriverRatingStars').textContent = `⭐ ${avgRating} (${completedCount} entregas)`;
+      document.getElementById('quickDriverPhone').textContent = driver.phone || 'N/A';
+      document.getElementById('quickDriverVehicle').textContent = driver.vehicle_type || 'Motocicleta';
+      document.getElementById('quickDriverPlate').textContent = driver.license_plate || 'Sin placa registrada';
+
+      modal.classList.remove('hidden');
+    }
+
+    function setupDriverRatingEvents() {
+      const closeBtn = document.getElementById('closeRateDriverBtn');
+      if (closeBtn) closeBtn.onclick = () => document.getElementById('rateDriverModal').classList.add('hidden');
+
+      document.querySelectorAll('#driverStarRatingContainer .driver-star').forEach(s => {
+        s.onclick = () => {
+          const val = parseInt(s.dataset.star, 10);
+          document.getElementById('selectedDriverScore').value = val;
+          updateDriverStarUI(val);
+        };
+      });
+
+      const submitBtn = document.getElementById('btnSubmitDriverRating');
+      if (submitBtn) {
+        submitBtn.onclick = async () => {
+          const reqId = document.getElementById('rateDriverReqId').value;
+          const score = parseInt(document.getElementById('selectedDriverScore').value, 10);
+          const client = window._supabase || initSupabaseClient();
+
+          const { error } = await client.from('delivery_requests').update({
+            driver_rating: score,
+            updated_at: new Date().toISOString()
+          }).eq('id', reqId);
+
+          if (error) alert('Error al guardar la calificación: ' + error.message);
+          else {
+            alert('¡Calificación enviada con éxito! ⭐');
+            document.getElementById('rateDriverModal').classList.add('hidden');
+            await loadStoreOrders();
+          }
+        };
+      }
+    }
+
+    function updateDriverStarUI(score) {
+      document.querySelectorAll('#driverStarRatingContainer .driver-star').forEach((s, idx) => {
+        s.style.opacity = (idx < score) ? '1' : '0.3';
+      });
+    }
+
+    function openRateDriverModal(requestId, driverName, currentRating) {
+      document.getElementById('rateDriverReqId').value = requestId;
+      document.getElementById('rateDriverName').textContent = `Piloto: ${driverName}`;
+      document.getElementById('rateDriverComment').value = '';
+      const score = currentRating || 5;
+      document.getElementById('selectedDriverScore').value = score;
+      updateDriverStarUI(score);
+      document.getElementById('rateDriverModal').classList.remove('hidden');
+    }
+
+    function openSellerChat(requestId, driverName) {
+      document.getElementById('chatRequestId').value = requestId;
+      document.getElementById('chatDriverName').textContent = driverName;
+      document.getElementById('sellerChatModal').classList.remove('hidden');
+      loadChatMessages(requestId);
+      subscribeToChat(requestId);
+    }
+
+    function setupSellerChatEvents() {
+      document.getElementById('closeSellerChatBtn').onclick = () => {
+        document.getElementById('sellerChatModal').classList.add('hidden');
+        if (sellerRealtimeChannel) sellerRealtimeChannel.unsubscribe();
+      };
+
+      document.getElementById('sellerChatForm').onsubmit = async (e) => {
+        e.preventDefault();
+        const input = document.getElementById('sellerChatMessageInput');
+        const msgText = input.value.trim();
+        const reqId = document.getElementById('chatRequestId').value;
+        if (!msgText) return;
+        input.value = '';
+        const client = window._supabase || initSupabaseClient();
+        await client.from('delivery_messages').insert([{
+          request_id: reqId,
+          sender_id: currentUser.id,
+          sender_role: 'seller',
+          sender_name: currentStore.name || 'Vendedor',
+          message: msgText
+        }]);
+        loadChatMessages(reqId);
+      };
+    }
+
+    async function loadChatMessages(requestId) {
+      const client = window._supabase || initSupabaseClient();
+      const container = document.getElementById('sellerChatMessages');
+
+      const { data } = await client.from('delivery_messages')
+        .select('*').eq('request_id', requestId).order('created_at', { ascending: true });
+
+      if (!data || data.length === 0) {
+        container.innerHTML = `<p class="text-center text-slate-400 py-4 font-medium">No hay mensajes aún. Saluda al piloto.</p>`;
+        return;
+      }
+
+      container.innerHTML = data.map(m => {
+        const isMe = m.sender_role === 'seller';
+        return `
+          <div class="flex flex-col ${isMe ? 'items-end' : 'items-start'}">
+            <span class="text-[9px] text-slate-400 font-bold mb-0.5">${dashEscapeHtml(m.sender_name || (isMe ? 'Tú' : 'Piloto'))}</span>
+            <div class="${isMe ? 'bg-emerald-600 text-white' : 'bg-white text-slate-800 border border-slate-200'} px-3 py-1.5 rounded-2xl max-w-[80%] font-medium">
+              ${dashEscapeHtml(m.message)}
+            </div>
+          </div>`;
+      }).join('');
+
+      container.scrollTop = container.scrollHeight;
+    }
+
+    function subscribeToChat(requestId) {
+      const client = window._supabase || initSupabaseClient();
+      if (sellerRealtimeChannel) sellerRealtimeChannel.unsubscribe();
+      sellerRealtimeChannel = client
+        .channel(`chat:${requestId}`)
+        .on('postgres_changes', {
+          event: 'INSERT',
+          schema: 'public',
+          table: 'delivery_messages',
+          filter: `request_id=eq.${requestId}`
+        }, () => loadChatMessages(requestId))
+        .subscribe();
+    }
+
+    function attachOrderEvents() {
+      document.querySelectorAll('[data-action="request-delivery"]').forEach(btn => {
+        btn.onclick = () => {
+          if (isStoreDeliverySuspended()) {
+            alert('⚠️ El servicio de delivery está pausado por auditoría. Contacta al administrador.');
+            return;
+          }
+          const order = allOrders.find(o => String(o.id) === String(btn.dataset.orderId));
+          if (order) openDeliveryModal(order);
+        };
+      });
+
+      document.querySelectorAll('[data-action="open-ticket"]').forEach(btn => {
+        btn.onclick = () => {
+          const order = allOrders.find(o => String(o.id) === String(btn.dataset.orderId));
+          if (order) openTicketModal(order);
+        };
+      });
+
+      document.querySelectorAll('[data-action="update-status"]').forEach(select => {
+        select.addEventListener('change', async () => {
+          const orderId = select.dataset.orderId;
+          const newStatus = select.value;
+          const client = window._supabase || initSupabaseClient();
+          await client.from('cart_orders').update({ status: newStatus, status_updated_at: new Date().toISOString() }).eq('id', orderId);
+          if (window.__pasajeRefreshDashBadges) window.__pasajeRefreshDashBadges();
+          await loadStoreOrders();
+        });
+      });
+
+      document.querySelectorAll('[data-action="notify-wa"]').forEach(btn => {
+        btn.onclick = () => {
+          const orderId = btn.dataset.orderId;
+          const order = allOrders.find(o => String(o.id) === String(orderId));
+          if (!order) return;
+
+          const cleanPhone = window.cleanPhone || (raw => String(raw || '').replace(/\D/g, ''));
+          const phone = cleanPhone(order.customer_phone);
+          if (!phone) { alert('El pedido no cuenta con un número de WhatsApp válido.'); return; }
+
+          const statusKey = getNormalizedStatus(order.status);
+          const statusLabel = STATUS_MAP[statusKey]?.label || 'Actualizado';
+
+          const origin = window.location.origin.includes('http') ? window.location.origin : 'https://pasajedelosaltos.com';
+          const trackingUrl = `${origin}/rastreo.html?id=${order.id}`;
+
+          let statusDetailMsg = '';
+          if (statusKey === 'cancelled') statusDetailMsg = 'Entendemos tu solicitud y hemos marcado tu pedido como *CANCELADO*.';
+          else if (statusKey === 'rejected') statusDetailMsg = 'Lamentamos informarte que tu pedido ha sido *RECHAZADO*.';
+          else statusDetailMsg = 'Tu pedido continúa su proceso con éxito.';
+
+          const delReq = deliveryRequestsMap[order.id];
+          let pinMsg = '';
+          if (delReq && delReq.delivery_pin) {
+            pinMsg = `\n\n🔑 *Tu PIN de confirmación para el repartidor es:* *${delReq.delivery_pin}*\n(Compártelo con el piloto al momento de recibir tu pedido)`;
+          }
+
+          const msg = `Hola *${order.customer_name || 'Cliente'}*, te saludamos de *${currentStore.name}* 🏪.\n\n` +
+                      `Tu pedido ha cambiado de estado:\n` +
+                      `📌 *NUEVO ESTADO:* ${statusLabel}\n` +
+                      `${statusDetailMsg}\n\n` +
+                      `📍 *Sigue el progreso en vivo de tu pedido aquí:*\n${trackingUrl}` +
+                      `${pinMsg}\n\n` +
+                      `¡Gracias por tu preferencia!`;
+
+          window.open(`https://wa.me/${phone}?text=${encodeURIComponent(msg)}`, '_blank');
+        };
+      });
+    }
+
+    function setupFilterButtons() {
+      document.querySelectorAll('.status-filter-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          activeFilter = btn.dataset.statusFilter;
+          document.querySelectorAll('.status-filter-btn').forEach(b => {
+            b.className = 'status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-white text-slate-700 border-slate-200 hover:border-emerald-500';
+          });
+          btn.className = 'status-filter-btn text-xs font-bold px-3 py-1.5 rounded-xl border bg-slate-900 text-white border-slate-900 shadow-sm';
+          renderModule1Orders();
+        });
+      });
+    }
+
+    function setupTicketModalEvents() {
+      const modal = document.getElementById('ticketModal');
+      document.getElementById('closeTicketModalBtn').onclick = () => modal.classList.add('hidden');
+      document.getElementById('printTicketBtn').onclick = () => window.print();
+
+      document.getElementById('downloadTicketImgBtn').onclick = async () => {
+        const captureArea = document.getElementById('ticketAreaToCapture');
+        const canvas = await html2canvas(captureArea, { scale: 2, backgroundColor: '#ffffff' });
+        const link = document.createElement('a');
+        link.download = `ticket-${currentTicketOrder ? currentTicketOrder.id : 'order'}.png`;
+        link.href = canvas.toDataURL('image/png');
+        link.click();
+      };
+    }
+
+    function openTicketModal(order) {
+      currentTicketOrder = order;
+      document.getElementById('ticketStoreName').textContent = currentStore?.name || 'Comercio Local';
+      document.getElementById('ticketStoreWa').textContent = currentStore?.whatsapp ? `📲 WA: ${currentStore.whatsapp}` : '';
+      document.getElementById('ticketOrderId').textContent = `ORDEN: #${String(order.id).slice(0, 8).toUpperCase()}`;
+      document.getElementById('ticketCustomerName').textContent = order.customer_name || 'Cliente';
+      document.getElementById('ticketCustomerPhone').textContent = order.customer_phone || 'N/A';
+      document.getElementById('ticketTotal').textContent = `Q ${parseFloat(order.total || 0).toFixed(2)}`;
+
+      const d = order.created_at ? new Date(order.created_at) : new Date();
+      const dateStr = d.toLocaleDateString('es-GT', { day: '2-digit', month: '2-digit', year: 'numeric' }) +
+                      ', ' +
+                      d.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', hour12: true });
+      document.getElementById('ticketDate').textContent = dateStr;
+
+      const isDelivery = order.delivery_type === 'delivery';
+      const methodEl = document.getElementById('ticketDeliveryType');
+      if (methodEl) methodEl.textContent = isDelivery ? '🛵 Envío a Domicilio' : '🏪 Recoger en Tienda';
+
+      const fullAddr = order.delivery_address || order.customer_address || 'Retiro en Tienda / Local';
+      const addrRow = document.getElementById('ticketAddressRow');
+      const addrEl = document.getElementById('ticketAddress');
+      if (isDelivery) { addrEl.textContent = fullAddr; addrRow.classList.remove('hidden'); }
+      else { addrRow.classList.add('hidden'); }
+
+      const notesRow = document.getElementById('ticketNotesRow');
+      const notesEl = document.getElementById('ticketNotes');
+      if (order.notes) { notesEl.textContent = order.notes; notesRow.classList.remove('hidden'); }
+      else { notesRow.classList.add('hidden'); }
+
+      const tbody = document.getElementById('ticketItemsTbody');
+      const items = Array.isArray(order.items) ? order.items : [];
+      tbody.innerHTML = items.map(it => {
+        const qty = parseInt(it.quantity || it.qty || 1, 10);
+        const price = parseFloat(it.price || 0);
+        const title = it.title || it.name || 'Producto';
+        return `
+          <tr class="align-top border-b border-dashed border-slate-100">
+            <td class="py-1 pr-1 font-bold">${qty}x</td>
+            <td class="py-1 pr-1 font-semibold">${dashEscapeHtml(title)}${dashEscapeHtml(formatItemVariant(it))}</td>
+            <td class="py-1 text-right font-bold whitespace-nowrap">Q ${(price * qty).toFixed(2)}</td>
+          </tr>`;
+      }).join('');
+
+      document.getElementById('ticketModal').classList.remove('hidden');
+    }
+
+    function openDeliveryModal(order) {
+      if (isStoreDeliverySuspended()) {
+        alert('⚠️ El servicio de delivery está pausado por auditoría.');
+        return;
+      }
+      document.getElementById('modalOrderId').value = order.id;
+      document.getElementById('modalCustomerName').value = order.customer_name || 'Cliente';
+      document.getElementById('modalCustomerPhone').value = order.customer_phone || '';
+      document.getElementById('modalOriginAddress').value = (currentStore.name || 'Tienda') + (currentStore.zone ? ` (${currentStore.zone})` : '');
+      document.getElementById('modalDestinationAddress').value = order.customer_address || order.delivery_address || '';
+      document.getElementById('modalSuggestedFee').value = '15.00';
+      switchDeliveryTab('broadcast');
+      document.getElementById('deliveryFormModal').classList.remove('hidden');
+    }
+
+    function switchDeliveryTab(tabName) {
+      document.querySelectorAll('.delivery-tab-btn').forEach(b => {
+        b.className = 'delivery-tab-btn py-2 rounded-xl transition text-slate-600 hover:bg-slate-200';
+      });
+      document.querySelectorAll('.delivery-tab-pane').forEach(p => p.classList.add('hidden'));
+
+      const activeBtn = document.querySelector(`[data-delivery-tab="${tabName}"]`);
+      if (activeBtn) activeBtn.className = 'delivery-tab-btn py-2 rounded-xl bg-white text-slate-900 shadow-sm transition';
+
+      const activePane = document.getElementById(`tabContent-${tabName}`);
+      if (activePane) activePane.classList.remove('hidden');
+
+      if (tabName === 'direct') loadActiveDriversForModal();
+    }
+
+    async function loadActiveDriversForModal() {
+      const container = document.getElementById('activeDriversList');
+      const client = window._supabase || initSupabaseClient();
+      const { data } = await client.from('delivery_drivers').select('*').eq('is_available', true);
+
+      if (!data || data.length === 0) {
+        container.innerHTML = '<p class="text-center text-xs text-rose-500 py-4 font-semibold">No hay pilotos disponibles.</p>';
+        return;
+      }
+
+      container.innerHTML = data.map(d => `
+        <div class="bg-white p-3 rounded-2xl border flex items-center justify-between gap-2">
+          <div>
+            <p class="font-extrabold text-xs text-slate-900">🛵 ${dashEscapeHtml(d.full_name || 'Piloto')}</p>
+            <p class="text-[11px] text-slate-500">📞 ${dashEscapeHtml(d.phone || 'N/A')}</p>
+          </div>
+          <div class="flex items-center gap-1.5">
+            <button type="button" onclick="openDriverQuickView('${d.id}')" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold px-2.5 py-1.5 rounded-xl text-xs">🔍 Perfil</button>
+            <button type="button" onclick="assignDirectDriver('${d.id}')" class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold px-3 py-1.5 rounded-xl text-xs shadow-sm">Elegir</button>
+          </div>
+        </div>`).join('');
+    }
+
+    async function assignDirectDriver(driverId) {
+      if (isStoreDeliverySuspended()) {
+        alert('⚠️ El servicio de delivery está pausado por auditoría.');
+        return;
+      }
+      const orderId = document.getElementById('modalOrderId').value;
+      const client = window._supabase || initSupabaseClient();
+      const pPin = String(Math.floor(1000 + Math.random() * 9000));
+      const dPin = String(Math.floor(1000 + Math.random() * 9000));
+
+      const { data, error } = await client.from('delivery_requests').insert([{
+        order_id: orderId,
+        store_id: currentStore.id,
+        driver_id: driverId,
+        target_driver_id: driverId,
+        assignment_type: 'direct',
+        status: 'pending',
+        suggested_fee: parseFloat(document.getElementById('modalSuggestedFee').value) || 15.00,
+        origin_address: document.getElementById('modalOriginAddress').value.trim(),
+        destination_address: document.getElementById('modalDestinationAddress').value.trim(),
+        pickup_pin: pPin,
+        delivery_pin: dPin
+      }]).select().single();
+
+      if (error) { alert('Error: ' + error.message); return; }
+
+      document.getElementById('deliveryFormModal').classList.add('hidden');
+      if (window.__pasajeRefreshDashBadges) window.__pasajeRefreshDashBadges();
+      await loadStoreOrders();
+      if (data) switchToDeliveryHub(data.id);
+    }
+
+    function setupDeliveryModalEvents() {
+      document.getElementById('closeDeliveryModalBtn').onclick = () => document.getElementById('deliveryFormModal').classList.add('hidden');
+      document.querySelectorAll('.delivery-tab-btn').forEach(btn => btn.onclick = () => switchDeliveryTab(btn.dataset.deliveryTab));
+
+      document.getElementById('btnSubmitBroadcast').onclick = async () => {
+        if (isStoreDeliverySuspended()) {
+          alert('⚠️ El servicio de delivery está pausado por auditoría.');
+          return;
+        }
+        const orderId = document.getElementById('modalOrderId').value;
+        const client = window._supabase || initSupabaseClient();
+        const pPin = String(Math.floor(1000 + Math.random() * 9000));
+        const dPin = String(Math.floor(1000 + Math.random() * 9000));
+
+        const { data, error } = await client.from('delivery_requests').insert([{
+          order_id: orderId,
+          store_id: currentStore.id,
+          assignment_type: 'broadcast',
+          status: 'pending',
+          suggested_fee: parseFloat(document.getElementById('modalSuggestedFee').value) || 15.00,
+          origin_address: document.getElementById('modalOriginAddress').value.trim(),
+          destination_address: document.getElementById('modalDestinationAddress').value.trim(),
+          pickup_pin: pPin,
+          delivery_pin: dPin
+        }]).select().single();
+
+        if (error) { alert('Error: ' + error.message); return; }
+
+        document.getElementById('deliveryFormModal').classList.add('hidden');
+        if (window.__pasajeRefreshDashBadges) window.__pasajeRefreshDashBadges();
+        await loadStoreOrders();
+        if (data) switchToDeliveryHub(data.id);
+      };
+    }
+
+    function bindManualDelivery() {
+      document.getElementById('btnOpenManualDelivery')?.addEventListener('click', () => {
+        if (isStoreDeliverySuspended()) {
+          alert('⚠️ El servicio de delivery está pausado por auditoría.');
+          return;
+        }
+        document.getElementById('manualCustomerName').value = '';
+        document.getElementById('manualCustomerPhone').value = '';
+        document.getElementById('manualOriginAddress').value =
+          (currentStore.name || 'Tienda') + (currentStore.zone ? ` (${currentStore.zone})` : '');
+        document.getElementById('manualDestinationAddress').value = '';
+        document.getElementById('manualSuggestedFee').value = '15.00';
+        document.getElementById('manualNotes').value = '';
+        document.getElementById('manualDeliveryModal').classList.remove('hidden');
+      });
+
+      document.getElementById('closeManualDeliveryBtn')?.addEventListener('click', () => {
+        document.getElementById('manualDeliveryModal').classList.add('hidden');
+      });
+
+      document.getElementById('btnSubmitManualDelivery')?.addEventListener('click', async () => {
+        const name = document.getElementById('manualCustomerName').value.trim();
+        const phone = document.getElementById('manualCustomerPhone').value.trim();
+        const origin = document.getElementById('manualOriginAddress').value.trim();
+        const destination = document.getElementById('manualDestinationAddress').value.trim();
+        const fee = parseFloat(document.getElementById('manualSuggestedFee').value) || 15;
+        const notes = document.getElementById('manualNotes').value.trim();
+
+        if (!name || !phone || !origin || !destination) {
+          alert('Completa todos los campos obligatorios.');
+          return;
+        }
+
+        const btn = document.getElementById('btnSubmitManualDelivery');
+        btn.disabled = true; btn.textContent = 'Publicando...';
+
+        try {
+          const client = window._supabase || initSupabaseClient();
+          const pPin = String(Math.floor(1000 + Math.random() * 9000));
+          const dPin = String(Math.floor(1000 + Math.random() * 9000));
+
+          const { data, error } = await client.from('delivery_requests').insert([{
+            order_id: null,
+            store_id: currentStore.id,
+            assignment_type: 'broadcast',
+            status: 'pending',
+            suggested_fee: fee,
+            origin_address: origin,
+            destination_address: destination,
+            customer_name: name,
+            customer_phone: phone,
+            notes: notes || null,
+            pickup_pin: pPin,
+            delivery_pin: dPin
+          }]).select().single();
+
+          if (error) throw error;
+
+          document.getElementById('manualDeliveryModal').classList.add('hidden');
+          alert('✅ Delivery externo publicado. Los pilotos lo verán al instante.');
+          if (window.__pasajeRefreshDashBadges) window.__pasajeRefreshDashBadges();
+          await loadStoreOrders();
+          if (data) switchToDeliveryHub(data.id);
+        } catch (err) {
+          console.error('[Manual Delivery]', err);
+          alert('Error: ' + (err.message || err));
+        } finally {
+          btn.disabled = false; btn.textContent = '🚀 Publicar Solicitud Externa';
+        }
+      });
+    }
+
+    // ============================================================
+    // CAMBIO FASE 22: 'new' cuenta como "Recibido" para filtros
+    // ============================================================
+    function getNormalizedStatus(st) {
+      const s = (st || 'new').toLowerCase();
+      if (s === 'new') return 'new';
+      if (s === 'pending' || s === 'sent') return 'sent';
+      if (s === 'confirmed') return 'confirmed';
+      if (s === 'preparing') return 'preparing';
+      if (s === 'on_the_way' || s === 'in_transit') return 'on_the_way';
+      if (s === 'completed' || s === 'delivered') return 'completed';
+      if (s === 'cancelled' || s === 'rejected') return 'cancelled_group';
+      return 'new';
+    }
+  </script>
+</body>
+</html>

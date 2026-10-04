@@ -1,0 +1,638 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pasaje Inmuebles · Propiedades en Quetzaltenango</title>
+  <meta name="description" content="Explora casas, apartamentos, locales y terrenos en alquiler, venta o usufructo en Quetzaltenango. Contacta directo por WhatsApp.">
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=8"></script>
+  <script src="../js/theme-loader.js?v=9"></script>
+  <script src="../js/footer.js?v=4"></script>
+  <script src="../js/inmuebles-sidebar.js?v=3"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background-color: #eef2ff; }
+
+    .property-card {
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+    .property-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 18px 36px -14px rgba(15, 23, 42, 0.25);
+      border-color: #6366f1;
+    }
+
+    .carousel-track {
+      display: flex;
+      overflow-x: auto;
+      scroll-snap-type: x mandatory;
+      scroll-behavior: smooth;
+      -webkit-overflow-scrolling: touch;
+    }
+    .carousel-track::-webkit-scrollbar { display: none; }
+    .carousel-slide { scroll-snap-align: start; flex-shrink: 0; width: 100%; }
+
+    .carousel-dot {
+      width: 6px; height: 6px; border-radius: 999px;
+      background: rgba(255,255,255,.5);
+      transition: all .2s;
+    }
+    .carousel-dot.active { width: 18px; background: #fff; }
+
+    .filter-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 700;
+      padding: 6px 12px; border-radius: 999px;
+      background: #fff; color: #475569;
+      border: 1.5px solid #e2e8f0;
+      cursor: pointer; transition: all .15s;
+    }
+    .filter-chip:hover { border-color: #6366f1; color: #4f46e5; }
+    .filter-chip.active { background: #4f46e5; color: #fff; border-color: #4f46e5; }
+
+    .price-badge {
+      background: linear-gradient(135deg, rgba(79,70,229,.92), rgba(37,99,235,.92));
+      backdrop-filter: blur(8px);
+      -webkit-backdrop-filter: blur(8px);
+      box-shadow: 0 4px 14px -6px rgba(0,0,0,.4);
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+  <div id="inmueblesSidebar"></div>
+
+  <!-- HEADER -->
+  <header class="glass-header text-white shadow-lg sticky top-0 z-40 border-b border-white/10">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <button id="sidebarToggleBtn" type="button"
+          onclick="if (window.PasajeInmueblesSidebar) window.PasajeInmueblesSidebar.toggle();"
+          class="bg-white/10 hover:bg-white/20 p-2 rounded-xl border border-white/15 text-white lg:hidden"
+          aria-label="Menú">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+            <line x1="3" y1="6" x2="21" y2="6"/>
+            <line x1="3" y1="12" x2="21" y2="12"/>
+            <line x1="3" y1="18" x2="21" y2="18"/>
+          </svg>
+        </button>
+        <a href="../index.html" class="text-lg font-extrabold text-white tracking-tight">
+          Pasaje <span class="text-indigo-300">Inmuebles</span>
+        </a>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="../index.html" class="bg-white/10 hover:bg-white/20 text-white font-bold text-xs px-3 py-2 rounded-xl border border-white/15 flex items-center gap-1.5 transition">
+          <span>🏬</span>
+          <span class="hidden sm:inline">Catálogo</span>
+        </a>
+        <a id="headerPublishBtn" href="dashboard/index.html"
+           class="hidden sm:inline-flex bg-indigo-500 hover:bg-indigo-600 text-white font-bold text-xs px-3 py-2 rounded-xl transition">
+          ➕ Publicar
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="bg-gradient-to-r from-indigo-600 to-blue-600 text-white py-8 px-4">
+    <div class="max-w-6xl mx-auto">
+      <h1 class="text-2xl sm:text-4xl font-black tracking-tight">Encuentra tu próximo hogar en Xela</h1>
+      <p class="text-sm text-indigo-100 mt-2 max-w-xl">
+        Casas, apartamentos, locales y terrenos en Quetzaltenango. Filtra por zona, precio y categoría.
+      </p>
+
+      <div class="mt-5 flex flex-wrap gap-2">
+        <div class="bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl px-3 py-2 text-[11px] font-black uppercase tracking-wider">
+          <span id="statTotalCount">—</span> propiedades activas
+        </div>
+        <div class="bg-white/15 backdrop-blur-sm border border-white/20 rounded-2xl px-3 py-2 text-[11px] font-black uppercase tracking-wider">
+          <span id="statZonesCount">—</span> zonas
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- MAIN -->
+  <main class="max-w-6xl mx-auto p-4 w-full flex-1 space-y-5">
+
+    <!-- FILTROS -->
+    <section class="glass-container bg-white rounded-3xl border border-slate-200/80 shadow-sm p-5 space-y-4">
+
+      <!-- Barra de búsqueda por texto -->
+      <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400">
+          <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+        </div>
+        <input id="searchInput" type="text" placeholder="Buscar por título, dirección o zona..."
+          autocomplete="off"
+          class="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-indigo-500 focus:border-indigo-500 outline-none text-sm font-semibold text-slate-800 bg-white shadow-sm transition">
+        <button id="clearSearchBtn" type="button"
+          class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600">
+          <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+          </svg>
+        </button>
+      </div>
+
+      <!-- Tipo de transacción -->
+      <div>
+        <p class="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-2">Tipo de transacción</p>
+        <div class="flex flex-wrap gap-1.5" id="transactionFilters">
+          <button type="button" class="filter-chip active" data-value="all">✨ Todas</button>
+          <button type="button" class="filter-chip" data-value="rent">🏢 Alquiler</button>
+          <button type="button" class="filter-chip" data-value="sale">🏡 Venta</button>
+          <button type="button" class="filter-chip" data-value="usufruct">📜 Usufructo</button>
+        </div>
+      </div>
+
+      <!-- Categoría -->
+      <div>
+        <p class="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-2">Categoría</p>
+        <div class="flex flex-wrap gap-1.5" id="propertyTypeFilters">
+          <button type="button" class="filter-chip active" data-value="all">Todas</button>
+          <button type="button" class="filter-chip" data-value="casa">🏠 Casa</button>
+          <button type="button" class="filter-chip" data-value="apartamento">🏢 Apartamento</button>
+          <button type="button" class="filter-chip" data-value="habitacion">🛏️ Habitación</button>
+          <button type="button" class="filter-chip" data-value="local">🏬 Local comercial</button>
+          <button type="button" class="filter-chip" data-value="terreno">🌳 Terreno</button>
+        </div>
+      </div>
+
+      <!-- Zona -->
+      <div>
+        <p class="text-[10px] font-black uppercase tracking-wider text-slate-500 mb-2">Zona de Xela</p>
+        <select id="zoneFilter"
+          class="w-full sm:w-auto border border-slate-200 rounded-xl px-3 py-2.5 text-xs font-semibold bg-white focus:ring-2 focus:ring-indigo-500 outline-none cursor-pointer">
+          <option value="all">📍 Todas las zonas</option>
+          <option value="Zona 1">Zona 1</option>
+          <option value="Zona 2">Zona 2</option>
+          <option value="Zona 3">Zona 3</option>
+          <option value="Zona 4">Zona 4</option>
+          <option value="Zona 5">Zona 5</option>
+          <option value="Zona 6">Zona 6</option>
+          <option value="Zona 7">Zona 7</option>
+          <option value="Zona 8">Zona 8</option>
+          <option value="Zona 9">Zona 9</option>
+          <option value="Zona 10">Zona 10</option>
+          <option value="Zona 11">Zona 11</option>
+          <option value="Salcajá">Salcajá</option>
+          <option value="La Esperanza">La Esperanza</option>
+          <option value="San Mateo">San Mateo</option>
+        </select>
+      </div>
+
+      <!-- Rango de precio + Habitaciones -->
+      <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Precio mínimo</label>
+          <input id="minPriceInput" type="number" min="0" step="100" placeholder="Q 0"
+            class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Precio máximo</label>
+          <input id="maxPriceInput" type="number" min="0" step="100" placeholder="Sin límite"
+            class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Habitaciones (mín)</label>
+          <input id="minBedroomsInput" type="number" min="0" max="20" placeholder="0"
+            class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase tracking-wider mb-1">Baños (mín)</label>
+          <input id="minBathroomsInput" type="number" min="0" max="20" step="0.5" placeholder="0"
+            class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+      </div>
+
+      <div class="flex items-center justify-between gap-3 pt-2 border-t border-slate-100">
+        <p id="resultsCount" class="text-xs font-bold text-slate-500">Cargando propiedades...</p>
+        <button id="clearAllFiltersBtn" type="button"
+          class="text-xs font-bold text-indigo-600 hover:bg-indigo-50 px-3 py-1.5 rounded-xl transition">
+          🔄 Limpiar filtros
+        </button>
+      </div>
+    </section>
+
+    <!-- RESULTADOS -->
+    <section>
+      <div id="resultsGrid" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+        <!-- Cards dinámicos -->
+      </div>
+
+      <div id="emptyState" class="hidden bg-white rounded-3xl border border-slate-200 p-12 text-center">
+        <div class="text-5xl mb-3">🏚️</div>
+        <p class="font-black text-slate-700">No encontramos propiedades</p>
+        <p class="text-xs text-slate-500 mt-1">Prueba ajustar los filtros o limpiar la búsqueda.</p>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="pasajeFooter"></div>
+
+  <script>
+    // =============================================================
+    // /inmuebles/index.html — Buscador público
+    // =============================================================
+    (function () {
+      'use strict';
+
+      const ZONE_COORDS = {
+        'Zona 1':       [14.8347, -91.5186],
+        'Zona 2':       [14.8398, -91.5221],
+        'Zona 3':       [14.8289, -91.5156],
+        'Zona 4':       [14.8451, -91.5203],
+        'Zona 5':       [14.8512, -91.5278],
+        'Zona 6':       [14.8435, -91.5312],
+        'Zona 7':       [14.8531, -91.5189],
+        'Zona 8':       [14.8408, -91.5098],
+        'Zona 9':       [14.8465, -91.4945],
+        'Zona 10':      [14.8567, -91.5102],
+        'Zona 11':      [14.8654, -91.5218],
+        'Salcajá':      [14.8833, -91.4500],
+        'La Esperanza': [14.8667, -91.5667],
+        'San Mateo':    [14.8667, -91.6000]
+      };
+
+      let allListings = [];
+      let filteredListings = [];
+
+      const state = {
+        q: '',
+        transaction: 'all',
+        propertyType: 'all',
+        zone: 'all',
+        minPrice: null,
+        maxPrice: null,
+        minBedrooms: null,
+        minBathrooms: null
+      };
+
+      // ---------------------------------------------------------
+      // Utilidades
+      // ---------------------------------------------------------
+      function esc(s) {
+        return String(s ?? '')
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+
+      function fmtMoney(n) {
+        const v = parseFloat(n || 0);
+        return new Intl.NumberFormat('es-GT', {
+          style: 'currency', currency: 'GTQ',
+          maximumFractionDigits: 0
+        }).format(v);
+      }
+
+      function transactionLabel(t) {
+        if (t === 'rent')      return 'Alquiler';
+        if (t === 'sale')      return 'Venta';
+        if (t === 'usufruct')  return 'Usufructo';
+        return t || '—';
+      }
+
+      function propertyTypeLabel(p) {
+        const map = {
+          casa: 'Casa',
+          apartamento: 'Apartamento',
+          habitacion: 'Habitación',
+          local: 'Local',
+          terreno: 'Terreno'
+        };
+        return map[p] || p || '—';
+      }
+
+      function debounce(fn, delay = 300) {
+        let t;
+        return function (...args) {
+          clearTimeout(t);
+          t = setTimeout(() => fn.apply(this, args), delay);
+        };
+      }
+
+      // ---------------------------------------------------------
+      // Cargar listings públicos
+      // ---------------------------------------------------------
+      async function loadListings() {
+        const c = window._supabase || initSupabaseClient();
+        if (!c) return;
+
+        const { data, error } = await c
+          .from('real_estate_listings')
+          .select('*')
+          .eq('is_active', true)
+          .order('is_featured', { ascending: false })
+          .order('created_at', { ascending: false })
+          .limit(200);
+
+        if (error) {
+          console.warn('[Inmuebles] load error:', error.message);
+          return;
+        }
+
+        allListings = data || [];
+        document.getElementById('statTotalCount').textContent = allListings.length;
+
+        const uniqueZones = [...new Set(allListings.map(l => l.zone).filter(Boolean))];
+        document.getElementById('statZonesCount').textContent = uniqueZones.length;
+
+        // Preseleccionar filtro desde ?type= (viene del sidebar)
+        const params = new URLSearchParams(window.location.search);
+        const urlType = params.get('type');
+        if (urlType && ['rent','sale','usufruct'].includes(urlType)) {
+          state.transaction = urlType;
+          document.querySelectorAll('#transactionFilters .filter-chip').forEach(chip => {
+            chip.classList.toggle('active', chip.dataset.value === urlType);
+          });
+        }
+
+        applyFilters();
+      }
+
+      // ---------------------------------------------------------
+      // Aplicar filtros
+      // ---------------------------------------------------------
+      function applyFilters() {
+        const q = state.q.toLowerCase().trim();
+
+        filteredListings = allListings.filter(l => {
+          // Texto
+          if (q) {
+            const haystack = [
+              l.title, l.description, l.zone, l.address, l.address_details
+            ].filter(Boolean).join(' ').toLowerCase();
+            if (!haystack.includes(q)) return false;
+          }
+          // Transacción
+          if (state.transaction !== 'all' && l.transaction_type !== state.transaction) return false;
+          // Categoría
+          if (state.propertyType !== 'all' && l.property_type !== state.propertyType) return false;
+          // Zona
+          if (state.zone !== 'all' && l.zone !== state.zone) return false;
+          // Precio
+          const price = parseFloat(l.price || 0);
+          if (state.minPrice != null && price < state.minPrice) return false;
+          if (state.maxPrice != null && price > state.maxPrice) return false;
+          // Habitaciones
+          if (state.minBedrooms != null && (l.bedrooms || 0) < state.minBedrooms) return false;
+          // Baños
+          if (state.minBathrooms != null && (l.bathrooms || 0) < state.minBathrooms) return false;
+
+          return true;
+        });
+
+        renderResults();
+      }
+
+      // ---------------------------------------------------------
+      // Render de resultados
+      // ---------------------------------------------------------
+      function renderResults() {
+        const grid = document.getElementById('resultsGrid');
+        const empty = document.getElementById('emptyState');
+        const countEl = document.getElementById('resultsCount');
+
+        countEl.textContent = `${filteredListings.length} propiedad${filteredListings.length !== 1 ? 'es' : ''} encontrada${filteredListings.length !== 1 ? 's' : ''}`;
+
+        if (!filteredListings.length) {
+          grid.innerHTML = '';
+          empty.classList.remove('hidden');
+          return;
+        }
+        empty.classList.add('hidden');
+
+        grid.innerHTML = filteredListings.map(l => {
+          const images = Array.isArray(l.image_urls) && l.image_urls.length > 0
+            ? l.image_urls
+            : ['../img/placeholder.png'];
+
+          const carouselId = 'carousel-' + l.id;
+
+          const slidesHtml = images.map((url, idx) => `
+            <div class="carousel-slide relative">
+              <div class="aspect-[4/3] bg-slate-100 overflow-hidden">
+                <img src="${esc(url)}" alt="Foto ${idx + 1}" class="w-full h-full object-cover" loading="lazy">
+              </div>
+            </div>
+          `).join('');
+
+          const dotsHtml = images.length > 1
+            ? `<div class="absolute bottom-2 left-1/2 -translate-x-1/2 flex gap-1.5 z-20">
+                 ${images.map((_, i) => `<span class="carousel-dot ${i === 0 ? 'active' : ''}" data-dot-for="${carouselId}" data-idx="${i}"></span>`).join('')}
+               </div>`
+            : '';
+
+          const featuredBadge = l.is_featured
+            ? `<span class="absolute top-2 left-2 bg-amber-500 text-white text-[10px] font-black px-2 py-1 rounded-full shadow z-20">⭐ DESTACADO</span>`
+            : '';
+
+          return `
+            <article class="property-card bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden flex flex-col">
+              <div class="relative">
+                <div id="${carouselId}" class="carousel-track" data-carousel-track>
+                  ${slidesHtml}
+                </div>
+                ${dotsHtml}
+                ${featuredBadge}
+                <div class="absolute top-2 right-2 price-badge text-white text-[12px] font-black px-3 py-1.5 rounded-full z-20">
+                  ${fmtMoney(l.price)}
+                </div>
+                <div class="absolute bottom-2 right-2 bg-black/60 backdrop-blur-sm text-white text-[10px] font-black uppercase tracking-wide px-2.5 py-1 rounded-full z-20">
+                  ${esc(transactionLabel(l.transaction_type))}
+                </div>
+              </div>
+
+              <div class="p-4 flex-1 flex flex-col justify-between space-y-3">
+                <div class="min-w-0">
+                  <div class="flex items-center gap-1.5 text-[10px] font-black uppercase tracking-wide text-indigo-600 mb-1">
+                    <span>📍 ${esc(l.zone || 'Xela')}</span>
+                    <span class="text-slate-300">·</span>
+                    <span>${esc(propertyTypeLabel(l.property_type))}</span>
+                  </div>
+                  <h3 class="font-black text-sm text-slate-900 line-clamp-2 leading-snug">${esc(l.title)}</h3>
+                  ${l.description ? `<p class="text-[11px] text-slate-500 mt-1 line-clamp-2">${esc(l.description)}</p>` : ''}
+                </div>
+
+                <div class="flex flex-wrap gap-2 text-[10px] font-bold text-slate-600">
+                  ${l.bedrooms ? `<span class="bg-slate-100 px-2 py-1 rounded-lg">🛏️ ${l.bedrooms}</span>` : ''}
+                  ${l.bathrooms ? `<span class="bg-slate-100 px-2 py-1 rounded-lg">🚿 ${l.bathrooms}</span>` : ''}
+                  ${l.parking_spaces ? `<span class="bg-slate-100 px-2 py-1 rounded-lg">🚗 ${l.parking_spaces}</span>` : ''}
+                  ${l.area_sqm ? `<span class="bg-slate-100 px-2 py-1 rounded-lg">📐 ${l.area_sqm} m²</span>` : ''}
+                </div>
+
+                <a href="detalle.html?id=${encodeURIComponent(l.id)}"
+                   class="block w-full text-center bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow-sm">
+                  Ver Detalle →
+                </a>
+              </div>
+            </article>
+          `;
+        }).join('');
+
+        // Bind de carrusel: dots + scroll
+        document.querySelectorAll('[data-carousel-track]').forEach(track => {
+          const carouselId = track.id;
+          const dots = document.querySelectorAll(`[data-dot-for="${carouselId}"]`);
+
+          // Actualizar dots al hacer scroll
+          track.addEventListener('scroll', debounce(() => {
+            const slideWidth = track.clientWidth;
+            const idx = Math.round(track.scrollLeft / slideWidth);
+            dots.forEach(d => d.classList.toggle('active', parseInt(d.dataset.idx, 10) === idx));
+          }, 80));
+
+          // Click en dots para navegar
+          dots.forEach(dot => {
+            dot.addEventListener('click', () => {
+              const idx = parseInt(dot.dataset.idx, 10);
+              track.scrollTo({ left: idx * track.clientWidth, behavior: 'smooth' });
+            });
+          });
+        });
+      }
+
+      // ---------------------------------------------------------
+      // Bind filtros
+      // ---------------------------------------------------------
+      function bindFilters() {
+        // Chips de transacción
+        document.querySelectorAll('#transactionFilters .filter-chip').forEach(chip => {
+          chip.addEventListener('click', () => {
+            document.querySelectorAll('#transactionFilters .filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            state.transaction = chip.dataset.value;
+            applyFilters();
+          });
+        });
+
+        // Chips de categoría
+        document.querySelectorAll('#propertyTypeFilters .filter-chip').forEach(chip => {
+          chip.addEventListener('click', () => {
+            document.querySelectorAll('#propertyTypeFilters .filter-chip').forEach(c => c.classList.remove('active'));
+            chip.classList.add('active');
+            state.propertyType = chip.dataset.value;
+            applyFilters();
+          });
+        });
+
+        // Zona
+        document.getElementById('zoneFilter').addEventListener('change', (e) => {
+          state.zone = e.target.value;
+          applyFilters();
+        });
+
+        // Búsqueda
+        const searchInput = document.getElementById('searchInput');
+        const clearSearchBtn = document.getElementById('clearSearchBtn');
+        searchInput.addEventListener('input', debounce((e) => {
+          state.q = e.target.value;
+          if (state.q) clearSearchBtn.classList.remove('hidden');
+          else clearSearchBtn.classList.add('hidden');
+          applyFilters();
+        }, 250));
+        clearSearchBtn.addEventListener('click', () => {
+          searchInput.value = '';
+          state.q = '';
+          clearSearchBtn.classList.add('hidden');
+          applyFilters();
+        });
+
+        // Rangos de precio y especificaciones
+        const minPriceInput    = document.getElementById('minPriceInput');
+        const maxPriceInput    = document.getElementById('maxPriceInput');
+        const minBedroomsInput = document.getElementById('minBedroomsInput');
+        const minBathroomsInput = document.getElementById('minBathroomsInput');
+
+        const readNumeric = (el) => {
+          const v = el.value.trim();
+          if (!v) return null;
+          const n = parseFloat(v);
+          return isNaN(n) ? null : n;
+        };
+
+        const reapply = debounce(() => {
+          state.minPrice    = readNumeric(minPriceInput);
+          state.maxPrice    = readNumeric(maxPriceInput);
+          state.minBedrooms = readNumeric(minBedroomsInput);
+          state.minBathrooms = readNumeric(minBathroomsInput);
+          applyFilters();
+        }, 300);
+
+        [minPriceInput, maxPriceInput, minBedroomsInput, minBathroomsInput].forEach(el => {
+          el.addEventListener('input', reapply);
+        });
+
+        // Limpiar todo
+        document.getElementById('clearAllFiltersBtn').addEventListener('click', () => {
+          searchInput.value = '';
+          clearSearchBtn.classList.add('hidden');
+          minPriceInput.value = '';
+          maxPriceInput.value = '';
+          minBedroomsInput.value = '';
+          minBathroomsInput.value = '';
+          document.getElementById('zoneFilter').value = 'all';
+
+          document.querySelectorAll('#transactionFilters .filter-chip').forEach(c => {
+            c.classList.toggle('active', c.dataset.value === 'all');
+          });
+          document.querySelectorAll('#propertyTypeFilters .filter-chip').forEach(c => {
+            c.classList.toggle('active', c.dataset.value === 'all');
+          });
+
+          state.q = '';
+          state.transaction = 'all';
+          state.propertyType = 'all';
+          state.zone = 'all';
+          state.minPrice = null;
+          state.maxPrice = null;
+          state.minBedrooms = null;
+          state.minBathrooms = null;
+
+          applyFilters();
+        });
+      }
+
+      // ---------------------------------------------------------
+      // Init
+      // ---------------------------------------------------------
+      async function init() {
+        bindFilters();
+        await loadListings();
+
+        // Realtime: cuando se publique/actualice una propiedad
+        if (window.PasajeRealtime) {
+          const debounced = PasajeRealtime.debounce(loadListings, 2000);
+          PasajeRealtime.subscribeToTable(
+            'inmuebles_public_listings',
+            'real_estate_listings',
+            null,
+            debounced
+          );
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+</body>
+</html>

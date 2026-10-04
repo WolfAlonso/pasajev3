@@ -1,0 +1,750 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Panel de Piloto · Pasaje Express</title>
+  <meta name="theme-color" content="#0d9488">
+  <link rel="manifest" href="../../manifest.json">
+  <link rel="icon" href="../../img/favicon.ico">
+  <link rel="apple-touch-icon" href="../../img/apple-touch-icon.png">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+
+  <script src="../../js/supabase.js?v=8"></script>
+  <script src="../../js/theme-loader.js?v=9"></script>
+  <script src="../../js/footer.js?v=4"></script>
+  <script src="../../js/express-sidebar.js?v=4"></script>
+  <script src="../../js/liquid-glass.js?v=4"></script>
+  <script src="../../js/audio-alerts.js?v=1"></script>
+  <script src="../../js/delivery/delivery-auth-guard.js?v=2"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background-color: #f0fdf4; }
+
+    .suspension-banner {
+      position: relative;
+      background: linear-gradient(135deg, rgba(220,38,38,.22), rgba(127,29,29,.28));
+      backdrop-filter: blur(20px) saturate(160%);
+      -webkit-backdrop-filter: blur(20px) saturate(160%);
+      border: 1px solid rgba(248,113,113,.45);
+      box-shadow: 0 10px 32px -10px rgba(220,38,38,.4), inset 0 1px 0 rgba(255,255,255,.15);
+      overflow: hidden;
+    }
+    .suspension-banner::before {
+      content: ''; position: absolute; inset: 0;
+      background: repeating-linear-gradient(45deg,
+        rgba(255,255,255,.03) 0px, rgba(255,255,255,.03) 12px,
+        transparent 12px, transparent 24px);
+      pointer-events: none;
+    }
+    .suspension-banner > * { position: relative; z-index: 2; }
+
+    .stat-card {
+      background: #fff;
+      border: 1px solid #e2e8f0;
+      border-radius: 16px;
+      padding: 14px;
+      transition: transform .15s, box-shadow .15s;
+    }
+    .stat-card:hover { transform: translateY(-1px); box-shadow: 0 6px 20px -8px rgba(15,23,42,.15); }
+
+    .is-suspended .btn-action-locked {
+      opacity: .45; cursor: not-allowed !important; filter: grayscale(.4); pointer-events: none;
+    }
+
+    #drvActiveMap { height: 300px; border-radius: 14px; z-index: 1; }
+    .leaflet-container { font-family: 'Inter', sans-serif; }
+
+    .ride-timer {
+      font-family: ui-monospace, monospace;
+      font-weight: 800;
+      color: #0d9488;
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+  <div id="expressSidebar"></div>
+
+  <header class="glass-header text-white shadow-lg sticky top-0 z-40 border-b border-white/10">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <button id="sidebarToggleBtn" type="button"
+          onclick="if (window.PasajeExpressSidebar) window.PasajeExpressSidebar.toggle();"
+          class="bg-white/10 hover:bg-white/20 p-2 rounded-xl border border-white/15 text-white lg:hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <a href="../../index.html" class="text-lg font-extrabold text-white">Pasaje Express · <span class="text-teal-300">Piloto</span></a>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="headerEmail" class="hidden sm:inline text-xs opacity-80 max-w-[180px] truncate"></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-6xl mx-auto p-4 w-full flex-1 space-y-5 pb-16">
+
+    <!-- BANNER SUSPENSIÓN -->
+    <div id="suspensionBanner" class="hidden suspension-banner rounded-2xl p-5 flex items-start gap-4">
+      <div class="w-12 h-12 rounded-2xl bg-red-500/25 border border-red-300/40 flex items-center justify-center text-2xl flex-shrink-0">⛔</div>
+      <div class="flex-1 min-w-0">
+        <h3 class="font-black text-red-950 text-sm uppercase tracking-wide">Perfil Suspendido Temporalmente</h3>
+        <p class="text-red-900 text-xs mt-1">Tu cuenta está bloqueada hasta el <strong id="suspensionDate" class="font-mono">—</strong>.</p>
+        <p class="text-red-800/80 text-[11px] mt-1.5">Durante este período no podrás activar tu disponibilidad ni aceptar nuevas carreras.</p>
+      </div>
+    </div>
+
+    <!-- HEADER PILOTO -->
+    <section class="bg-white rounded-3xl border border-slate-200/80 shadow-sm p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+      <div class="flex items-center gap-4">
+        <div class="w-14 h-14 rounded-full bg-teal-600 text-white flex items-center justify-center text-2xl font-black flex-shrink-0">🛵</div>
+        <div class="min-w-0">
+          <h1 id="driverName" class="text-lg font-black text-slate-900 truncate">Cargando...</h1>
+          <p class="text-xs text-slate-500 mt-0.5">
+            <span id="driverVehicle">—</span> · <span id="driverPlate">—</span>
+            <span class="ml-2 text-amber-500">⭐ <span id="driverRating">5.0</span></span>
+          </p>
+        </div>
+      </div>
+      <div class="flex items-center gap-3 bg-slate-50 p-2.5 rounded-xl border border-slate-200 flex-shrink-0">
+        <span class="text-xs font-extrabold text-slate-700">Disponibilidad:</span>
+        <button id="btnToggleOnline" class="px-3 py-1.5 rounded-lg text-xs font-black transition shadow-sm bg-slate-300 text-slate-600">
+          ⚪ En pausa
+        </button>
+      </div>
+    </section>
+
+    <!-- MÉTRICAS -->
+    <section class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+      <div class="stat-card">
+        <p class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Hoy</p>
+        <p id="statTodayEarnings" class="text-2xl font-black text-teal-700 mt-1">Q0.00</p>
+        <p class="text-[10px] text-slate-400 mt-0.5">Ganancias del día</p>
+      </div>
+      <div class="stat-card bg-emerald-50/40 border-emerald-200">
+        <p class="text-[10px] font-black text-emerald-700 uppercase tracking-wider">Semana</p>
+        <p id="statWeekEarnings" class="text-2xl font-black text-emerald-700 mt-1">Q0.00</p>
+        <p class="text-[10px] text-emerald-600/70 mt-0.5">Últimos 7 días</p>
+      </div>
+      <div class="stat-card bg-blue-50/40 border-blue-200">
+        <p class="text-[10px] font-black text-blue-700 uppercase tracking-wider">Viajes</p>
+        <p id="statTotalTrips" class="text-2xl font-black text-blue-700 mt-1">0</p>
+        <p class="text-[10px] text-blue-600/70 mt-0.5">Completados total</p>
+      </div>
+      <div class="stat-card bg-amber-50/40 border-amber-200">
+        <p class="text-[10px] font-black text-amber-700 uppercase tracking-wider">Calificación</p>
+        <p id="statRating" class="text-2xl font-black text-amber-700 mt-1">⭐ 5.0</p>
+        <p class="text-[10px] text-amber-600/70 mt-0.5">Promedio histórico</p>
+      </div>
+    </section>
+
+    <!-- CARRERAS ACTIVAS -->
+    <section class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between flex-wrap gap-2">
+        <div>
+          <h2 class="font-black text-sm text-slate-900 flex items-center gap-2">
+            <span class="inline-block w-2 h-2 rounded-full bg-emerald-500 animate-pulse"></span>
+            Carreras en curso
+          </h2>
+          <p class="text-[11px] text-slate-500 mt-0.5">Valida PINs y finaliza entregas</p>
+        </div>
+        <button id="btnRefreshRides" class="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl">🔄 Actualizar</button>
+      </div>
+      <div id="activeRidesList" class="p-4 space-y-3">
+        <p class="text-center text-slate-400 text-xs py-6">Cargando carreras...</p>
+      </div>
+    </section>
+
+    <!-- MAPA -->
+    <section class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <h2 class="font-black text-sm text-slate-900">🗺️ Tu ubicación en tiempo real</h2>
+        <div class="flex items-center gap-2">
+          <span id="gpsStatus" class="text-[10px] font-black bg-amber-100 text-amber-800 px-3 py-1 rounded-full">Inactivo</span>
+          <button id="btnRecenterMap" class="text-[10px] font-black bg-teal-50 hover:bg-teal-100 text-teal-700 px-3 py-1 rounded-full border border-teal-200">📍 Centrar</button>
+        </div>
+      </div>
+      <div class="p-4">
+        <div class="rounded-2xl overflow-hidden border-2 border-slate-200">
+          <div id="drvActiveMap"></div>
+        </div>
+        <p class="text-[10px] text-slate-400 mt-2 text-center">📍 Tu GPS se actualiza automáticamente para los clientes</p>
+      </div>
+    </section>
+
+    <!-- PERFIL -->
+    <section class="bg-white rounded-3xl border border-slate-200/80 shadow-sm overflow-hidden">
+      <div class="p-4 border-b border-slate-100 flex items-center justify-between">
+        <h2 class="font-black text-sm text-slate-900">👤 Mi Perfil de Piloto</h2>
+        <button id="btnEditProfile" class="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl">✏️ Editar</button>
+      </div>
+      <div id="profileView" class="p-5 grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs">
+        <div><p class="text-slate-500 font-bold uppercase text-[10px]">Nombre</p><p id="pvName" class="font-semibold text-slate-900 mt-0.5">—</p></div>
+        <div><p class="text-slate-500 font-bold uppercase text-[10px]">Teléfono</p><p id="pvPhone" class="font-semibold text-slate-900 mt-0.5">—</p></div>
+        <div><p class="text-slate-500 font-bold uppercase text-[10px]">Vehículo</p><p id="pvVehicle" class="font-semibold text-slate-900 mt-0.5">—</p></div>
+        <div><p class="text-slate-500 font-bold uppercase text-[10px]">Placa</p><p id="pvPlate" class="font-semibold text-slate-900 mt-0.5">—</p></div>
+        <div class="sm:col-span-2"><p class="text-slate-500 font-bold uppercase text-[10px]">Zonas de cobertura</p><p id="pvZones" class="font-semibold text-slate-900 mt-0.5">—</p></div>
+      </div>
+      <div id="profileEdit" class="hidden p-5 space-y-3 border-t border-slate-100">
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Nombre</label>
+            <input id="edName" type="text" class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-teal-500">
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Teléfono</label>
+            <input id="edPhone" type="tel" class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-teal-500">
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Vehículo</label>
+            <select id="edVehicle" class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-teal-500">
+              <option value="moto">🛵 Moto</option>
+              <option value="carro">🚗 Carro</option>
+              <option value="bicicleta">🚲 Bicicleta</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Placa</label>
+            <input id="edPlate" type="text" class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-teal-500">
+          </div>
+          <div class="sm:col-span-2">
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Zonas de cobertura (separadas por coma)</label>
+            <input id="edZones" type="text" placeholder="Zona 1, Zona 3, Zona 9" class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-teal-500">
+          </div>
+        </div>
+        <div class="flex gap-2 pt-2">
+          <button id="btnCancelEdit" class="flex-1 bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs">Cancelar</button>
+          <button id="btnSaveProfile" class="flex-1 bg-teal-600 hover:bg-teal-700 text-white font-extrabold py-2.5 rounded-xl text-xs">Guardar</button>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL PIN -->
+  <div id="pinValidateModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-4 border border-slate-100 text-center">
+      <div class="w-12 h-12 bg-teal-100 text-teal-800 rounded-2xl flex items-center justify-center text-2xl mx-auto font-bold">🔑</div>
+      <div>
+        <h3 id="pinValidateTitle" class="font-black text-slate-900 text-sm">Validar PIN</h3>
+        <p id="pinValidateDesc" class="text-[11px] text-slate-500 mt-1">Ingresa el PIN de 4 dígitos.</p>
+      </div>
+      <input type="hidden" id="pinValidateRequestId" />
+      <input type="hidden" id="pinValidateStep" />
+      <input type="text" id="pinValidateInput" maxlength="4" inputmode="numeric" placeholder="••••"
+        class="w-full text-center text-2xl font-black tracking-[0.5em] border-2 border-slate-200 p-3 rounded-2xl outline-none focus:border-teal-500 bg-slate-50" />
+      <div class="grid grid-cols-2 gap-2">
+        <button type="button" id="btnPinCancel" class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs">Cancelar</button>
+        <button type="button" id="btnPinConfirm" class="bg-teal-600 hover:bg-teal-700 text-white font-extrabold py-2.5 rounded-xl text-xs">Validar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pasajeFooter"></div>
+
+  <script>
+    let currentUser = null;
+    let currentDriver = null;
+    let activeRides = [];
+    let rideTimerInterval = null;
+
+    let drvMap = null;
+    let drvMarker = null;
+    let gpsWatchId = null;
+    let lastGpsPush = 0;
+
+    (async () => {
+      const guard = await window.PasajeDeliveryGuard.guard({ requiredRole: 'delivery', allowAdmin: true });
+      if (!guard || !guard.session) return;
+      if (!guard.hasRole && !guard.isAdmin) return;
+
+      const client = window._supabase;
+      currentUser = guard.user;
+      document.getElementById('headerEmail').textContent = currentUser.email || '';
+
+      // Cargar o crear ficha de piloto
+      const { data: driverData } = await client
+        .from('delivery_drivers').select('*').eq('user_id', currentUser.id).maybeSingle();
+
+      if (!driverData) {
+        const { data: created } = await client.from('delivery_drivers').insert([{
+          user_id: currentUser.id,
+          full_name: (currentUser.email || '').split('@')[0] || 'Piloto',
+          is_available: false,
+          is_verified: false
+        }]).select().single();
+        currentDriver = created;
+      } else {
+        currentDriver = driverData;
+      }
+
+      renderProfile(currentDriver);
+      applySuspension();
+      updateOnlineBtn();
+
+      await loadMetrics();
+      await loadActiveRides();
+
+      startGps();
+      startRideTimer();
+      bindEvents();
+      startRealtime();
+    })();
+
+    // ============================================================
+    // Utilidades
+    // ============================================================
+    function esc(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+    function fmtMoney(n) { return `Q${parseFloat(n || 0).toFixed(2)}`; }
+    function fmtDate(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleDateString('es-GT',{day:'2-digit',month:'2-digit',year:'numeric'}) + ' · '
+        + d.toLocaleTimeString('es-GT',{hour:'2-digit',minute:'2-digit',hour12:true});
+    }
+    function fmtDuration(sec) {
+      if (!Number.isFinite(sec) || sec < 0) return '00:00';
+      const h = Math.floor(sec / 3600);
+      const m = Math.floor((sec % 3600) / 60);
+      const s = Math.floor(sec % 60);
+      if (h > 0) return `${h}h ${String(m).padStart(2,'0')}m`;
+      return `${String(m).padStart(2,'0')}:${String(s).padStart(2,'0')}`;
+    }
+
+    // ============================================================
+    // Suspensión
+    // ============================================================
+    function isSuspended(driver) {
+      if (!driver || !driver.suspended_until) return false;
+      return new Date(driver.suspended_until).getTime() > Date.now();
+    }
+    function fmtSuspension(iso) {
+      if (!iso) return '—';
+      const d = new Date(iso);
+      return d.toLocaleDateString('es-GT',{day:'2-digit',month:'2-digit',year:'numeric'}) + ', '
+        + d.toLocaleTimeString('es-GT',{hour:'2-digit',minute:'2-digit',hour12:true});
+    }
+    function applySuspension() {
+      const banner = document.getElementById('suspensionBanner');
+      if (isSuspended(currentDriver)) {
+        banner.classList.remove('hidden');
+        document.getElementById('suspensionDate').textContent = fmtSuspension(currentDriver.suspended_until);
+        document.body.classList.add('is-suspended');
+
+        // Auto-offline si está marcado disponible
+        if (currentDriver.is_available) {
+          window._supabase.from('delivery_drivers')
+            .update({ is_available: false, updated_at: new Date().toISOString() })
+            .eq('id', currentDriver.id)
+            .then(() => {
+              currentDriver.is_available = false;
+              updateOnlineBtn();
+            });
+        }
+      } else {
+        banner.classList.add('hidden');
+        document.body.classList.remove('is-suspended');
+      }
+    }
+
+    // ============================================================
+    // Toggle online/offline
+    // ============================================================
+    function updateOnlineBtn() {
+      const btn = document.getElementById('btnToggleOnline');
+      const suspended = isSuspended(currentDriver);
+
+      if (suspended) {
+        btn.textContent = '🔒 Suspendido';
+        btn.className = 'px-3 py-1.5 rounded-lg text-xs font-black bg-red-500 text-white opacity-70 cursor-not-allowed';
+        btn.disabled = true; btn.onclick = null;
+        return;
+      }
+      btn.disabled = false;
+      if (currentDriver.is_available) {
+        btn.textContent = '🟢 En línea';
+        btn.className = 'px-3 py-1.5 rounded-lg text-xs font-black bg-emerald-500 text-white shadow-sm';
+      } else {
+        btn.textContent = '⚪ En pausa';
+        btn.className = 'px-3 py-1.5 rounded-lg text-xs font-black bg-slate-300 text-slate-600 shadow-sm';
+      }
+      btn.onclick = async () => {
+        if (isSuspended(currentDriver)) { alert('⛔ Tu perfil está suspendido.'); return; }
+        const ns = !currentDriver.is_available;
+        const { error } = await window._supabase.from('delivery_drivers')
+          .update({ is_available: ns, updated_at: new Date().toISOString() })
+          .eq('id', currentDriver.id);
+        if (error) { alert('Error: ' + error.message); return; }
+        currentDriver.is_available = ns;
+        updateOnlineBtn();
+      };
+    }
+
+    // ============================================================
+    // Perfil
+    // ============================================================
+    function renderProfile(driver) {
+      document.getElementById('driverName').textContent = driver.full_name || 'Piloto';
+      document.getElementById('driverVehicle').textContent = driver.vehicle_type || 'Moto';
+      document.getElementById('driverPlate').textContent = driver.license_plate || 'Sin placa';
+      document.getElementById('driverRating').textContent = parseFloat(driver.rating_avg || 5).toFixed(1);
+
+      document.getElementById('pvName').textContent = driver.full_name || '—';
+      document.getElementById('pvPhone').textContent = driver.phone || '—';
+      document.getElementById('pvVehicle').textContent = driver.vehicle_type || '—';
+      document.getElementById('pvPlate').textContent = driver.license_plate || '—';
+      const zones = Array.isArray(driver.coverage_zones) ? driver.coverage_zones.join(', ') : '—';
+      document.getElementById('pvZones').textContent = zones || '—';
+    }
+
+    function bindProfileButtons() {
+      document.getElementById('btnEditProfile').onclick = () => {
+        document.getElementById('edName').value = currentDriver.full_name || '';
+        document.getElementById('edPhone').value = currentDriver.phone || '';
+        document.getElementById('edVehicle').value = currentDriver.vehicle_type || 'moto';
+        document.getElementById('edPlate').value = currentDriver.license_plate || '';
+        const zones = Array.isArray(currentDriver.coverage_zones) ? currentDriver.coverage_zones.join(', ') : '';
+        document.getElementById('edZones').value = zones;
+        document.getElementById('profileEdit').classList.remove('hidden');
+      };
+      document.getElementById('btnCancelEdit').onclick = () => {
+        document.getElementById('profileEdit').classList.add('hidden');
+      };
+      document.getElementById('btnSaveProfile').onclick = async () => {
+        const name = document.getElementById('edName').value.trim();
+        const phone = document.getElementById('edPhone').value.trim();
+        const vehicle = document.getElementById('edVehicle').value;
+        const plate = document.getElementById('edPlate').value.trim();
+        const zones = document.getElementById('edZones').value.split(',').map(z => z.trim()).filter(Boolean);
+
+        const btn = document.getElementById('btnSaveProfile');
+        btn.disabled = true; btn.textContent = 'Guardando...';
+
+        const { error } = await window._supabase.from('delivery_drivers').update({
+          full_name: name || null,
+          phone: phone || null,
+          vehicle_type: vehicle,
+          license_plate: plate || null,
+          coverage_zones: zones,
+          updated_at: new Date().toISOString()
+        }).eq('id', currentDriver.id);
+
+        btn.disabled = false; btn.textContent = 'Guardar';
+
+        if (error) { alert('Error: ' + error.message); return; }
+        Object.assign(currentDriver, {
+          full_name: name, phone, vehicle_type: vehicle,
+          license_plate: plate, coverage_zones: zones
+        });
+        renderProfile(currentDriver);
+        document.getElementById('profileEdit').classList.add('hidden');
+      };
+    }
+
+    // ============================================================
+    // Métricas
+    // ============================================================
+    async function loadMetrics() {
+      const c = window._supabase;
+      const today = new Date(); today.setHours(0,0,0,0);
+      const weekAgo = new Date(Date.now() - 7*24*3600*1000);
+
+      const { data: all } = await c.from('delivery_requests')
+        .select('final_fee, suggested_fee, status, updated_at, created_at')
+        .eq('driver_id', currentDriver.id)
+        .in('status', ['delivered','completed']);
+
+      const list = all || [];
+      const todayList = list.filter(r => new Date(r.updated_at || r.created_at) >= today);
+      const weekList  = list.filter(r => new Date(r.updated_at || r.created_at) >= weekAgo);
+      const sum = arr => arr.reduce((s, r) => s + parseFloat(r.final_fee || r.suggested_fee || 0), 0);
+
+      document.getElementById('statTodayEarnings').textContent = fmtMoney(sum(todayList));
+      document.getElementById('statWeekEarnings').textContent = fmtMoney(sum(weekList));
+      document.getElementById('statTotalTrips').textContent = list.length;
+      document.getElementById('statRating').textContent = '⭐ ' + parseFloat(currentDriver.rating_avg || 5).toFixed(1);
+    }
+
+    // ============================================================
+    // Carreras activas
+    // ============================================================
+    async function loadActiveRides() {
+      const c = window._supabase;
+      const listEl = document.getElementById('activeRidesList');
+
+      const { data } = await c.from('delivery_requests')
+        .select('*')
+        .eq('driver_id', currentDriver.id)
+        .in('status', ['accepted','in_transit','on_the_way'])
+        .order('updated_at', { ascending: false });
+
+      activeRides = data || [];
+
+      if (!activeRides.length) {
+        listEl.innerHTML = `<p class="text-center text-slate-400 text-xs py-6">No tienes carreras activas en este momento.</p>`;
+        return;
+      }
+
+      listEl.innerHTML = activeRides.map(r => {
+        const isPickup = r.status === 'accepted';
+        const fee = parseFloat(r.final_fee || r.counter_fee || r.suggested_fee || 0).toFixed(2);
+        const startIso = r.updated_at || r.created_at;
+        const startMs = new Date(startIso).getTime();
+        const elapsed = Math.max(0, Math.floor((Date.now() - startMs) / 1000));
+
+        return `
+          <article class="rounded-2xl border border-slate-200 bg-slate-50/60 p-4 space-y-3" data-ride-id="${r.id}">
+            <div class="flex justify-between items-start border-b pb-2">
+              <div class="min-w-0">
+                <p class="text-[10px] font-mono text-slate-400">#${esc(String(r.id).slice(0,8).toUpperCase())}</p>
+                <p class="font-black text-xs text-slate-900 mt-0.5">📍 ${esc(r.origin_address || 'Origen')}</p>
+                <p class="font-black text-xs text-slate-900">🎯 ${esc(r.destination_address || 'Destino')}</p>
+                <p class="text-[10px] text-slate-500 mt-1">👤 ${esc(r.customer_name || 'Cliente')}</p>
+              </div>
+              <div class="text-right">
+                <span class="inline-block text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${isPickup ? 'bg-blue-100 text-blue-800' : 'bg-purple-100 text-purple-800'}">
+                  ${isPickup ? '📌 Recoger' : '🚀 Entregar'}
+                </span>
+                <p class="font-black text-teal-600 mt-1">Q${fee}</p>
+                <p class="text-[9px] text-slate-400 mt-0.5">⏱️ <span class="ride-timer" data-start-ms="${startMs}">${fmtDuration(elapsed)}</span></p>
+              </div>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              ${r.customer_phone ? `<a href="https://wa.me/${String(r.customer_phone).replace(/\D/g,'')}" target="_blank"
+                class="text-center bg-[#25D366] hover:bg-[#128C7E] text-white font-extrabold py-2 rounded-xl text-xs">📱 WhatsApp</a>` : '<div></div>'}
+              ${isPickup ? `
+                <button data-action="pin-pickup" data-req="${r.id}" class="bg-blue-600 hover:bg-blue-700 text-white font-extrabold py-2 rounded-xl text-xs">🔑 PIN Recoger</button>
+              ` : `
+                <button data-action="pin-deliver" data-req="${r.id}" class="bg-teal-600 hover:bg-teal-700 text-white font-extrabold py-2 rounded-xl text-xs">🔑 PIN Entregar</button>
+              `}
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      listEl.querySelectorAll('[data-action]').forEach(btn => {
+        btn.onclick = () => {
+          const step = btn.dataset.action === 'pin-pickup' ? 'pickup' : 'delivery';
+          openPinModal(btn.dataset.req, step);
+        };
+      });
+    }
+
+    // Cronómetro en vivo por cada ride
+    function startRideTimer() {
+      if (rideTimerInterval) clearInterval(rideTimerInterval);
+      rideTimerInterval = setInterval(() => {
+        document.querySelectorAll('.ride-timer[data-start-ms]').forEach(el => {
+          const startMs = parseInt(el.dataset.startMs, 10);
+          if (!isFinite(startMs)) return;
+          el.textContent = fmtDuration(Math.max(0, Math.floor((Date.now() - startMs) / 1000)));
+        });
+      }, 1000);
+    }
+
+    // ============================================================
+    // PIN modal
+    // ============================================================
+    function openPinModal(reqId, step) {
+      document.getElementById('pinValidateRequestId').value = reqId;
+      document.getElementById('pinValidateStep').value = step;
+      document.getElementById('pinValidateInput').value = '';
+      document.getElementById('pinValidateTitle').textContent =
+        step === 'pickup' ? '📌 PIN de Recolección' : '🔑 PIN de Entrega';
+      document.getElementById('pinValidateDesc').textContent =
+        step === 'pickup' ? 'Ingresa el PIN que te dio el origen.' : 'Ingresa el PIN que te dio el destinatario.';
+      document.getElementById('pinValidateModal').classList.remove('hidden');
+      setTimeout(() => document.getElementById('pinValidateInput').focus(), 80);
+    }
+
+    function bindPinModal() {
+      document.getElementById('btnPinCancel').onclick = () =>
+        document.getElementById('pinValidateModal').classList.add('hidden');
+
+      document.getElementById('btnPinConfirm').onclick = async () => {
+        const reqId = document.getElementById('pinValidateRequestId').value;
+        const step  = document.getElementById('pinValidateStep').value;
+        const entered = document.getElementById('pinValidateInput').value.trim();
+
+        const c = window._supabase;
+        const { data: req } = await c.from('delivery_requests').select('*').eq('id', reqId).maybeSingle();
+        if (!req) { alert('Carrera no encontrada.'); return; }
+
+        const expected = step === 'pickup' ? req.pickup_pin : req.delivery_pin;
+        if (!expected || entered !== String(expected)) {
+          alert('❌ PIN incorrecto.');
+          document.getElementById('pinValidateInput').value = '';
+          return;
+        }
+
+        const newStatus = step === 'pickup' ? 'in_transit' : 'delivered';
+        const now = new Date().toISOString();
+
+        const { error } = await c.from('delivery_requests').update({
+          status: newStatus, updated_at: now
+        }).eq('id', reqId);
+        if (error) { alert('Error: ' + error.message); return; }
+
+        if (step === 'delivery') {
+          if (req.order_id) {
+            await c.from('cart_orders').update({ status: 'completed', status_updated_at: now }).eq('id', req.order_id);
+          }
+          await c.from('delivery_drivers').update({
+            total_trips: (currentDriver.total_trips || 0) + 1
+          }).eq('id', currentDriver.id);
+          currentDriver.total_trips = (currentDriver.total_trips || 0) + 1;
+        }
+
+        document.getElementById('pinValidateModal').classList.add('hidden');
+        alert(step === 'pickup' ? '✅ ¡En ruta!' : '🎉 ¡Entrega confirmada!');
+        await loadActiveRides();
+        await loadMetrics();
+      };
+    }
+
+    // ============================================================
+    // GPS + Mapa
+    // ============================================================
+    function initMap() {
+      if (drvMap) return;
+      const el = document.getElementById('drvActiveMap');
+      if (!el) return;
+      drvMap = L.map(el, { zoomControl: true }).setView([14.8347, -91.5186], 14);
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19, attribution: '© OpenStreetMap'
+      }).addTo(drvMap);
+      setTimeout(() => drvMap.invalidateSize(), 250);
+    }
+
+    function updateMapMarker(lat, lng) {
+      if (!drvMap) initMap();
+      if (!drvMap) return;
+      const icon = L.divIcon({
+        className: '',
+        html: `<div style="width:38px;height:38px;background:#0d9488;border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:16px;border:3px solid #fff;box-shadow:0 4px 12px rgba(0,0,0,0.35)">🛵</div>`,
+        iconSize: [38, 38], iconAnchor: [19, 19]
+      });
+      if (!drvMarker) {
+        drvMarker = L.marker([lat, lng], { icon }).addTo(drvMap).bindPopup('Tu ubicación actual');
+      } else {
+        drvMarker.setLatLng([lat, lng]);
+      }
+      drvMap.setView([lat, lng], Math.max(drvMap.getZoom(), 14));
+    }
+
+    function startGps() {
+      const statusEl = document.getElementById('gpsStatus');
+      if (!('geolocation' in navigator)) {
+        statusEl.textContent = 'No soportado';
+        statusEl.className = 'text-[10px] font-black bg-rose-100 text-rose-800 px-3 py-1 rounded-full';
+        return;
+      }
+      if (gpsWatchId !== null) {
+        try { navigator.geolocation.clearWatch(gpsWatchId); } catch(e) {}
+      }
+      gpsWatchId = navigator.geolocation.watchPosition(
+        async (pos) => {
+          statusEl.textContent = '🟢 Activo';
+          statusEl.className = 'text-[10px] font-black bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full';
+          const lat = pos.coords.latitude;
+          const lng = pos.coords.longitude;
+          updateMapMarker(lat, lng);
+
+          const now = Date.now();
+          if (now - lastGpsPush < 8000) return;
+          lastGpsPush = now;
+          try {
+            const { data: activeReqs } = await window._supabase.from('delivery_requests')
+              .select('id').eq('driver_id', currentDriver.id)
+              .in('status', ['accepted','in_transit','on_the_way']);
+            if (activeReqs && activeReqs.length) {
+              const ids = activeReqs.map(r => r.id);
+              await window._supabase.from('delivery_requests')
+                .update({
+                  driver_lat: lat, driver_lng: lng,
+                  driver_location_updated_at: new Date().toISOString()
+                })
+                .in('id', ids);
+            }
+          } catch (e) { /* silencioso */ }
+        },
+        () => {
+          statusEl.textContent = 'Bloqueado';
+          statusEl.className = 'text-[10px] font-black bg-rose-100 text-rose-800 px-3 py-1 rounded-full';
+        },
+        { enableHighAccuracy: true, timeout: 20000, maximumAge: 8000 }
+      );
+      initMap();
+    }
+
+    function bindRecenterMap() {
+      document.getElementById('btnRecenterMap').onclick = async () => {
+        if (!('geolocation' in navigator)) return;
+        navigator.geolocation.getCurrentPosition(
+          (pos) => {
+            const lat = pos.coords.latitude, lng = pos.coords.longitude;
+            if (drvMap) drvMap.setView([lat, lng], 16);
+            updateMapMarker(lat, lng);
+          },
+          () => alert('No pudimos obtener tu ubicación.'),
+          { enableHighAccuracy: true, timeout: 8000 }
+        );
+      };
+    }
+
+    // ============================================================
+    // Realtime
+    // ============================================================
+    function startRealtime() {
+      if (!window.PasajeRealtime) return;
+
+      PasajeRealtime.subscribeToTable(
+        `drv_dash_${currentDriver.id}`,
+        'delivery_requests',
+        null,
+        () => loadActiveRides()
+      );
+
+      PasajeRealtime.subscribeToTable(
+  `drv_dash_${currentDriver.id}`,
+  'delivery_requests',
+  null,
+  (payload) => {
+    if (payload.eventType === 'INSERT' && window.PasajeAudio) {
+      window.PasajeAudio.playAlert('delivery');
+    }
+    // Si el evento es una actualización a counter_offered
+    if (payload.eventType === 'UPDATE'
+        && payload.new
+        && payload.new.status === 'counter_offered'
+        && window.PasajeAudio) {
+      window.PasajeAudio.playAlert('delivery');
+    }
+    loadActiveRides();
+  }
+);
+    }
+
+    // ============================================================
+    // Bind events
+    // ============================================================
+    function bindEvents() {
+      bindProfileButtons();
+      bindPinModal();
+      bindRecenterMap();
+
+      document.getElementById('btnRefreshRides').onclick = () => {
+        loadActiveRides();
+        loadMetrics();
+      };
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../../manifest.json">
+  <link rel="icon" href="../../img/favicon.ico">
+  <title>CRM & Libreta de Clientes · Pasaje Tiendas</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../../js/supabase.js?v=8"></script>
+  <script src="../../js/theme-loader.js?v=8"></script>
+  <script src="../../js/tiendas/tienda-auth-guard.js?v=1"></script>
+  <script src="../../js/tiendas/merchant-sidebar.js?v=1"></script>
+  <script src="../../js/dashboard-utils.js?v=8"></script>
+  <script src="../../js/liquid-glass.js?v=5"></script>
+  <script src="../../js/audio-alerts.js?v=2"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <script>
+    (function () {
+      if (typeof window.dashEscapeHtml === 'undefined') {
+        window.dashEscapeHtml = function (s) {
+          return String(s ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        };
+      }
+      if (typeof window.cleanPhone === 'undefined') {
+        window.cleanPhone = function (raw) { return String(raw || '').replace(/\D/g, ''); };
+      }
+    })();
+  </script>
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--color-secondary, #f8fafc);
+      color: var(--color-text, #1e293b);
+      background-image: var(--bg-image, none);
+      background-size: cover;
+      background-attachment: fixed;
+      background-position: center;
+      min-height: 100vh;
+    }
+
+    .glass-container, .simple-card {
+      background-color: rgba(255, 255, 255, 0.85);
+      backdrop-filter: blur(16px);
+      -webkit-backdrop-filter: blur(16px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+      border-radius: var(--theme-radius, 1rem);
+      color: var(--color-text, #1e293b);
+      box-shadow: 0 4px 12px -2px rgba(15, 23, 42, 0.05);
+    }
+
+    h1, h2, h3, h4 { color: var(--color-heading, #0f172a); }
+
+    .filter-chip {
+      font-size: 12px; font-weight: 700;
+      padding: 6px 14px; border-radius: 9999px;
+      transition: all .15s; cursor: pointer; border: 1px solid #cbd5e1;
+      background: rgba(255, 255, 255, 0.85); color: #475569;
+      white-space: nowrap;
+    }
+    .filter-chip-active { background: #0f172a; color: white; border-color: #0f172a; }
+
+    .tag-badge {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 800; padding: 2px 8px;
+      border-radius: 9999px; border: 1px solid transparent;
+    }
+    .tag-frecuente { background: #fef3c7; color: #92400e; border-color: #fde68a; }
+    .tag-mayorista { background: #e0e7ff; color: #3730a3; border-color: #c7d2fe; }
+    .tag-pendiente { background: #fee2e2; color: #991b1b; border-color: #fca5a5; }
+    .tag-nuevo { background: #d1fae5; color: #065f46; border-color: #a7f3d0; }
+
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+  </style>
+</head>
+<body class="min-h-screen text-slate-800">
+
+  <div id="merchantSidebar"></div>
+
+  <main class="max-w-5xl mx-auto p-4 pb-20">
+
+    <div id="loadingState" class="simple-card p-8 text-center text-slate-500 font-medium">
+      ⏳ Abriendo libreta de clientes y CRM...
+    </div>
+
+    <div id="errorState" class="hidden simple-card p-6 border-l-4 border-red-500 mb-4 bg-red-50/80">
+      <p class="text-sm font-bold text-red-700">No se pudieron cargar tus clientes.</p>
+      <p id="errorMsg" class="text-xs text-red-600 mt-1"></p>
+    </div>
+
+    <section id="content" class="hidden space-y-5">
+
+      <div class="flex flex-col sm:flex-row sm:items-center justify-between gap-4 simple-card p-5 rounded-2xl shadow-sm">
+        <div>
+          <h1 class="text-2xl font-black flex items-center gap-2">
+            👥 CRM & Agenda Personalizada
+          </h1>
+          <p class="text-xs text-slate-500 font-medium mt-1">
+            Gestión y edición completa de datos de compradores, llamadas a un toque y notas privadas.
+          </p>
+        </div>
+        <button type="button" id="newSaleBtn"
+          class="bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-5 py-3 rounded-xl shadow-md transition flex items-center justify-center gap-2">
+          <span>➕</span> Registrar nueva venta
+        </button>
+      </div>
+
+      <div class="grid grid-cols-2 sm:grid-cols-3 gap-3">
+        <div class="simple-card p-4 border-l-4 border-blue-500">
+          <p class="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Total Compradores</p>
+          <p id="custTotal" class="text-2xl sm:text-3xl font-black text-slate-900 mt-1">0</p>
+        </div>
+        <div class="simple-card p-4 border-l-4 border-emerald-500">
+          <p class="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Con Teléfono Móvil</p>
+          <p id="custWithPhone" class="text-2xl sm:text-3xl font-black text-slate-900 mt-1">0</p>
+        </div>
+        <div class="col-span-2 sm:col-span-1 simple-card p-4 border-l-4 border-amber-500">
+          <p class="text-[10px] sm:text-xs font-bold text-slate-500 uppercase tracking-wider">Clientes Frecuentes</p>
+          <p id="custFrequentCount" class="text-2xl sm:text-3xl font-black text-amber-700 mt-1">0</p>
+        </div>
+      </div>
+
+      <div class="simple-card p-4 space-y-3">
+        <div class="relative">
+          <input type="text" id="custSearch" placeholder="🔍 Buscar por nombre, teléfono o correo..."
+            class="w-full pl-4 pr-4 py-3 border border-slate-300 rounded-xl text-sm font-medium focus:ring-2 focus:ring-emerald-500 outline-none bg-white/80 text-slate-900">
+        </div>
+
+        <div class="flex gap-2 overflow-x-auto pb-1 no-scrollbar" id="custFilterChips">
+          <button data-filter="all" class="filter-chip filter-chip-active">Todos</button>
+          <button data-filter="frecuente" class="filter-chip">⭐ Frecuentes</button>
+          <button data-filter="mayorista" class="filter-chip">📦 Mayoristas</button>
+          <button data-filter="pendiente" class="filter-chip">⚠️ Pago Pendiente</button>
+          <button data-filter="nuevo" class="filter-chip">🆕 Nuevos</button>
+          <button data-filter="inactivo" class="filter-chip">⏸️ Inactivos (+60 días)</button>
+        </div>
+      </div>
+
+      <div id="customersList" class="space-y-3">
+        <p class="p-8 text-center text-sm text-slate-500">Cargando lista...</p>
+      </div>
+
+    </section>
+  </main>
+
+  <div id="customerModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-50 flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto border border-slate-200">
+      <div id="customerModalContent" class="p-5 sm:p-6 space-y-4"></div>
+    </div>
+  </div>
+
+  <div id="saleModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-xs z-[60] flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto border border-slate-200">
+      <div class="p-5 border-b border-slate-100 flex items-center justify-between">
+        <div>
+          <h3 class="text-lg font-black text-slate-900">➕ Anotar Venta Manual</h3>
+          <p class="text-xs text-slate-500 mt-0.5">Registra una venta hecha por teléfono o en persona</p>
+        </div>
+        <button type="button" id="closeSaleModalBtn"
+          class="bg-slate-100 hover:bg-slate-200 text-slate-700 w-9 h-9 rounded-xl font-bold flex items-center justify-center">✕</button>
+      </div>
+
+      <form id="saleForm" class="p-5 space-y-4">
+        <div>
+          <label class="block text-xs font-extrabold text-slate-700 uppercase mb-1">¿Qué producto vendiste? *</label>
+          <select id="saleProduct" required
+            class="w-full border border-slate-300 p-3 rounded-xl bg-white text-sm font-semibold focus:ring-2 focus:ring-emerald-500 outline-none">
+            <option value="">Selecciona un producto...</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-extrabold text-slate-700 uppercase mb-1">Cantidad *</label>
+            <input type="number" min="1" step="1" id="saleQuantity" value="1" required
+              class="w-full border border-slate-300 p-3 rounded-xl text-sm font-bold focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-extrabold text-slate-700 uppercase mb-1">Precio unitario (Q) *</label>
+            <input type="number" min="0" step="0.01" id="saleUnitPrice" value="0" required
+              class="w-full border border-slate-300 p-3 rounded-xl text-sm font-bold focus:ring-2 focus:ring-emerald-500 outline-none">
+          </div>
+        </div>
+
+        <div class="bg-emerald-50 p-3 rounded-xl border border-emerald-200 flex items-center justify-between">
+          <span class="text-xs font-bold text-emerald-800 uppercase">Cobro Total:</span>
+          <input type="text" id="saleTotal" value="Q 0.00" readonly
+            class="bg-transparent text-right text-lg font-black text-emerald-700 outline-none">
+        </div>
+
+        <hr class="border-slate-200">
+
+        <p class="text-xs font-extrabold text-slate-400 uppercase tracking-wider">👤 Datos del Comprador (Opcional)</p>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Nombre completo</label>
+          <input type="text" id="saleCustomerName" placeholder="Ej. María López"
+            class="w-full border border-slate-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Número de WhatsApp / Teléfono</label>
+          <input type="tel" id="saleCustomerPhone" placeholder="Ej. 55123456" maxlength="12"
+            class="w-full border border-slate-300 p-3 rounded-xl text-sm font-mono focus:ring-2 focus:ring-emerald-500 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 mb-1">Dirección de entrega</label>
+          <input type="text" id="saleCustomerAddress" placeholder="Ej. Zona 1, Quetzaltenango"
+            class="w-full border border-slate-300 p-3 rounded-xl text-sm focus:ring-2 focus:ring-emerald-500 outline-none">
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" id="cancelSaleBtn"
+            class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-3 rounded-xl text-sm transition">
+            Cancelar
+          </button>
+          <button type="submit" id="submitSaleBtn"
+            class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl text-sm shadow-md transition">
+            Guardar Venta
+          </button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    const $ = (id) => document.getElementById(id);
+    const esc = window.dashEscapeHtml;
+
+    let currentStore = null;
+    let allCustomers = [];
+    let allCustomerProfiles = {};
+    let allProducts = [];
+    let currentTagFilter = 'all';
+
+    const modal = $('customerModal');
+    const saleModal = $('saleModal');
+
+    (async () => {
+      try {
+        const ctx = await window.tiendaRequireMerchant();
+        if (!ctx) return;
+
+        currentStore = ctx.store;
+        if (!currentStore) {
+          window.location.replace('index.html');
+          return;
+        }
+
+        await window.initMerchantNav(ctx);
+
+        $('loadingState').classList.add('hidden');
+        $('content').classList.remove('hidden');
+
+        await Promise.all([ loadCustomers(), loadProducts() ]);
+
+        $('custSearch').addEventListener('input', renderCustomers);
+
+        $('custFilterChips').addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-filter]');
+          if (!btn) return;
+          document.querySelectorAll('#custFilterChips .filter-chip').forEach(b => {
+            b.classList.remove('filter-chip-active');
+          });
+          btn.classList.add('filter-chip-active');
+          currentTagFilter = btn.dataset.filter;
+          renderCustomers();
+        });
+
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeModal(); });
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeModal();
+        });
+
+        $('newSaleBtn').addEventListener('click', openSaleModal);
+        $('closeSaleModalBtn').addEventListener('click', closeSaleModal);
+        $('cancelSaleBtn').addEventListener('click', closeSaleModal);
+        saleModal.addEventListener('click', (e) => { if (e.target === saleModal) closeSaleModal(); });
+
+        $('saleProduct').addEventListener('change', (e) => {
+          const p = allProducts.find(x => String(x.id) === e.target.value);
+          if (p) $('saleUnitPrice').value = parseFloat(p.price).toFixed(2);
+          updateSaleTotal();
+        });
+
+        $('saleQuantity').addEventListener('input', updateSaleTotal);
+        $('saleUnitPrice').addEventListener('input', updateSaleTotal);
+        $('saleForm').addEventListener('submit', handleSaleSubmit);
+
+      } catch (err) {
+        console.error('[Clientes] init:', err);
+        $('loadingState').classList.add('hidden');
+        $('errorState').classList.remove('hidden');
+        $('errorMsg').textContent = err?.message || 'Error desconocido';
+      }
+    })();
+
+    function closeModal() {
+      modal.classList.add('hidden');
+      document.body.style.overflow = '';
+      $('customerModalContent').innerHTML = '';
+    }
+
+    function openSaleModal() {
+      $('saleForm').reset();
+      $('saleQuantity').value = 1;
+      $('saleUnitPrice').value = 0;
+      $('saleTotal').value = 'Q 0.00';
+
+      const sel = $('saleProduct');
+      sel.innerHTML = '<option value="">Selecciona un producto...</option>' +
+        allProducts.map(p => `<option value="${p.id}">${esc(p.title)} — Q ${parseFloat(p.price).toFixed(2)}</option>`).join('');
+
+      saleModal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeSaleModal() {
+      saleModal.classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
+    function updateSaleTotal() {
+      const q = parseFloat($('saleQuantity').value) || 0;
+      const u = parseFloat($('saleUnitPrice').value) || 0;
+      $('saleTotal').value = 'Q ' + (q * u).toFixed(2);
+    }
+
+    async function loadProducts() {
+      const { data } = await _supabase
+        .from('products')
+        .select('id, title, price, is_active')
+        .eq('store_id', currentStore.id)
+        .eq('is_active', true)
+        .order('title', { ascending: true });
+
+      allProducts = (data || []).map(p => ({ ...p, price: parseFloat(p.price) || 0 }));
+    }
+
+    async function handleSaleSubmit(e) {
+      e.preventDefault();
+      const btn = $('submitSaleBtn');
+      btn.disabled = true;
+      btn.textContent = 'Guardando...';
+
+      try {
+        const productId = $('saleProduct').value;
+        const product = allProducts.find(p => String(p.id) === productId);
+        if (!product) throw new Error('Por favor selecciona un producto.');
+
+        const quantity = Math.max(1, parseInt($('saleQuantity').value, 10) || 1);
+        const unitPrice = Math.max(0, parseFloat($('saleUnitPrice').value) || 0);
+
+        const customerName = $('saleCustomerName').value.trim() || null;
+        const rawPhone = $('saleCustomerPhone').value.trim();
+        const customerPhone = rawPhone ? cleanPhone(rawPhone) : null;
+        const customerAddress = $('saleCustomerAddress').value.trim() || null;
+
+        const payload = {
+          store_id: currentStore.id,
+          product_id: product.id,
+          product_title: product.title,
+          quantity: quantity,
+          total_revenue: quantity * unitPrice,
+          customer_name: customerName,
+          customer_phone: customerPhone,
+          customer_address: customerAddress,
+          created_at: new Date().toISOString()
+        };
+
+        const { error } = await _supabase.from('sales_log').insert([payload]);
+        if (error) throw error;
+
+        closeSaleModal();
+        await loadCustomers();
+
+        alert('✅ Venta registrada correctamente.');
+
+      } catch (err) {
+        alert('Error al guardar la venta: ' + (err.message || 'Error de conexión'));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Guardar Venta';
+      }
+    }
+
+    async function loadCustomers() {
+      const container = $('customersList');
+      container.innerHTML = '<p class="p-8 text-center text-sm text-slate-500">Cargando tus clientes...</p>';
+
+      const { data, error } = await _supabase
+        .from('sales_log')
+        .select(`
+          id, quantity, total_revenue, created_at,
+          customer_name, customer_phone, customer_address,
+          products ( title )
+        `)
+        .eq('store_id', currentStore.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        container.innerHTML = `<p class="p-8 text-center text-sm text-red-500">Error: ${esc(error.message)}</p>`;
+        return;
+      }
+
+      try {
+        const res = await _supabase.from('customer_profiles').select('*').eq('store_id', currentStore.id);
+        (res.data || []).forEach(p => { allCustomerProfiles[p.customer_key] = p; });
+      } catch (e) { console.warn('customer_profiles no disponible'); }
+
+      const withCustomer = (data || []).filter(s => s.customer_phone || s.customer_name);
+      const map = new Map();
+
+      withCustomer.forEach(s => {
+        const rawPhone = s.customer_phone ? cleanPhone(s.customer_phone) : null;
+        const key = rawPhone ? rawPhone : `name:${s.customer_name}`;
+
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            rawName: s.customer_name || null,
+            rawPhone: rawPhone,
+            rawAddress: s.customer_address || null,
+            purchases: [],
+            totalSpent: 0,
+            lastPurchase: s.created_at
+          });
+        }
+        const c = map.get(key);
+        if (!c.rawName && s.customer_name) c.rawName = s.customer_name;
+        if (!c.rawAddress && s.customer_address) c.rawAddress = s.customer_address;
+
+        c.purchases.push(s);
+        c.totalSpent += parseFloat(s.total_revenue || 0);
+
+        if (new Date(s.created_at) > new Date(c.lastPurchase)) c.lastPurchase = s.created_at;
+      });
+
+      allCustomers = Array.from(map.values()).map(c => {
+        const prof = allCustomerProfiles[c.key] || {};
+        return {
+          ...c,
+          name: prof.customer_name || c.rawName || null,
+          phone: prof.customer_phone || c.rawPhone || null,
+          address: prof.customer_address || c.rawAddress || null,
+          email: prof.customer_email || null,
+          tag: prof.tag || (c.purchases.length >= 2 ? 'frecuente' : null),
+          privateNote: prof.private_note || null
+        };
+      });
+
+      $('custTotal').textContent = allCustomers.length;
+      $('custWithPhone').textContent = allCustomers.filter(c => c.phone).length;
+      $('custFrequentCount').textContent = allCustomers.filter(c => c.tag === 'frecuente' || c.purchases.length >= 2).length;
+
+      renderCustomers();
+    }
+
+    function getTagBadgeHTML(tagKey) {
+      if (tagKey === 'frecuente') return '<span class="tag-badge tag-frecuente">⭐ Frecuente</span>';
+      if (tagKey === 'mayorista') return '<span class="tag-badge tag-mayorista">📦 Mayorista</span>';
+      if (tagKey === 'pendiente') return '<span class="tag-badge tag-pendiente">⚠️ Pago Pendiente</span>';
+      if (tagKey === 'nuevo') return '<span class="tag-badge tag-nuevo">🆕 Nuevo</span>';
+      return '';
+    }
+
+    function renderCustomers() {
+      const container = $('customersList');
+      const term = $('custSearch').value.toLowerCase().trim();
+
+      let list = allCustomers.filter(c => {
+        const effectiveTag = c.tag || (c.purchases.length >= 2 ? 'frecuente' : 'nuevo');
+        const days = Math.floor((Date.now() - new Date(c.lastPurchase).getTime()) / 86400000);
+
+        if (currentTagFilter === 'frecuente' && effectiveTag !== 'frecuente') return false;
+        if (currentTagFilter === 'mayorista' && effectiveTag !== 'mayorista') return false;
+        if (currentTagFilter === 'pendiente' && effectiveTag !== 'pendiente') return false;
+        if (currentTagFilter === 'nuevo' && effectiveTag !== 'nuevo') return false;
+        if (currentTagFilter === 'inactivo' && days < 60) return false;
+
+        if (!term) return true;
+        return (c.name || '').toLowerCase().includes(term) ||
+               (c.phone || '').includes(term) ||
+               (c.email || '').toLowerCase().includes(term);
+      });
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="simple-card p-10 text-center">
+            <div class="text-4xl mb-2">🔎</div>
+            <p class="text-sm font-bold text-slate-700">No se encontraron contactos</p>
+            <p class="text-xs text-slate-500 mt-1">Intenta con otro término o usa el botón "Registrar nueva venta".</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(c => {
+        const initial = (c.name || 'C').charAt(0).toUpperCase();
+        const days = Math.floor((Date.now() - new Date(c.lastPurchase).getTime()) / 86400000);
+        const lastText = days === 0 ? 'hoy' : days === 1 ? 'ayer' : `hace ${days} días`;
+
+        const cleanP = c.phone ? cleanPhone(c.phone) : null;
+        const callLink = cleanP ? `tel:${cleanP}` : null;
+        const waLink = cleanP ? `https://wa.me/${cleanP.length === 8 ? '502' + cleanP : cleanP}` : null;
+
+        const tagBadge = getTagBadgeHTML(c.tag);
+
+        return `
+          <div class="simple-card p-4 hover:border-slate-300 transition flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 cursor-pointer"
+               data-customer="${encodeURIComponent(c.key)}">
+
+            <div class="flex items-center gap-3 min-w-0 w-full sm:w-auto">
+              <div class="w-12 h-12 rounded-2xl bg-slate-900 text-white flex items-center justify-center font-black text-lg flex-shrink-0 shadow-sm">
+                ${initial}
+              </div>
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h4 class="font-extrabold text-slate-900 truncate text-base">
+                    ${c.name ? esc(c.name) : 'Cliente sin nombre'}
+                  </h4>
+                  ${tagBadge}
+                  ${c.privateNote ? '<span title="Tiene nota privada" class="text-xs">📝</span>' : ''}
+                </div>
+                <p class="text-xs text-slate-500 font-medium mt-0.5">
+                  <span class="font-bold text-emerald-600">Q ${c.totalSpent.toFixed(2)} acumulados</span>
+                  · ${c.purchases.length} compra${c.purchases.length === 1 ? '' : 's'}
+                  · Última ${lastText}
+                </p>
+              </div>
+            </div>
+
+            <div class="flex items-center gap-2 w-full sm:w-auto pt-2 sm:pt-0 border-t sm:border-t-0 border-slate-100" onclick="event.stopPropagation()">
+              ${callLink ? `
+                <a href="${callLink}"
+                   class="flex-1 sm:flex-none bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">
+                  <span>📞 Llamar</span>
+                </a>` : ''}
+
+              ${waLink ? `
+                <a href="${waLink}" target="_blank" rel="noopener"
+                   class="flex-1 sm:flex-none bg-[#25D366] hover:bg-[#128C7E] text-white font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">
+                  <span>💬 WhatsApp</span>
+                </a>` : ''}
+
+              <button type="button"
+                class="flex-1 sm:flex-none bg-slate-100 hover:bg-slate-200 text-slate-800 font-extrabold text-xs px-3.5 py-2.5 rounded-xl transition"
+                onclick="openCustomerDetail('${encodeURIComponent(c.key)}')">
+                Editar / Ver
+              </button>
+            </div>
+
+          </div>`;
+      }).join('');
+
+      container.querySelectorAll('[data-customer]').forEach(el => {
+        el.addEventListener('click', () => openCustomerDetail(decodeURIComponent(el.dataset.customer)));
+      });
+    }
+
+    function openCustomerDetail(key) {
+      const c = allCustomers.find(x => x.key === key);
+      if (!c) return;
+
+      const cleanP = c.phone ? cleanPhone(c.phone) : null;
+      const callLink = cleanP ? `tel:${cleanP}` : null;
+      const waLink = cleanP ? `https://wa.me/${cleanP.length === 8 ? '502' + cleanP : cleanP}` : null;
+
+      const days = Math.floor((Date.now() - new Date(c.lastPurchase).getTime()) / 86400000);
+      const lastText = days === 0 ? 'Hoy' : days === 1 ? 'Ayer' : `Hace ${days} días`;
+
+      const purchasesHTML = c.purchases.map(s => `
+        <div class="flex items-center justify-between p-3 bg-slate-50 rounded-xl border border-slate-100 text-xs">
+          <div>
+            <p class="font-bold text-slate-800">${esc(s.products?.title || s.product_title || 'Producto')}</p>
+            <p class="text-[10px] text-slate-400 mt-0.5">${new Date(s.created_at).toLocaleDateString('es-GT', { year: 'numeric', month: 'short', day: 'numeric' })}</p>
+          </div>
+          <span class="font-black text-emerald-600 text-sm">Q ${parseFloat(s.total_revenue).toFixed(2)}</span>
+        </div>
+      `).join('');
+
+      $('customerModalContent').innerHTML = `
+        <div class="flex items-start justify-between border-b pb-3">
+          <div>
+            <h3 class="text-xl font-black text-slate-900">${c.name ? esc(c.name) : 'Cliente'}</h3>
+            <p class="text-xs text-slate-500 font-medium">${c.phone ? '📱 ' + esc(c.phone) : 'Sin teléfono registrado'}</p>
+          </div>
+          <button id="closeCustomerModalBtn" class="bg-slate-100 text-slate-700 font-bold w-8 h-8 rounded-xl hover:bg-slate-200">✕</button>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          ${callLink ? `
+            <a href="${callLink}"
+               class="w-full bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs py-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">
+              <span>📞 Llamar</span>
+            </a>` : '<button disabled class="w-full bg-slate-100 text-slate-400 font-bold text-xs py-3 rounded-xl opacity-60">Sin Teléfono</button>'}
+
+          ${waLink ? `
+            <a href="${waLink}" target="_blank" rel="noopener"
+               class="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-extrabold text-xs py-3 rounded-xl transition flex items-center justify-center gap-1.5 shadow-sm">
+              <span>💬 WhatsApp</span>
+            </a>` : '<button disabled class="w-full bg-slate-100 text-slate-400 font-bold text-xs py-3 rounded-xl opacity-60">Sin WhatsApp</button>'}
+        </div>
+
+        <div class="grid grid-cols-3 gap-2 bg-slate-50 p-3 rounded-xl border border-slate-100 text-center">
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 uppercase">Acumulado</p>
+            <p class="text-sm font-black text-emerald-600 mt-0.5">Q ${c.totalSpent.toFixed(2)}</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 uppercase">Pedidos</p>
+            <p class="text-sm font-black text-slate-800 mt-0.5">${c.purchases.length}</p>
+          </div>
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 uppercase">Última Compra</p>
+            <p class="text-xs font-bold text-slate-700 mt-0.5">${lastText}</p>
+          </div>
+        </div>
+
+        <form id="editCustomerForm" class="bg-amber-50/80 border border-amber-200/80 rounded-xl p-4 space-y-3">
+          <p class="text-xs font-black text-amber-900 uppercase tracking-wider flex items-center gap-1">
+            <span>✏️ Editar Datos Maestros del Cliente</span>
+          </p>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nombre Completo</label>
+              <input type="text" id="editCustName" value="${esc(c.name || '')}" placeholder="Ej. María López"
+                class="w-full border border-amber-300 p-2.5 rounded-xl text-xs bg-white text-slate-800 font-semibold focus:ring-2 focus:ring-amber-500 outline-none">
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Teléfono / WhatsApp</label>
+              <input type="tel" id="editCustPhone" value="${esc(c.phone || '')}" placeholder="Ej. 55123456"
+                class="w-full border border-amber-300 p-2.5 rounded-xl text-xs bg-white text-slate-800 font-mono focus:ring-2 focus:ring-amber-500 outline-none">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Dirección de Entrega</label>
+            <input type="text" id="editCustAddress" value="${esc(c.address || '')}" placeholder="Ej. 14 Av 4-12 Zona 1, Quetzaltenango"
+              class="w-full border border-amber-300 p-2.5 rounded-xl text-xs bg-white text-slate-800 focus:ring-2 focus:ring-amber-500 outline-none">
+          </div>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Correo Electrónico (Opcional)</label>
+              <input type="email" id="editCustEmail" value="${esc(c.email || '')}" placeholder="cliente@correo.com"
+                class="w-full border border-amber-300 p-2.5 rounded-xl text-xs bg-white text-slate-800 focus:ring-2 focus:ring-amber-500 outline-none">
+            </div>
+
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Etiqueta de Clasificación</label>
+              <select id="editCustTag" class="w-full border border-amber-300 p-2.5 rounded-xl text-xs font-bold bg-white text-slate-800 focus:ring-2 focus:ring-amber-500 outline-none">
+                <option value="" ${!c.tag ? 'selected' : ''}>Sin Etiqueta Manual</option>
+                <option value="frecuente" ${c.tag === 'frecuente' ? 'selected' : ''}>⭐ Cliente Frecuente</option>
+                <option value="mayorista" ${c.tag === 'mayorista' ? 'selected' : ''}>📦 Mayorista</option>
+                <option value="pendiente" ${c.tag === 'pendiente' ? 'selected' : ''}>⚠️ Pago Pendiente</option>
+                <option value="nuevo" ${c.tag === 'nuevo' ? 'selected' : ''}>🆕 Nuevo</option>
+              </select>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Notas Privadas / Preferencias</label>
+            <textarea id="editCustNotes" rows="2" placeholder="Ej: Prefiere entregas por la tarde. Paga por transferencia."
+              class="w-full border border-amber-300 p-2.5 rounded-xl text-xs bg-white focus:ring-2 focus:ring-amber-500 outline-none text-slate-800">${esc(c.privateNote || '')}</textarea>
+          </div>
+
+          <button type="submit" id="saveCustomerProfileBtn"
+            class="w-full bg-amber-600 hover:bg-amber-700 text-white font-extrabold text-xs py-3 rounded-xl transition shadow-sm flex items-center justify-center gap-1">
+            <span>💾 Guardar Cambios en Expediente</span>
+          </button>
+        </form>
+
+        <div class="space-y-2">
+          <h4 class="text-xs font-black text-slate-400 uppercase tracking-wider">Historial de Productos Comprados (${c.purchases.length})</h4>
+          <div class="space-y-2 max-h-36 overflow-y-auto pr-1">${purchasesHTML}</div>
+        </div>
+      `;
+
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+
+      $('closeCustomerModalBtn').addEventListener('click', closeModal);
+
+      $('editCustomerForm').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const btn = $('saveCustomerProfileBtn');
+
+        const newName = $('editCustName').value.trim() || null;
+        const newPhoneRaw = $('editCustPhone').value.trim();
+        const newPhone = newPhoneRaw ? cleanPhone(newPhoneRaw) : null;
+        const newAddress = $('editCustAddress').value.trim() || null;
+        const newEmail = $('editCustEmail').value.trim() || null;
+        const selectedTag = $('editCustTag').value || null;
+        const note = $('editCustNotes').value.trim() || null;
+
+        btn.disabled = true;
+        btn.textContent = 'Guardando datos...';
+
+        try {
+          const existing = allCustomerProfiles[key];
+          const payload = {
+            store_id: currentStore.id,
+            customer_key: key,
+            customer_name: newName,
+            customer_phone: newPhone,
+            customer_address: newAddress,
+            customer_email: newEmail,
+            tag: selectedTag,
+            private_note: note,
+            updated_at: new Date().toISOString()
+          };
+
+          if (existing) {
+            const { error } = await _supabase
+              .from('customer_profiles')
+              .update(payload)
+              .eq('id', existing.id);
+
+            if (error) throw error;
+            Object.assign(existing, payload);
+          } else {
+            const { data, error } = await _supabase
+              .from('customer_profiles')
+              .insert([payload])
+              .select()
+              .single();
+
+            if (error) throw error;
+            if (data) allCustomerProfiles[key] = data;
+          }
+
+          btn.textContent = '✅ Cambios Guardados';
+          await loadCustomers();
+
+          setTimeout(() => {
+            closeModal();
+          }, 800);
+
+        } catch (err) {
+          console.error('[Customer Edit Error]', err);
+          alert('No se pudieron guardar los cambios: ' + (err.message || 'Error de conexión'));
+          btn.disabled = false;
+          btn.textContent = '💾 Guardar Cambios en Expediente';
+        }
+      });
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,84 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Redirigiendo... · Pasaje de los Altos</title>
+  <meta name="robots" content="noindex, follow">
+  <meta http-equiv="refresh" content="0; url=productos.html?openCategories=true">
+  <link rel="canonical" href="productos.html?openCategories=true">
+
+  <script>
+    // Redirección inmediata conservando posibles query strings adicionales (?cat=...)
+    (function () {
+      try {
+        var params = new URLSearchParams(window.location.search);
+        params.set('openCategories', 'true');
+        var target = 'productos.html?' + params.toString();
+        window.location.replace(target);
+      } catch (e) {
+        window.location.replace('productos.html?openCategories=true');
+      }
+    })();
+  </script>
+
+  <style>
+    body {
+      font-family: system-ui, -apple-system, sans-serif;
+      background: #f8fafc;
+      color: #0f172a;
+      min-height: 100vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      margin: 0;
+      padding: 24px;
+    }
+    .card {
+      max-width: 380px;
+      width: 100%;
+      background: #ffffff;
+      border: 1px solid #e2e8f0;
+      border-radius: 20px;
+      padding: 32px 24px;
+      text-align: center;
+      box-shadow: 0 20px 40px -12px rgba(15, 23, 42, 0.15);
+    }
+    .icon {
+      font-size: 42px;
+      margin-bottom: 8px;
+    }
+    h1 {
+      font-size: 18px;
+      font-weight: 800;
+      margin: 0 0 8px;
+    }
+    p {
+      font-size: 13.5px;
+      color: #475569;
+      margin: 0 0 20px;
+      line-height: 1.5;
+    }
+    a {
+      display: inline-block;
+      background: linear-gradient(135deg, #4f46e5, #2563eb);
+      color: #fff;
+      font-weight: 800;
+      font-size: 13px;
+      text-decoration: none;
+      padding: 12px 20px;
+      border-radius: 12px;
+      box-shadow: 0 8px 20px rgba(79, 70, 229, 0.35);
+    }
+    a:hover { filter: brightness(1.05); }
+  </style>
+</head>
+<body>
+  <div class="card">
+    <div class="icon">📂</div>
+    <h1>Redirigiendo a categorías…</h1>
+    <p>Estamos abriendo el explorador de categorías dentro del catálogo.</p>
+    <a href="productos.html?openCategories=true">Ir ahora →</a>
+  </div>
+</body>
+</html>

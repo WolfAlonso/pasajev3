@@ -1,0 +1,377 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f172a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-title" content="Pasaje Admin">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png">
+  <link rel="icon" href="../img/favicon.ico">
+  <title>Admin · Pasaje de los Altos</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="../js/theme-loader.js?v=3"></script>
+  <script src="../js/admin-utils.js"></script>
+  <script src="../js/admin-sidebar.js?v=2"></script>
+  <script src="../js/liquid-glass.js?v=1"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background:
+        radial-gradient(1200px 600px at 10% 0%, #0f172a 0%, #1e293b 45%, #0f172a 100%);
+      background-attachment: fixed;
+      min-height: 100vh;
+      color: #e5e7eb;
+    }
+
+    .admin-glass {
+      background: rgba(15, 23, 42, 0.72);
+      backdrop-filter: blur(16px) saturate(140%);
+      -webkit-backdrop-filter: blur(16px) saturate(140%);
+      border: 1px solid rgba(148, 163, 184, 0.18);
+      box-shadow: 0 20px 48px -20px rgba(0, 0, 0, 0.65);
+    }
+
+    .admin-card {
+      transition: transform .18s ease, box-shadow .18s ease, border-color .18s ease;
+    }
+    .admin-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 18px 36px -14px rgba(0, 0, 0, 0.55);
+      border-color: rgba(251, 191, 36, 0.35);
+    }
+
+    .admin-badge {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      min-width: 24px;
+      height: 24px;
+      padding: 0 8px;
+      border-radius: 999px;
+      font-size: 11px;
+      font-weight: 800;
+      line-height: 1;
+    }
+    .admin-badge-red    { background: #ef4444; color: #fff; }
+    .admin-badge-amber  { background: #f59e0b; color: #111827; }
+    .admin-badge-slate  { background: #334155; color: #cbd5e1; }
+  </style>
+</head>
+<body class="min-h-screen">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-7xl mx-auto p-4">
+
+    <div id="adminTabs"></div>
+
+    <div id="loadingState" class="admin-glass rounded-2xl p-8 text-center text-sm text-gray-300">
+      Verificando permisos...
+    </div>
+
+    <section id="menuView" class="hidden space-y-4">
+
+      <div class="admin-glass rounded-2xl p-6">
+        <div class="flex items-center gap-4 flex-wrap">
+          <div class="text-4xl">🛡️</div>
+          <div class="min-w-0 flex-1">
+            <h1 class="text-2xl font-extrabold text-white">Panel de Administración</h1>
+            <p class="text-sm text-gray-300" id="menuAdminEmail"></p>
+          </div>
+          <span class="text-[10px] uppercase tracking-widest font-bold text-amber-400 bg-amber-500/10 border border-amber-500/30 px-3 py-1 rounded-full">
+            Nivel Admin
+          </span>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+        <a href="admin-resumen.html"
+           class="admin-glass admin-card rounded-2xl p-5 group">
+          <div class="text-3xl mb-2">📊</div>
+          <h3 class="font-bold text-white group-hover:text-amber-400">Resumen Global</h3>
+          <p class="text-xs text-gray-400 mt-1">Tiendas, productos, clics y reportes pendientes.</p>
+        </a>
+
+        <!-- NUEVO: Personalización y Temas -->
+        <a href="admin-diseno.html"
+           class="admin-glass admin-card rounded-2xl p-5 group border-amber-500/20">
+          <div class="flex items-start justify-between gap-2">
+            <div class="text-3xl mb-2">🎨</div>
+            <span class="text-[10px] bg-amber-500/15 text-amber-300 border border-amber-500/30 font-bold px-2 py-0.5 rounded-full">NUEVO</span>
+          </div>
+          <h3 class="font-bold text-white group-hover:text-amber-400">Personalización y Temas</h3>
+          <p class="text-xs text-gray-400 mt-1">Selector de temporadas, logos y apariencia del sitio.</p>
+        </a>
+
+        <!-- Reportes con badge dinámico -->
+        <a href="admin-reportes.html"
+           class="admin-glass admin-card rounded-2xl p-5 group"
+           id="reportsCard">
+          <div class="flex items-start justify-between gap-2">
+            <div class="text-3xl mb-2">🚨</div>
+            <span id="reportsBadge" class="admin-badge admin-badge-slate hidden">0</span>
+          </div>
+          <h3 class="font-bold text-white group-hover:text-amber-400">Moderación y Reportes</h3>
+          <p class="text-xs text-gray-400 mt-1">Centro de casos con notas al vendedor y acciones.</p>
+        </a>
+
+        <!-- Tiendas con badge dinámico -->
+        <a href="admin-tiendas.html"
+           class="admin-glass admin-card rounded-2xl p-5 group"
+           id="storesCard">
+          <div class="flex items-start justify-between gap-2">
+            <div class="text-3xl mb-2">🏪</div>
+            <span id="storesBadge" class="admin-badge admin-badge-slate hidden">0</span>
+          </div>
+          <h3 class="font-bold text-white group-hover:text-amber-400">Tiendas</h3>
+          <p class="text-xs text-gray-400 mt-1">Buscar, ver y suspender/activar emprendedores.</p>
+        </a>
+
+        <a href="admin-productos.html"
+           class="admin-glass admin-card rounded-2xl p-5 group">
+          <div class="text-3xl mb-2">📦</div>
+          <h3 class="font-bold text-white group-hover:text-amber-400">Productos</h3>
+          <p class="text-xs text-gray-400 mt-1">Control total: editar, ocultar, destacar, eliminar.</p>
+        </a>
+
+        <a href="admin-categorias.html"
+           class="admin-glass admin-card rounded-2xl p-5 group">
+          <div class="text-3xl mb-2">🏷️</div>
+          <h3 class="font-bold text-white group-hover:text-amber-400">Categorías</h3>
+          <p class="text-xs text-gray-400 mt-1">CRUD de categorías con conteo de productos.</p>
+        </a>
+
+        <a href="admin-storage.html"
+           class="admin-glass admin-card rounded-2xl p-5 group">
+          <div class="text-3xl mb-2">📁</div>
+          <h3 class="font-bold text-white group-hover:text-amber-400">Storage</h3>
+          <p class="text-xs text-gray-400 mt-1">Explorar buckets products y logos.</p>
+        </a>
+
+        <a href="admin-usuarios.html"
+           class="admin-glass admin-card rounded-2xl p-5 group">
+          <div class="text-3xl mb-2">🛡️</div>
+          <h3 class="font-bold text-white group-hover:text-amber-400">Usuarios y Roles</h3>
+          <p class="text-xs text-gray-400 mt-1">Otorgar o quitar permisos de administrador.</p>
+        </a>
+
+      </div>
+    </section>
+  </main>
+
+  <script>
+    (async () => {
+      // --------------------------------------------------------
+      // 1. Autenticación
+      // --------------------------------------------------------
+      let session = null;
+      try {
+        if (typeof requireAuth === 'function') {
+          session = await requireAuth();
+        } else if (typeof _supabase !== 'undefined') {
+          const { data } = await _supabase.auth.getSession();
+          session = data && data.session ? data.session : null;
+          if (!session) {
+            window.location.replace('../login.html');
+            return;
+          }
+        } else {
+          console.warn('[Admin] requireAuth/_supabase no disponibles.');
+          return;
+        }
+      } catch (e) {
+        console.error('[Admin] requireAuth:', e);
+        return;
+      }
+      if (!session) return;
+
+      // --------------------------------------------------------
+      // 2. Verificar admin estricto
+      // --------------------------------------------------------
+      let admin = false;
+      try {
+        if (typeof isAdmin === 'function') {
+          admin = await isAdmin();
+        }
+      } catch (e) {
+        console.warn('[Admin] isAdmin excepción:', e);
+        admin = false;
+      }
+
+      if (!admin) {
+        alert('No tienes permisos de administrador.');
+        window.location.replace('../index.html');
+        return;
+      }
+
+      // --------------------------------------------------------
+      // 3. Inyectar header/tabs del admin
+      // --------------------------------------------------------
+      try {
+        if (typeof initAdminNav === 'function') {
+          await initAdminNav({ user: session.user });
+        }
+      } catch (e) {
+        console.warn('[Admin] initAdminNav:', e);
+      }
+
+      const emailEl = document.getElementById('menuAdminEmail');
+      if (emailEl) emailEl.textContent = (session.user && session.user.email) || '';
+
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('menuView').classList.remove('hidden');
+
+      // --------------------------------------------------------
+      // 4. Badges en vivo
+      // --------------------------------------------------------
+      loadAdminBadges();
+    })();
+
+    // ============================================================
+    // Badges dinámicos
+    // ============================================================
+    async function loadAdminBadges() {
+      await Promise.allSettled([
+        loadReportsBadge(),
+        loadStoresBadge(),
+      ]);
+    }
+
+    // ------------------------------------------------------------
+    // Reportes pendientes
+    // ------------------------------------------------------------
+    async function loadReportsBadge() {
+      const badge = document.getElementById('reportsBadge');
+      if (!badge) return;
+
+      try {
+        if (typeof _supabase === 'undefined') return;
+
+        let count = 0;
+        let ok = false;
+
+        // Intento 1: status pendiente/abierto
+        const first = await _supabase
+          .from('reports')
+          .select('id, status', { count: 'exact', head: true })
+          .in('status', ['pendiente', 'pending', 'abierto', 'open']);
+
+        if (!first.error) {
+          count = first.count || 0;
+          ok = true;
+        }
+
+        // Intento 2: si status no existe, contar todos
+        if (!ok) {
+          const second = await _supabase
+            .from('reports')
+            .select('id', { count: 'exact', head: true });
+          if (!second.error) {
+            count = second.count || 0;
+            ok = true;
+          }
+        }
+
+        if (!ok) {
+          badge.classList.add('hidden');
+          return;
+        }
+
+        if (count === 0) {
+          badge.classList.add('hidden');
+        } else {
+          badge.textContent = count > 99 ? '99+' : String(count);
+          badge.classList.remove('hidden', 'admin-badge-slate');
+          badge.classList.remove('admin-badge-amber', 'admin-badge-red');
+          badge.classList.add(count >= 5 ? 'admin-badge-red' : 'admin-badge-amber');
+        }
+      } catch (e) {
+        console.warn('[Admin] loadReportsBadge:', e);
+        if (badge) badge.classList.add('hidden');
+      }
+    }
+
+    // ------------------------------------------------------------
+    // Tiendas suspendidas / con solicitud de eliminación
+    // ------------------------------------------------------------
+    async function loadStoresBadge() {
+      const badge = document.getElementById('storesBadge');
+      if (!badge) return;
+
+      try {
+        if (typeof _supabase === 'undefined') return;
+
+        let count = 0;
+        let ok = false;
+
+        // Intento 1: contar is_suspended=true o deletion_requested=true
+        const first = await _supabase
+          .from('stores')
+          .select('id, is_suspended, deletion_requested', { count: 'exact', head: true })
+          .or('is_suspended.eq.true,deletion_requested.eq.true');
+
+        if (!first.error) {
+          count = first.count || 0;
+          ok = true;
+        }
+
+        // Intento 2: solo is_suspended
+        if (!ok) {
+          const second = await _supabase
+            .from('stores')
+            .select('id, is_suspended', { count: 'exact', head: true })
+            .eq('is_suspended', true);
+          if (!second.error) {
+            count = second.count || 0;
+            ok = true;
+          }
+        }
+
+        if (!ok) {
+          badge.classList.add('hidden');
+          return;
+        }
+
+        if (count === 0) {
+          badge.classList.add('hidden');
+        } else {
+          badge.textContent = count > 99 ? '99+' : String(count);
+          badge.classList.remove('hidden', 'admin-badge-slate');
+          badge.classList.remove('admin-badge-amber', 'admin-badge-red');
+          badge.classList.add('admin-badge-red');
+        }
+      } catch (e) {
+        console.warn('[Admin] loadStoresBadge:', e);
+        if (badge) badge.classList.add('hidden');
+      }
+    }
+
+    // ============================================================
+    // Service Worker (PWA)
+    // ============================================================
+    if ('serviceWorker' in navigator) {
+      const isLocalhost = ['localhost', '127.0.0.1'].includes(location.hostname);
+      const isSecure = location.protocol === 'https:';
+      if (isLocalhost || isSecure) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('../sw.js')
+            .then(() => console.log('[PWA] Service Worker registrado ✅'))
+            .catch(err => console.warn('[PWA] SW no registrado:', err));
+        });
+      }
+    }
+  </script>
+</body>
+</html>

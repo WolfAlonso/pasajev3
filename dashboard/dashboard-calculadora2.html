@@ -1,0 +1,1317 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <title>Calculadora Reventa · Pasaje de los Altos</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=4"></script>
+  <script src="../js/theme-loader.js?v=4"></script>
+  <script src="../js/dashboard-utils.js?v=4"></script>
+  <script src="../js/dashboard-sidebar.js?v=4"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--color-secondary, #f8fafc);
+      color: var(--color-text, #1e293b);
+      background-image: var(--bg-image, none);
+      background-size: cover;
+      background-attachment: fixed;
+      background-position: center;
+      min-height: 100vh;
+    }
+
+    /* ====== COMPONENTES UNIFICADOS ====== */
+    .pasaje-card {
+      background-color: rgba(var(--color-secondary-rgb, 255, 255, 255), var(--glass-opacity, 0.85));
+      backdrop-filter: blur(var(--glass-blur, 16px));
+      -webkit-backdrop-filter: blur(var(--glass-blur, 16px));
+      border: 1px solid rgba(226, 232, 240, var(--glass-border-opacity, 0.8));
+      border-radius: var(--theme-radius, 1rem);
+      color: var(--color-text, #1e293b);
+      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, .05);
+    }
+
+    /* ====== CHIPS / TABS ====== */
+    .pasaje-chip {
+      transition: all .2s ease;
+      border: 1px solid #e2e8f0;
+      background: rgba(255, 255, 255, .7);
+      color: #64748b;
+    }
+    .pasaje-chip.active {
+      background: #ffffff;
+      border-color: rgba(16, 185, 129, .4);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, .12);
+      color: #065f46;
+      font-weight: 700;
+    }
+    .pasaje-chip:not(.active):hover {
+      color: #0f172a;
+      background: rgba(255, 255, 255, .95);
+    }
+
+    input[type="range"].pasaje-range {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 9999px;
+      background: linear-gradient(to right,
+        #10b981 0%,
+        #10b981 var(--range-progress, 50%),
+        #e2e8f0 var(--range-progress, 50%),
+        #e2e8f0 100%);
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"].pasaje-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid #10b981;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, .18);
+      transition: transform .15s ease;
+    }
+    input[type="range"].pasaje-range::-webkit-slider-thumb:hover { transform: scale(1.12); }
+    input[type="range"].pasaje-range::-moz-range-thumb {
+      width: 24px; height: 24px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid #10b981;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, .18);
+    }
+
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button { -webkit-appearance: none; margin: 0; }
+    input[type=number] { -moz-appearance: textfield; }
+
+    @keyframes flashGreen {
+      0%,100% { background-color: transparent; }
+      50%     { background-color: rgba(16,185,129,.15); }
+    }
+    .flash-green { animation: flashGreen .8s; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp .3s ease both; }
+
+    .history-item { transition: background .15s ease; }
+    .history-item:hover { background: rgba(16,185,129,.06); }
+
+    .soft-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .soft-scroll::-webkit-scrollbar-track { background: transparent; }
+    .soft-scroll::-webkit-scrollbar-thumb { background: rgba(100,116,139,.35); border-radius: 9999px; }
+
+    .donut-seg { transition: stroke-dasharray .35s ease, stroke-dashoffset .35s ease; }
+
+    /* Toggle grande lote vs unidad */
+    .purchase-mode-btn {
+      transition: all .2s ease;
+      border: 2px solid transparent;
+    }
+    .purchase-mode-btn.active {
+      background: linear-gradient(135deg, #ecfdf5, #d1fae5);
+      border-color: #10b981;
+      color: #065f46;
+      box-shadow: 0 4px 12px rgba(16,185,129,.15);
+    }
+    .purchase-mode-btn:not(.active) {
+      background: rgba(255,255,255,.7);
+      border-color: #e2e8f0;
+      color: #64748b;
+    }
+  </style>
+</head>
+<body class="min-h-screen text-slate-800">
+
+  <div id="dashboardHeader"></div>
+  <aside id="sidebar-container"></aside>
+
+  <main class="min-h-screen text-slate-800 max-w-7xl mx-auto p-4 pb-16">
+    <div id="dashboardTabs"></div>
+
+    <div id="loadingState" class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-8 text-center text-sm text-slate-500 shadow-sm">
+      Cargando calculadora de reventa...
+    </div>
+
+    <div id="errorState" class="hidden pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-6 text-center border-l-4 border-red-400 shadow-sm">
+      <p class="text-sm font-semibold text-red-700">No se pudo inicializar la calculadora.</p>
+      <p id="errorStateMsg" class="text-xs text-red-500 mt-1"></p>
+    </div>
+
+    <div id="content" class="hidden space-y-6 fade-up">
+
+      <!-- ════════════════════════════════════════════════════
+           FILA 1 · KPIs
+           ════════════════════════════════════════════════════ -->
+      <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+
+        <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 lg:p-5 border-l-4 border-emerald-500 shadow-sm">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Precio de venta</span>
+            <span class="text-lg">🏷️</span>
+          </div>
+          <p id="kpiPrice" class="text-2xl lg:text-3xl font-extrabold text-slate-900 leading-tight">Q 0.00</p>
+          <p id="kpiPriceSub" class="text-[11px] text-slate-500 mt-1">Precio público sugerido</p>
+        </div>
+
+        <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 lg:p-5 border-l-4 border-blue-500 shadow-sm">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-blue-700">Ganancia neta / u</span>
+            <span class="text-lg">💰</span>
+          </div>
+          <p id="kpiProfit" class="text-2xl lg:text-3xl font-extrabold text-slate-900 leading-tight">Q 0.00</p>
+          <p id="kpiProfitSub" class="text-[11px] text-slate-500 mt-1">Margen: 0.0%</p>
+        </div>
+
+        <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 lg:p-5 border-l-4 border-indigo-500 shadow-sm">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-700">Inversión del lote</span>
+            <span class="text-lg">📦</span>
+          </div>
+          <p id="kpiInvestment" class="text-2xl lg:text-3xl font-extrabold text-slate-900 leading-tight">Q 0.00</p>
+          <p id="kpiInvestmentSub" class="text-[11px] text-slate-500 mt-1">Costo de arranque</p>
+        </div>
+
+        <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 lg:p-5 border-l-4 border-amber-500 shadow-sm">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-700">ROI del lote</span>
+            <span class="text-lg">🚀</span>
+          </div>
+          <p id="kpiROI" class="text-2xl lg:text-3xl font-extrabold text-slate-900 leading-tight">0.0%</p>
+          <p id="kpiROISub" class="text-[11px] text-slate-500 mt-1">Recuperas en 0 meses</p>
+        </div>
+
+      </section>
+
+      <!-- ════════════════════════════════════════════════════
+           FILA 2 · FORMULARIO + HISTORIAL
+           ════════════════════════════════════════════════════ -->
+      <div class="grid lg:grid-cols-3 gap-6">
+
+        <div class="lg:col-span-2">
+          <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
+
+            <div class="px-5 py-4 border-b border-slate-200/60 flex flex-wrap items-center justify-between gap-3">
+              <div class="min-w-0 flex-1">
+                <h2 class="text-lg font-extrabold text-slate-900 leading-tight">🛍️ Calculadora de reventa</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Compra al por mayor y calcula cuánto cobrar por unidad.</p>
+              </div>
+              <div class="flex items-center gap-2">
+                <button type="button" id="btnNew"
+                  class="text-xs bg-white/80 hover:bg-white border border-slate-200 text-slate-700 font-bold px-3 py-2 rounded-xl transition">
+                  ✨ Nuevo
+                </button>
+                <button type="button" id="btnSave"
+                  class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                  💾 <span>Guardar</span>
+                </button>
+              </div>
+            </div>
+
+            <div class="px-5 py-3 border-b border-slate-200/60 bg-slate-50/50">
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                Nombre del producto <span class="text-slate-400 normal-case font-normal">(opcional, se pide al guardar)</span>
+              </label>
+              <input type="text" id="calcName" placeholder="Ej. Audífonos Bluetooth, Blusa talla M…"
+                class="w-full bg-white border border-slate-200 text-sm text-slate-800 rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+            </div>
+
+            <div class="px-3 pt-3 flex flex-wrap gap-1.5 bg-slate-100/40">
+              <button type="button" data-calc-tab="purchase" class="pasaje-chip calc-tab active text-xs px-3 py-2 rounded-xl flex items-center gap-1.5">
+                <span>🛒</span><span>Compra del producto</span>
+              </button>
+              <button type="button" data-calc-tab="perSale" class="pasaje-chip calc-tab text-xs px-3 py-2 rounded-xl flex items-center gap-1.5">
+                <span>💸</span><span>Costos por venta</span>
+              </button>
+              <button type="button" data-calc-tab="operations" class="pasaje-chip calc-tab text-xs px-3 py-2 rounded-xl flex items-center gap-1.5">
+                <span>🏪</span><span>Operación mensual</span>
+              </button>
+              <button type="button" data-calc-tab="margin" class="pasaje-chip calc-tab text-xs px-3 py-2 rounded-xl flex items-center gap-1.5">
+                <span>📈</span><span>Precio y margen</span>
+              </button>
+            </div>
+
+            <!-- Panel: Compra del producto -->
+            <div data-calc-panel="purchase" class="p-5 space-y-5">
+
+              <div class="grid grid-cols-2 gap-2">
+                <button type="button" data-purchase-mode="lote" class="purchase-mode-btn active rounded-2xl p-3 text-left">
+                  <div class="text-xs font-bold">📦 Compro por lote</div>
+                  <div class="text-[10px] opacity-80 mt-0.5">Ej. 12 unidades por Q 240</div>
+                </button>
+                <button type="button" data-purchase-mode="unit" class="purchase-mode-btn rounded-2xl p-3 text-left">
+                  <div class="text-xs font-bold">🛍️ Compro por unidad</div>
+                  <div class="text-[10px] opacity-80 mt-0.5">Solo 1 precio unitario</div>
+                </button>
+              </div>
+
+              <div id="panelLote" class="space-y-3">
+                <div class="grid grid-cols-2 gap-3">
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Costo total del lote (Q)</label>
+                    <input type="number" step="0.01" min="0" id="calcLotCost" value="0"
+                      class="w-full bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+                  </div>
+                  <div>
+                    <label class="block text-xs font-bold text-slate-700 mb-1.5">Unidades en el lote</label>
+                    <input type="number" step="1" min="1" id="calcLotUnits" value="12"
+                      class="w-full bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+                  </div>
+                </div>
+                <div class="bg-blue-50/70 rounded-2xl p-4 flex items-center justify-between border border-blue-100">
+                  <div>
+                    <span class="text-xs font-bold uppercase tracking-wider text-blue-700">Costo por unidad</span>
+                    <p class="text-[11px] text-blue-600 mt-0.5">Costo lote ÷ unidades</p>
+                  </div>
+                  <span id="unitCostFromLot" class="text-xl font-extrabold text-blue-900">Q 0.00</span>
+                </div>
+              </div>
+
+              <div id="panelUnit" class="hidden space-y-3">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Costo por unidad (Q)</label>
+                  <input type="number" step="0.01" min="0" id="calcUnitCost" value="0"
+                    class="w-full bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">
+                    ¿Cuántas unidades piensas revender? <span class="text-slate-400 normal-case font-normal">(para cálculo de lote)</span>
+                  </label>
+                  <input type="number" step="1" min="1" id="calcUnitQty" value="12"
+                    class="w-full bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+                </div>
+              </div>
+
+              <div class="bg-white/60 border border-dashed border-slate-300 rounded-2xl p-4">
+                <p class="text-[11px] text-slate-600 leading-relaxed">
+                  <strong class="text-slate-800">💡 Consejo:</strong> cuando compras al mayoreo el costo unitario baja.
+                  Compara el precio por unidad con el que conseguirías en tienda antes de fijar tu precio de venta.
+                </p>
+              </div>
+            </div>
+
+            <!-- Panel: Costos por venta -->
+            <div data-calc-panel="perSale" class="hidden p-5 space-y-5">
+
+              <div class="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Envío / delivery por unidad (Q)</label>
+                  <input type="number" step="0.01" min="0" id="calcShipping" value="0"
+                    class="w-full bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+                  <p class="text-[11px] text-slate-500 mt-1">Si tú lo absorbes. Déjalo en 0 si lo paga el cliente.</p>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Empaque / presentación (Q)</label>
+                  <input type="number" step="0.01" min="0" id="calcPackaging" value="0"
+                    class="w-full bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+                  <p class="text-[11px] text-slate-500 mt-1">Bolsa, caja, etiqueta, cinta, sticker.</p>
+                </div>
+              </div>
+
+              <div class="pt-4 border-t border-slate-200/80">
+                <label class="block text-xs font-bold text-slate-700 mb-2">Comisión de plataforma (% sobre el precio)</label>
+                <div class="flex flex-wrap gap-1.5 mb-3">
+                  <button type="button" data-comm-preset="0"  class="pasaje-chip comm-chip text-[11px] font-bold px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition">Sin comisión</button>
+                  <button type="button" data-comm-preset="3"  class="pasaje-chip comm-chip text-[11px] font-bold px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition">3% transferencia</button>
+                  <button type="button" data-comm-preset="5"  class="pasaje-chip comm-chip text-[11px] font-bold px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition">5% tarjeta</button>
+                  <button type="button" data-comm-preset="10" class="pasaje-chip comm-chip text-[11px] font-bold px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition">10% marketplace</button>
+                  <button type="button" data-comm-preset="15" class="pasaje-chip comm-chip text-[11px] font-bold px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition">15% full service</button>
+                </div>
+                <div class="flex items-center gap-3">
+                  <input type="number" step="0.1" min="0" max="40" id="calcCommission" value="0"
+                    class="w-28 bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-center">
+                  <span class="text-sm text-slate-500">%</span>
+                  <span class="text-[11px] text-slate-500 ml-auto">Personalizado</span>
+                </div>
+              </div>
+
+              <div class="pt-4 border-t border-slate-200/80">
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Otros costos por venta (Q)</label>
+                <input type="number" step="0.01" min="0" id="calcOther" value="0"
+                  class="w-full bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+                <p class="text-[11px] text-slate-500 mt-1">Propinas, cortesía, ajustes, garantías.</p>
+              </div>
+
+              <div class="bg-rose-50/70 rounded-2xl p-4 flex items-center justify-between border border-rose-100">
+                <div>
+                  <span class="text-xs font-bold uppercase tracking-wider text-rose-700">Total costos por venta</span>
+                  <p class="text-[11px] text-rose-600 mt-0.5">Envío + empaque + otros (sin comisión)</p>
+                </div>
+                <span id="perSaleTotal" class="text-xl font-extrabold text-rose-900">Q 0.00</span>
+              </div>
+            </div>
+
+            <!-- Panel: Operación mensual -->
+            <div data-calc-panel="operations" class="hidden p-5 space-y-5">
+
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-sm font-bold text-slate-800">Gastos operativos mensuales</h3>
+                  <button type="button" id="btnAddExpense"
+                    class="text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-2.5 py-1.5 rounded-lg transition">
+                    + Agregar fila
+                  </button>
+                </div>
+                <div id="expensesList" class="space-y-2"></div>
+                <p class="text-[11px] text-slate-500 mt-2">
+                  Total mensual: <span id="expensesTotal" class="font-bold text-slate-800">Q 0.00</span>
+                </p>
+              </div>
+
+              <div class="pt-4 border-t border-slate-200/80">
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Ventas estimadas al mes</label>
+                <input type="number" step="1" min="1" id="calcMonthlyUnits" value="30"
+                  class="w-full bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+                <p class="text-[11px] text-slate-500 mt-1">
+                  Cuántas unidades esperas vender por mes.
+                </p>
+              </div>
+
+              <div class="bg-amber-50/70 rounded-2xl p-4 flex items-center justify-between border border-amber-100">
+                <div>
+                  <span class="text-xs font-bold uppercase tracking-wider text-amber-700">Prorrateo por unidad</span>
+                  <p class="text-[11px] text-amber-600 mt-0.5">Gastos operativos ÷ ventas mensuales</p>
+                </div>
+                <span id="expensesPerUnit" class="text-xl font-extrabold text-amber-900">Q 0.00</span>
+              </div>
+
+              <div class="bg-white/60 border border-dashed border-slate-300 rounded-2xl p-4">
+                <p class="text-[11px] text-slate-600 leading-relaxed">
+                  <strong class="text-slate-800">💡 Consejo:</strong> incluye datos móviles, transporte a entregas,
+                  publicidad (Facebook/Instagram Ads), empaque comprado al mayoreo, suscripciones de herramientas.
+                </p>
+              </div>
+            </div>
+
+            <!-- Panel: Precio y margen -->
+            <div data-calc-panel="margin" class="hidden p-5 space-y-6">
+
+              <div>
+                <label class="block text-xs font-bold text-slate-700 mb-2">¿Cómo quieres calcular tu margen?</label>
+                <div class="grid grid-cols-2 gap-2">
+                  <button type="button" data-margin-base="price" class="purchase-mode-btn active rounded-2xl p-3 text-left">
+                    <div class="text-xs font-bold">📊 Sobre el precio de venta</div>
+                    <div class="text-[10px] opacity-80 mt-0.5">Ej. 30% = Q 30 de cada Q 100</div>
+                  </button>
+                  <button type="button" data-margin-base="cost" class="purchase-mode-btn rounded-2xl p-3 text-left">
+                    <div class="text-xs font-bold">🧮 Sobre el costo (markup)</div>
+                    <div class="text-[10px] opacity-80 mt-0.5">Ej. 50% = cost + Q 50%</div>
+                  </button>
+                </div>
+              </div>
+
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <label class="text-xs font-bold text-slate-700">Margen deseado</label>
+                  <span id="marginPill" class="text-xs font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">40%</span>
+                </div>
+                <input type="range" min="10" max="100" step="1" value="40" id="calcMargin" class="pasaje-range">
+                <div class="flex justify-between text-[10px] text-slate-400 font-semibold mt-1.5">
+                  <span>10%</span><span>40%</span><span>70%</span><span>100%</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">
+                  Ganancia objetivo por unidad: <strong id="marginQty" class="text-emerald-700">Q 0.00</strong>
+                </p>
+              </div>
+
+              <div class="pt-4 border-t border-slate-200/80 bg-indigo-50/50 border border-indigo-100 rounded-2xl p-4 -mx-1">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold uppercase tracking-wider text-indigo-700">Precio mínimo rentable</span>
+                  <span id="breakEvenPrice" class="text-lg font-extrabold text-indigo-900">Q 0.00</span>
+                </div>
+                <p class="text-[11px] text-indigo-600">
+                  Bajo este precio pierdes dinero después de cubrir gastos operativos.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── HISTORIAL ─── -->
+        <aside>
+          <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl overflow-hidden lg:sticky lg:top-20 shadow-sm">
+            <div class="px-5 py-4 border-b border-slate-200/60 flex items-center justify-between">
+              <div>
+                <h2 class="text-base font-extrabold text-slate-900 leading-tight">📚 Historial de reventa</h2>
+                <p class="text-[11px] text-slate-500 mt-0.5">Productos ya calculados</p>
+              </div>
+              <button type="button" id="btnReloadHistory"
+                class="text-[11px] bg-white/70 hover:bg-white border border-slate-200 text-slate-600 font-bold w-8 h-8 rounded-lg transition flex items-center justify-center"
+                title="Recargar">
+                ⟳
+              </button>
+            </div>
+
+            <div id="historyList" class="p-3 soft-scroll max-h-[560px] overflow-y-auto space-y-2">
+              <div class="text-xs text-slate-400 text-center py-6">
+                Sin cálculos guardados aún.
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════
+           FILA 3 · SIMULADOR + DONUT
+           ════════════════════════════════════════════════════ -->
+      <div class="grid lg:grid-cols-2 gap-6">
+
+        <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-5 lg:p-6 shadow-sm">
+          <div class="flex items-center justify-between mb-1">
+            <h2 class="text-base font-extrabold text-slate-900">🎚️ Simulador de escenarios</h2>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">En vivo</span>
+          </div>
+          <p class="text-xs text-slate-500 mb-5">
+            Ajusta el precio y mira cuánto ganas al mes según tu ritmo de ventas.
+          </p>
+
+          <div class="rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 mb-5 shadow-sm">
+            <div class="flex items-baseline justify-between mb-1">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-300">Precio simulado</span>
+              <span id="simPct" class="text-[10px] font-bold bg-white/15 px-2 py-0.5 rounded-full">100%</span>
+            </div>
+            <p id="simPrice" class="text-3xl font-extrabold mb-4">Q 0.00</p>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div class="bg-white/10 rounded-xl p-3">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-300">Ganancia mensual</div>
+                <div id="simMonthly" class="text-lg font-extrabold text-emerald-300 mt-0.5">Q 0.00</div>
+              </div>
+              <div class="bg-white/10 rounded-xl p-3">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-300">Vs. precio sugerido</div>
+                <div id="simDelta" class="text-lg font-extrabold mt-0.5">Q 0.00</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-2">
+            <input type="range" min="50" max="200" step="1" value="100" id="simSlider" class="pasaje-range">
+            <div class="flex justify-between text-[10px] text-slate-400 font-semibold mt-1.5">
+              <span>−50%</span><span>Sugerido</span><span>+100%</span>
+            </div>
+          </div>
+
+          <div class="mt-5 space-y-3">
+            <div>
+              <div class="flex justify-between text-[11px] font-semibold text-slate-600 mb-1">
+                <span>Precio mínimo rentable</span>
+                <span id="simBarBreakLabel" class="text-slate-800 font-bold">Q 0.00</span>
+              </div>
+              <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div id="simBarBreak" class="h-full bg-amber-500 rounded-full transition-all" style="width:0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-[11px] font-semibold text-slate-600 mb-1">
+                <span>Precio sugerido</span>
+                <span id="simBarSuggestedLabel" class="text-slate-800 font-bold">Q 0.00</span>
+              </div>
+              <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div id="simBarSuggested" class="h-full bg-emerald-500 rounded-full transition-all" style="width:0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-[11px] font-semibold text-slate-600 mb-1">
+                <span>Precio simulado</span>
+                <span id="simBarCurrentLabel" class="text-slate-800 font-bold">Q 0.00</span>
+              </div>
+              <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div id="simBarCurrent" class="h-full bg-blue-500 rounded-full transition-all" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="simWarn" class="hidden mt-4 text-[11px] bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2">
+            ⚠️ Con este precio no cubres tus gastos operativos mensuales.
+          </div>
+          <div id="simOk" class="hidden mt-4 text-[11px] bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-3 py-2">
+            ✅ Escenario rentable dentro del rango simulado.
+          </div>
+        </div>
+
+        <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-5 lg:p-6 shadow-sm">
+          <h2 class="text-base font-extrabold text-slate-900 mb-1">🥧 Desglose del precio de venta</h2>
+          <p class="text-xs text-slate-500 mb-5">
+            Cómo se reparte cada quetzal que cobras.
+          </p>
+
+          <div class="relative w-full aspect-square max-w-[260px] mx-auto mb-5">
+            <svg viewBox="0 0 42 42" class="w-full h-full -rotate-90">
+              <circle cx="21" cy="21" r="15.9155" fill="none" stroke="#f1f5f9" stroke-width="6"/>
+              <g id="donutSegments"></g>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Precio de venta</div>
+              <div id="donutCenterPrice" class="text-2xl font-extrabold text-slate-900">Q 0.00</div>
+              <div id="donutCenterCost" class="text-[11px] text-slate-500 font-semibold mt-0.5">Costo Q 0.00</div>
+            </div>
+          </div>
+
+          <div id="donutLegend" class="space-y-2"></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+  (function () {
+    'use strict';
+
+    const TABLE = 'store_pricing_calculations';
+    const MODE  = 'reseller';
+
+    const state = {
+      id: null,
+      name: '',
+      purchaseMode: 'lote',
+      lotCost: 0,
+      lotUnits: 12,
+      unitCostDirect: 0,
+      unitQty: 12,
+      shipping: 0,
+      packaging: 0,
+      otherCost: 0,
+      commissionPct: 0,
+      monthlyExpenses: [{ name: '', amount: 0 }],
+      monthlyUnits: 30,
+      marginPct: 40,
+      marginBase: 'price',
+      simulatorPct: 100
+    };
+
+    let storeRef = null;
+    let sessionRef = null;
+
+    const fmtQ   = (n) => 'Q ' + (Number(n) || 0).toFixed(2);
+    const fmtPct = (n) => (Number(n) || 0).toFixed(1) + '%';
+    const num    = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+    const clamp  = (v, a, b) => Math.max(a, Math.min(b, v));
+    const round2 = (n) => Math.round((Number(n) || 0) * 100) / 100;
+    const esc    = (s) => String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+
+    function computeTotals() {
+      const lotUnits     = Math.max(1, Math.floor(num(state.lotUnits) || 1));
+      const lotCost      = num(state.lotCost);
+      const unitCostFromLot = lotCost / lotUnits;
+
+      const purchaseUnitCost = state.purchaseMode === 'lote'
+        ? unitCostFromLot
+        : num(state.unitCostDirect);
+
+      const unitQty = Math.max(1, Math.floor(num(state.unitQty) || 1));
+
+      const shipping  = num(state.shipping);
+      const packaging = num(state.packaging);
+      const otherCost = num(state.otherCost);
+      const variableCostPerSale = shipping + packaging + otherCost;
+
+      const baseCost = purchaseUnitCost + variableCostPerSale;
+
+      const commissionRate = clamp(num(state.commissionPct), 0, 40) / 100;
+      const marginRate     = clamp(num(state.marginPct), 0, 100) / 100;
+
+      let price = 0;
+      if (state.marginBase === 'price') {
+        const denom = 1 - commissionRate - marginRate;
+        price = denom > 0.0001 ? baseCost / denom : baseCost * 3;
+      } else {
+        const denom = 1 - commissionRate;
+        price = denom > 0.0001
+          ? baseCost * (1 + marginRate) / denom
+          : baseCost * (1 + marginRate);
+      }
+
+      const commissionQ   = price * commissionRate;
+      const netProfit     = price - baseCost - commissionQ;
+      const netMarginPct  = price > 0 ? (netProfit / price) * 100 : 0;
+
+      const monthlyExpensesTotal = state.monthlyExpenses.reduce((a, e) => a + num(e.amount), 0);
+      const monthlyUnits = Math.max(1, Math.floor(num(state.monthlyUnits) || 1));
+      const fixedPerUnit = monthlyExpensesTotal / monthlyUnits;
+
+      const initialInvestment = state.purchaseMode === 'lote'
+        ? lotCost
+        : purchaseUnitCost * unitQty;
+
+      const contributionPerSale = price - commissionQ - variableCostPerSale - purchaseUnitCost;
+      const breakEvenUnits = contributionPerSale > 0
+        ? Math.ceil((state.purchaseMode === 'lote' ? lotCost : initialInvestment) / contributionPerSale)
+        : Infinity;
+
+      const lotSize = state.purchaseMode === 'lote' ? lotUnits : unitQty;
+      const lotProfit = netProfit * lotSize;
+      const lotROI = initialInvestment > 0 ? (lotProfit / initialInvestment) * 100 : 0;
+
+      const monthlyProfitBeforeFixed = netProfit * monthlyUnits;
+      const paybackMonths = monthlyProfitBeforeFixed > 0
+        ? initialInvestment / monthlyProfitBeforeFixed
+        : Infinity;
+
+      const breakEvenPrice = commissionRate < 1
+        ? (purchaseUnitCost + variableCostPerSale + fixedPerUnit) / (1 - commissionRate)
+        : Infinity;
+
+      const segments = [
+        { key: 'purchase',   label: 'Compra del producto', value: purchaseUnitCost,          color: '#3b82f6' },
+        { key: 'shipping',   label: 'Envío',               value: shipping,                  color: '#0ea5e9' },
+        { key: 'packaging',  label: 'Empaque',             value: packaging,                 color: '#6366f1' },
+        { key: 'otherSale',  label: 'Otros por venta',     value: otherCost,                 color: '#8b5cf6' },
+        { key: 'commission', label: 'Comisión',            value: commissionQ,               color: '#ef4444' },
+        { key: 'profit',     label: 'Ganancia neta',       value: Math.max(0, netProfit),    color: '#10b981' }
+      ];
+
+      return {
+        lotUnits, lotCost, unitCostFromLot, unitQty,
+        purchaseUnitCost, shipping, packaging, otherCost, variableCostPerSale,
+        baseCost, commissionRate, marginRate, commissionQ,
+        price, netProfit, netMarginPct,
+        monthlyExpensesTotal, monthlyUnits, fixedPerUnit,
+        initialInvestment, lotSize, lotProfit, lotROI,
+        breakEvenUnits, breakEvenPrice, paybackMonths,
+        segments
+      };
+    }
+
+    function renderExpenses() {
+      const wrap = document.getElementById('expensesList');
+      if (!wrap) return;
+      if (state.monthlyExpenses.length === 0) {
+        state.monthlyExpenses.push({ name: '', amount: 0 });
+      }
+      wrap.innerHTML = state.monthlyExpenses.map((e, i) => `
+        <div class="flex items-center gap-2">
+          <input type="text" placeholder="Ej. Transporte" value="${esc(e.name || '')}"
+            data-exp-name="${i}"
+            class="flex-1 min-w-0 bg-white border border-slate-200 text-sm rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none">
+          <input type="number" step="0.01" min="0" placeholder="0.00" value="${e.amount || ''}"
+            data-exp-amount="${i}"
+            class="w-28 bg-white border border-slate-200 text-sm rounded-xl px-3 py-2 text-right focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+          <button type="button" data-exp-del="${i}"
+            class="text-slate-400 hover:text-red-600 hover:bg-red-50 w-9 h-9 rounded-xl transition flex items-center justify-center flex-shrink-0"
+            title="Eliminar">
+            ✕
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function renderDonut(segments, price, cost) {
+      const g = document.getElementById('donutSegments');
+      if (!g) return;
+      g.innerHTML = '';
+
+      const total = segments.reduce((a, s) => a + Math.max(0, s.value), 0);
+      document.getElementById('donutCenterPrice').textContent = fmtQ(price);
+      document.getElementById('donutCenterCost').textContent = 'Costo ' + fmtQ(cost);
+
+      const legend = document.getElementById('donutLegend');
+      if (total <= 0) {
+        legend.innerHTML = `<div class="text-xs text-slate-400 text-center py-4">Completa los datos para ver el desglose.</div>`;
+        return;
+      }
+
+      let cumulative = 0;
+      const NS = 'http://www.w3.org/2000/svg';
+
+      segments.forEach((seg) => {
+        const val = Math.max(0, seg.value);
+        if (val <= 0) return;
+        const pct = (val / total) * 100;
+
+        const c = document.createElementNS(NS, 'circle');
+        c.setAttribute('class', 'donut-seg');
+        c.setAttribute('cx', '21');
+        c.setAttribute('cy', '21');
+        c.setAttribute('r', '15.9155');
+        c.setAttribute('fill', 'none');
+        c.setAttribute('stroke', seg.color);
+        c.setAttribute('stroke-width', '6');
+        c.setAttribute('stroke-dasharray', `${pct.toFixed(4)} ${(100 - pct).toFixed(4)}`);
+        c.setAttribute('stroke-dashoffset', `${(-cumulative).toFixed(4)}`);
+        const title = document.createElementNS(NS, 'title');
+        title.textContent = `${seg.label}: ${fmtQ(val)} (${pct.toFixed(1)}%)`;
+        c.appendChild(title);
+        g.appendChild(c);
+
+        cumulative += pct;
+      });
+
+      legend.innerHTML = segments.filter(s => s.value > 0).map(s => {
+        const pct = (s.value / total) * 100;
+        return `
+          <div class="flex items-center gap-3 text-xs">
+            <span class="w-3 h-3 rounded-full flex-shrink-0" style="background:${s.color}"></span>
+            <span class="flex-1 text-slate-700 font-semibold truncate">${esc(s.label)}</span>
+            <span class="text-slate-400 font-mono text-[11px]">${pct.toFixed(1)}%</span>
+            <span class="text-slate-800 font-bold w-20 text-right">${fmtQ(s.value)}</span>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function renderSimulator(t) {
+      const pct = clamp(num(state.simulatorPct) || 100, 50, 200);
+      const simPrice = t.price * (pct / 100);
+      const simCommission = simPrice * t.commissionRate;
+      const simUnitProfit = simPrice - t.baseCost - simCommission;
+      const simMonthlyProfit = simUnitProfit * t.monthlyUnits - t.monthlyExpensesTotal;
+      const baselineMonthly = t.netProfit * t.monthlyUnits - t.monthlyExpensesTotal;
+      const delta = simMonthlyProfit - baselineMonthly;
+
+      document.getElementById('simPct').textContent = pct + '%';
+      document.getElementById('simPrice').textContent = fmtQ(simPrice);
+      document.getElementById('simMonthly').textContent = fmtQ(simMonthlyProfit);
+      const deltaEl = document.getElementById('simDelta');
+      deltaEl.textContent = (delta >= 0 ? '+' : '') + fmtQ(delta);
+      deltaEl.classList.remove('text-emerald-300', 'text-rose-300');
+      deltaEl.classList.add(delta >= 0 ? 'text-emerald-300' : 'text-rose-300');
+
+      const slider = document.getElementById('simSlider');
+      if (slider) {
+        slider.value = pct;
+        const progress = ((pct - 50) / (200 - 50)) * 100;
+        slider.style.setProperty('--range-progress', progress + '%');
+      }
+
+      const maxBar = Math.max(t.price * 2, simPrice, t.breakEvenPrice || 0, 1);
+      const pctOf = (v) => Math.max(0, Math.min(100, (v / maxBar) * 100));
+
+      const beP = isFinite(t.breakEvenPrice) ? t.breakEvenPrice : 0;
+      document.getElementById('simBarBreak').style.width = pctOf(beP) + '%';
+      document.getElementById('simBarBreakLabel').textContent = beP > 0 ? fmtQ(beP) : '—';
+
+      document.getElementById('simBarSuggested').style.width = pctOf(t.price) + '%';
+      document.getElementById('simBarSuggestedLabel').textContent = fmtQ(t.price);
+
+      document.getElementById('simBarCurrent').style.width = pctOf(simPrice) + '%';
+      document.getElementById('simBarCurrentLabel').textContent = fmtQ(simPrice);
+
+      const warnEl = document.getElementById('simWarn');
+      const okEl   = document.getElementById('simOk');
+      if (t.monthlyExpensesTotal > 0 && simMonthlyProfit < 0) {
+        warnEl.classList.remove('hidden');
+        okEl.classList.add('hidden');
+      } else if (t.price > 0) {
+        warnEl.classList.add('hidden');
+        okEl.classList.remove('hidden');
+      } else {
+        warnEl.classList.add('hidden');
+        okEl.classList.add('hidden');
+      }
+    }
+
+    function recompute() {
+      const t = computeTotals();
+
+      document.getElementById('kpiPrice').textContent = fmtQ(t.price);
+      document.getElementById('kpiPriceSub').textContent = `Costo base ${fmtQ(t.baseCost)}`;
+
+      document.getElementById('kpiProfit').textContent = fmtQ(t.netProfit);
+      document.getElementById('kpiProfitSub').textContent = `Margen: ${fmtPct(t.netMarginPct)}`;
+
+      document.getElementById('kpiInvestment').textContent = fmtQ(t.initialInvestment);
+      document.getElementById('kpiInvestmentSub').textContent =
+        `${t.lotSize} ${t.lotSize === 1 ? 'unidad' : 'unidades'} · ${fmtQ(t.purchaseUnitCost)} c/u`;
+
+      document.getElementById('kpiROI').textContent = fmtPct(t.lotROI);
+      document.getElementById('kpiROISub').textContent = isFinite(t.paybackMonths)
+        ? `Recuperas en ${t.paybackMonths.toFixed(1)} meses`
+        : 'Ajusta margen o ventas mensuales';
+
+      document.getElementById('unitCostFromLot').textContent = fmtQ(t.unitCostFromLot);
+      document.getElementById('perSaleTotal').textContent = fmtQ(t.variableCostPerSale);
+      document.getElementById('expensesTotal').textContent = fmtQ(t.monthlyExpensesTotal);
+      document.getElementById('expensesPerUnit').textContent = fmtQ(t.fixedPerUnit);
+
+      document.getElementById('marginPill').textContent = Math.round(t.marginRate * 100) + '%';
+      document.getElementById('marginQty').textContent = fmtQ(t.netProfit);
+      const beP = isFinite(t.breakEvenPrice) ? fmtQ(t.breakEvenPrice) : '—';
+      document.getElementById('breakEvenPrice').textContent = beP;
+
+      const mSlider = document.getElementById('calcMargin');
+      if (mSlider) {
+        const p = ((t.marginRate * 100 - 10) / (100 - 10)) * 100;
+        mSlider.style.setProperty('--range-progress', clamp(p, 0, 100) + '%');
+      }
+
+      document.querySelectorAll('.comm-chip').forEach(chip => {
+        const active = Number(chip.dataset.commPreset) === Number(state.commissionPct);
+        chip.classList.toggle('bg-emerald-600', active);
+        chip.classList.toggle('text-white', active);
+        chip.classList.toggle('border-emerald-600', active);
+        chip.classList.toggle('bg-white', !active);
+        chip.classList.toggle('text-slate-700', !active);
+      });
+
+      renderDonut(t.segments, t.price, t.baseCost);
+      renderSimulator(t);
+
+      state.__lastTotals = t;
+    }
+
+    function hydrateUIFromState() {
+      document.getElementById('calcName').value = state.name || '';
+      document.getElementById('calcLotCost').value = state.lotCost || 0;
+      document.getElementById('calcLotUnits').value = state.lotUnits || 12;
+      document.getElementById('calcUnitCost').value = state.unitCostDirect || 0;
+      document.getElementById('calcUnitQty').value = state.unitQty || 12;
+      document.getElementById('calcShipping').value = state.shipping || 0;
+      document.getElementById('calcPackaging').value = state.packaging || 0;
+      document.getElementById('calcOther').value = state.otherCost || 0;
+      document.getElementById('calcCommission').value = state.commissionPct || 0;
+      document.getElementById('calcMonthlyUnits').value = state.monthlyUnits || 30;
+      document.getElementById('calcMargin').value = state.marginPct ?? 40;
+
+      document.querySelectorAll('[data-purchase-mode]').forEach(b => {
+        b.classList.toggle('active', b.dataset.purchaseMode === state.purchaseMode);
+      });
+      document.getElementById('panelLote').classList.toggle('hidden', state.purchaseMode !== 'lote');
+      document.getElementById('panelUnit').classList.toggle('hidden', state.purchaseMode !== 'unit');
+
+      document.querySelectorAll('[data-margin-base]').forEach(b => {
+        b.classList.toggle('active', b.dataset.marginBase === state.marginBase);
+      });
+
+      renderExpenses();
+      recompute();
+    }
+
+    function bindTabs() {
+      document.querySelectorAll('[data-calc-tab]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.calcTab;
+          document.querySelectorAll('[data-calc-tab]').forEach(b =>
+            b.classList.toggle('active', b.dataset.calcTab === id)
+          );
+          document.querySelectorAll('[data-calc-panel]').forEach(p =>
+            p.classList.toggle('hidden', p.dataset.calcPanel !== id)
+          );
+        });
+      });
+    }
+
+    function bindPurchaseMode() {
+      document.querySelectorAll('[data-purchase-mode]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.purchaseMode = btn.dataset.purchaseMode;
+          document.querySelectorAll('[data-purchase-mode]').forEach(b =>
+            b.classList.toggle('active', b === btn)
+          );
+          document.getElementById('panelLote').classList.toggle('hidden', state.purchaseMode !== 'lote');
+          document.getElementById('panelUnit').classList.toggle('hidden', state.purchaseMode !== 'unit');
+          recompute();
+        });
+      });
+    }
+
+    function bindMarginBase() {
+      document.querySelectorAll('[data-margin-base]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          state.marginBase = btn.dataset.marginBase;
+          document.querySelectorAll('[data-margin-base]').forEach(b =>
+            b.classList.toggle('active', b === btn)
+          );
+          recompute();
+        });
+      });
+    }
+
+    function bindCommissionPresets() {
+      document.querySelectorAll('.comm-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const v = num(chip.dataset.commPreset);
+          state.commissionPct = v;
+          document.getElementById('calcCommission').value = v;
+          recompute();
+        });
+      });
+    }
+
+    function bindExpenses() {
+      const wrap = document.getElementById('expensesList');
+      if (!wrap) return;
+
+      wrap.addEventListener('input', (e) => {
+        const t = e.target;
+        if (t.dataset.expName !== undefined) {
+          state.monthlyExpenses[+t.dataset.expName].name = t.value;
+        } else if (t.dataset.expAmount !== undefined) {
+          state.monthlyExpenses[+t.dataset.expAmount].amount = num(t.value);
+        }
+        recompute();
+      });
+
+      wrap.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-exp-del]');
+        if (!btn) return;
+        const i = +btn.dataset.expDel;
+        state.monthlyExpenses.splice(i, 1);
+        if (state.monthlyExpenses.length === 0) state.monthlyExpenses.push({ name: '', amount: 0 });
+        renderExpenses();
+        recompute();
+      });
+    }
+
+    function bindScalars() {
+      const bindNum = (id, setter) => {
+        const el = document.getElementById(id);
+        if (!el) return;
+        el.addEventListener('input', () => { setter(num(el.value)); recompute(); });
+      };
+
+      document.getElementById('calcName').addEventListener('input', (e) => {
+        state.name = e.target.value;
+      });
+
+      bindNum('calcLotCost',    v => state.lotCost = v);
+      bindNum('calcLotUnits',   v => state.lotUnits = Math.max(1, Math.floor(v) || 1));
+      bindNum('calcUnitCost',   v => state.unitCostDirect = v);
+      bindNum('calcUnitQty',    v => state.unitQty = Math.max(1, Math.floor(v) || 1));
+      bindNum('calcShipping',   v => state.shipping = v);
+      bindNum('calcPackaging',  v => state.packaging = v);
+      bindNum('calcOther',      v => state.otherCost = v);
+      bindNum('calcCommission', v => state.commissionPct = clamp(v, 0, 40));
+      bindNum('calcMonthlyUnits', v => state.monthlyUnits = Math.max(1, Math.floor(v) || 1));
+      bindNum('calcMargin',     v => state.marginPct = clamp(v, 10, 100));
+    }
+
+    function bindSimulator() {
+      const s = document.getElementById('simSlider');
+      s.addEventListener('input', () => {
+        state.simulatorPct = num(s.value);
+        const t = state.__lastTotals || computeTotals();
+        renderSimulator(t);
+      });
+    }
+
+    function bindButtons() {
+      document.getElementById('btnAddExpense').addEventListener('click', () => {
+        state.monthlyExpenses.push({ name: '', amount: 0 });
+        renderExpenses();
+        recompute();
+        const inputs = document.querySelectorAll('#expensesList [data-exp-name]');
+        if (inputs.length) inputs[inputs.length - 1].focus();
+      });
+
+      document.getElementById('btnNew').addEventListener('click', () => {
+        if (!confirm('¿Empezar un cálculo nuevo? Se perderán los cambios no guardados.')) return;
+        resetState();
+        hydrateUIFromState();
+      });
+
+      document.getElementById('btnSave').addEventListener('click', saveCurrent);
+      document.getElementById('btnReloadHistory').addEventListener('click', loadHistory);
+    }
+
+    function resetState() {
+      state.id = null;
+      state.name = '';
+      state.purchaseMode = 'lote';
+      state.lotCost = 0;
+      state.lotUnits = 12;
+      state.unitCostDirect = 0;
+      state.unitQty = 12;
+      state.shipping = 0;
+      state.packaging = 0;
+      state.otherCost = 0;
+      state.commissionPct = 0;
+      state.monthlyExpenses = [{ name: '', amount: 0 }];
+      state.monthlyUnits = 30;
+      state.marginPct = 40;
+      state.marginBase = 'price';
+      state.simulatorPct = 100;
+    }
+
+    async function saveCurrent() {
+      if (!storeRef || !sessionRef) {
+        alert('Sesión no disponible.');
+        return;
+      }
+
+      let name = (state.name || '').trim();
+      if (!name) {
+        name = (prompt('Nombre del producto (ej. Audífonos Bluetooth):', '') || '').trim();
+        if (!name) return;
+        state.name = name;
+        document.getElementById('calcName').value = name;
+      }
+
+      const t = computeTotals();
+      const payload = {
+        store_id: storeRef.id,
+        user_id: sessionRef.user.id,
+        mode: MODE,
+        name: name,
+        calc_data: {
+          purchaseMode: state.purchaseMode,
+          lotCost: state.lotCost,
+          lotUnits: state.lotUnits,
+          unitCostDirect: state.unitCostDirect,
+          unitQty: state.unitQty,
+          shipping: state.shipping,
+          packaging: state.packaging,
+          otherCost: state.otherCost,
+          commissionPct: state.commissionPct,
+          monthlyExpenses: state.monthlyExpenses,
+          monthlyUnits: state.monthlyUnits,
+          marginPct: state.marginPct,
+          marginBase: state.marginBase,
+          simulatorPct: state.simulatorPct
+        },
+        unit_cost: round2(t.purchaseUnitCost),
+        suggested_price: round2(t.price),
+        net_profit: round2(t.netProfit),
+        margin: round2(t.netMarginPct)
+      };
+
+      const btn = document.getElementById('btnSave');
+      const originalHTML = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ <span>Guardando…</span>';
+
+      try {
+        let res;
+        if (state.id) {
+          res = await _supabase.from(TABLE).update(payload).eq('id', state.id).select().single();
+        } else {
+          res = await _supabase.from(TABLE).insert(payload).select().single();
+        }
+
+        if (res.error) {
+          console.error('[CalcRev] save error:', res.error);
+          alert('No se pudo guardar: ' + res.error.message);
+          return;
+        }
+
+        state.id = res.data.id;
+        await loadHistory();
+        flashSaved();
+      } catch (err) {
+        console.error('[CalcRev] save exception:', err);
+        alert('Error inesperado al guardar.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+      }
+    }
+
+    function flashSaved() {
+      const btn = document.getElementById('btnSave');
+      const original = btn.innerHTML;
+      btn.classList.add('flash-green');
+      btn.innerHTML = '✅ <span>Guardado</span>';
+      setTimeout(() => {
+        btn.classList.remove('flash-green');
+        btn.innerHTML = original;
+      }, 1400);
+    }
+
+    async function loadHistory() {
+      if (!storeRef) return;
+      const wrap = document.getElementById('historyList');
+      wrap.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">Cargando…</div>`;
+
+      const probe = await _supabase.from(TABLE).select('id, mode').limit(1);
+
+      if (probe.error) {
+        console.warn('[CalcRev] tabla no disponible:', probe.error);
+        const msg = probe.error.message || '';
+        const hint = msg.includes('does not exist')
+          ? 'La tabla no existe. Ejecuta el SQL de creación en Supabase.'
+          : msg.includes('column') && msg.includes('mode')
+            ? 'Falta la columna <code class="font-mono text-[10px] bg-white px-1 rounded">mode</code>. Ejecuta el SQL de migración.'
+            : 'Error de conexión con la base de datos.';
+        wrap.innerHTML = `
+          <div class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+            ${hint}
+          </div>`;
+        return;
+      }
+
+      const { data, error } = await _supabase
+        .from(TABLE)
+        .select('id, name, unit_cost, suggested_price, net_profit, margin, calc_data, created_at')
+        .eq('store_id', storeRef.id)
+        .eq('mode', MODE)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.warn('[CalcRev] history error:', error);
+        wrap.innerHTML = `
+          <div class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+            No se pudo cargar el historial: ${esc(error.message || 'error desconocido')}
+          </div>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        wrap.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">Sin cálculos guardados aún.</div>`;
+        return;
+      }
+
+      wrap.innerHTML = data.map(item => `
+        <div class="history-item rounded-xl border border-slate-200/80 p-3" data-history-id="${esc(item.id)}">
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-bold text-slate-800 truncate">${esc(item.name)}</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">${new Date(item.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <div class="text-sm font-extrabold text-emerald-700">${fmtQ(item.suggested_price)}</div>
+              <div class="text-[10px] text-slate-500">${fmtPct(item.margin)} margen</div>
+            </div>
+          </div>
+          <div class="flex gap-1.5">
+            <button type="button" data-action="load" data-id="${esc(item.id)}"
+              class="flex-1 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 rounded-lg transition">
+              Cargar
+            </button>
+            <button type="button" data-action="edit" data-id="${esc(item.id)}"
+              class="flex-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg transition">
+              Editar
+            </button>
+            <button type="button" data-action="delete" data-id="${esc(item.id)}"
+              class="text-[10px] font-bold bg-white hover:bg-red-50 border border-slate-200 text-red-600 py-1.5 px-2.5 rounded-lg transition">
+              🗑
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      wrap.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const action = btn.dataset.action;
+          const id = btn.dataset.id;
+          const item = data.find(d => String(d.id) === String(id));
+          if (!item) return;
+          if (action === 'load')        loadCalculation(item);
+          else if (action === 'edit')   editCalculation(item);
+          else if (action === 'delete') deleteCalculation(item);
+        });
+      });
+    }
+
+    function applyCalcDataToState(item) {
+      const cd = item.calc_data || {};
+      state.id = item.id;
+      state.name = item.name || '';
+      state.purchaseMode = cd.purchaseMode || 'lote';
+      state.lotCost = num(cd.lotCost);
+      state.lotUnits = Math.max(1, Math.floor(num(cd.lotUnits) || 12));
+      state.unitCostDirect = num(cd.unitCostDirect);
+      state.unitQty = Math.max(1, Math.floor(num(cd.unitQty) || 12));
+      state.shipping = num(cd.shipping);
+      state.packaging = num(cd.packaging);
+      state.otherCost = num(cd.otherCost);
+      state.commissionPct = num(cd.commissionPct);
+      state.monthlyExpenses = Array.isArray(cd.monthlyExpenses) && cd.monthlyExpenses.length
+        ? cd.monthlyExpenses.map(e => ({ name: e.name || '', amount: num(e.amount) }))
+        : [{ name: '', amount: 0 }];
+      state.monthlyUnits = Math.max(1, Math.floor(num(cd.monthlyUnits) || 30));
+      state.marginPct = cd.marginPct !== undefined ? clamp(num(cd.marginPct), 10, 100) : 40;
+      state.marginBase = cd.marginBase === 'cost' ? 'cost' : 'price';
+      state.simulatorPct = cd.simulatorPct !== undefined ? num(cd.simulatorPct) : 100;
+    }
+
+    function loadCalculation(item) {
+      applyCalcDataToState(item);
+      hydrateUIFromState();
+      document.querySelector('[data-calc-tab="purchase"]').click();
+      const content = document.getElementById('content');
+      content.classList.remove('flash-green');
+      void content.offsetWidth;
+      content.classList.add('flash-green');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function editCalculation(item) {
+      loadCalculation(item);
+      setTimeout(() => {
+        const nameEl = document.getElementById('calcName');
+        nameEl.focus();
+        nameEl.select();
+      }, 350);
+    }
+
+    async function deleteCalculation(item) {
+      if (!confirm(`¿Eliminar "${item.name}"? Esta acción no se puede deshacer.`)) return;
+      const { error } = await _supabase.from(TABLE).delete().eq('id', item.id);
+      if (error) {
+        alert('No se pudo eliminar: ' + error.message);
+        return;
+      }
+      if (String(state.id) === String(item.id)) {
+        resetState();
+        hydrateUIFromState();
+      }
+      await loadHistory();
+    }
+
+    async function init() {
+      try {
+        const { session, store, stores } = await guardDashboardPage();
+        if (!session || !store) return;
+
+        sessionRef = session;
+        storeRef = store;
+
+        await initDashboardNav({ user: session.user, store, stores });
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+
+        bindTabs();
+        bindPurchaseMode();
+        bindMarginBase();
+        bindCommissionPresets();
+        bindExpenses();
+        bindScalars();
+        bindSimulator();
+        bindButtons();
+
+        renderExpenses();
+        recompute();
+
+        await loadHistory();
+
+      } catch (err) {
+        console.error('[CalcRev] init error:', err);
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('errorState').classList.remove('hidden');
+        document.getElementById('errorStateMsg').textContent = err && err.message ? err.message : '';
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  })();
+  </script>
+</body>
+</html>

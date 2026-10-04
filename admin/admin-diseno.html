@@ -1,0 +1,770 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diseño Global, Presets y Encabezados · Admin</title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="../js/theme-loader.js?v=9"></script>
+  <script src="../js/admin-utils.js?v=6"></script>
+  <script src="../js/admin-sidebar.js?v=3"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: #1e293b; }
+
+    .design-layout { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
+    @media (min-width: 1100px) { .design-layout { grid-template-columns: minmax(0, 1fr) 420px; } }
+
+    .panel-section {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 16px;
+      margin-bottom: 16px; overflow: hidden; transition: box-shadow .2s, border-color .2s;
+    }
+    .panel-section > summary {
+      list-style: none; cursor: pointer; padding: 16px 20px;
+      display: flex; align-items: center; gap: 12px;
+      font-weight: 700; font-size: 15px; color: #0f172a; user-select: none;
+    }
+    .panel-section > summary::-webkit-details-marker { display: none; }
+    .panel-section > summary:hover { background: #f8fafc; }
+    .panel-section > summary .chev { margin-left: auto; transition: transform .2s ease; color: #94a3b8; }
+    .panel-section[open] > summary .chev { transform: rotate(180deg); }
+    .panel-section > summary .sec-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 34px; height: 34px; border-radius: 10px; background: #f1f5f9; font-size: 18px;
+    }
+
+    .panel-body { padding: 20px; border-top: 1px solid #f1f5f9; }
+    .field-label { display: block; font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 6px; text-transform: uppercase; }
+    .input-text { width: 100%; border: 1px solid #cbd5e1; border-radius: 10px; padding: 9px 12px; font-size: 13px; color: #0f172a; }
+    .input-mono { font-family: ui-monospace, monospace; font-size: 12px; text-transform: uppercase; }
+
+    .color-group { display: flex; align-items: center; gap: 10px; }
+    .color-group input[type="color"] { width: 48px; height: 40px; border: 1px solid #cbd5e1; border-radius: 10px; cursor: pointer; padding: 2px; background: #fff; }
+
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none; width: 100%; height: 5px;
+      background: #e2e8f0; border-radius: 999px; outline: none; margin: 8px 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 18px; height: 18px;
+      border-radius: 50%; background: #fff; border: 3px solid #10b981; cursor: pointer;
+    }
+
+    .range-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; font-weight: 600; color: #475569; }
+    .range-value { font-family: ui-monospace, monospace; color: #059669; background: #ecfdf5; padding: 1px 7px; border-radius: 5px; font-size: 11px; }
+
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px; }
+    .toggle-switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-switch .slider { position: absolute; inset: 0; background: #cbd5e1; border-radius: 999px; cursor: pointer; transition: background .2s; }
+    .toggle-switch .slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
+    .toggle-switch input:checked + .slider { background: #10b981; }
+    .toggle-switch input:checked + .slider::before { transform: translateX(18px); }
+
+    /* CARRUSEL DE PRESETS */
+    .carousel-track-container { position: relative; overflow: hidden; border-radius: 14px; padding: 4px 0; }
+    .carousel-track {
+      display: flex; gap: 14px; overflow-x: auto; scroll-behavior: smooth;
+      padding: 6px 2px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    }
+    .carousel-track::-webkit-scrollbar { height: 6px; }
+    .carousel-track::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+
+    .preset-card {
+      flex: 0 0 260px; scroll-snap-align: start;
+      background: #fff; border: 2px solid #e2e8f0; border-radius: 14px; padding: 14px;
+      cursor: pointer; text-align: left; transition: all .2s cubic-bezier(.2,.7,.2,1);
+      position: relative; overflow: hidden;
+    }
+    .preset-card:hover { border-color: #10b981; transform: translateY(-2px); box-shadow: 0 8px 18px -4px rgba(15,23,42,.1); }
+    .preset-card.active-preset { border-color: #10b981; background: #f0fdf4; box-shadow: 0 0 0 3px rgba(16,185,129,.2); }
+    .preset-card .pc-badge { position: absolute; top: 10px; right: 10px; font-size: 10px; font-weight: 800; padding: 2px 7px; border-radius: 999px; }
+
+    .preset-swatches { display: flex; height: 14px; border-radius: 6px; overflow: hidden; margin-top: 12px; border: 1px solid rgba(0,0,0,.08); }
+    .preset-swatch { flex: 1; height: 100%; }
+
+    /* FONDOS Y TARJETAS */
+    .bg-preset-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(110px, 1fr)); gap: 10px; margin-top: 10px; }
+    .bg-preset-card {
+      border: 2px solid #e2e8f0; border-radius: 12px; padding: 8px; cursor: pointer; text-align: center;
+      transition: all .15s ease; background: #fff;
+    }
+    .bg-preset-card:hover { border-color: #10b981; transform: translateY(-1px); }
+    .bg-preset-thumb { height: 44px; border-radius: 8px; margin-bottom: 6px; border: 1px solid rgba(0,0,0,0.1); background-size: cover; background-position: center; }
+
+    .category-tab-btn {
+      padding: 8px 16px; border-radius: 10px; font-weight: 700; font-size: 12px;
+      cursor: pointer; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; transition: all .15s;
+    }
+    .category-tab-btn.active { background: #10b981; color: #fff; border-color: #10b981; }
+
+    .carousel-nav-btn {
+      position: absolute; top: 50%; transform: translateY(-50%); z-index: 10;
+      width: 36px; height: 36px; border-radius: 50%; background: #fff; border: 1px solid #cbd5e1;
+      display: flex; align-items: center; justify-content: center; font-weight: 800; color: #0f172a;
+      box-shadow: 0 4px 12px rgba(0,0,0,.1); cursor: pointer; transition: all .15s;
+    }
+    .carousel-nav-btn:hover { background: #10b981; color: #fff; border-color: #10b981; }
+    .carousel-nav-btn.prev { left: 4px; }
+    .carousel-nav-btn.next { right: 4px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 12px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 12px; }
+
+    .save-bar { position: sticky; bottom: 0; z-index: 20; padding-top: 16px; background: linear-gradient(to top, #f1f5f9 70%, transparent); margin-top: 16px; }
+    .save-bar-inner { background: #fff; border: 1px solid #e2e8f0; border-radius: 16px; padding: 14px 20px; display: flex; align-items: center; justify-content: space-between; gap: 16px; box-shadow: 0 10px 25px -5px rgba(0,0,0,.08); }
+    .btn { padding: 10px 20px; border-radius: 10px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; transition: all .15s; }
+    .btn-primary { background: #10b981; color: #fff; }
+    .btn-primary:hover { background: #059669; }
+    .btn-ghost { background: #f1f5f9; color: #475569; }
+
+    /* PREVIEW CONTAINER CON ELEMENTOS DE FONDO PARA BLUR */
+    .preview-box {
+      border-radius: 16px; transition: background-color .2s ease; overflow: hidden;
+      box-shadow: 0 12px 30px -8px rgba(0,0,0,.15); background-size: cover; background-position: center;
+      position: relative; min-height: 400px; display: flex; flex-direction: column;
+    }
+    .preview-mock-header {
+      padding: 14px 18px; display: flex; align-items: center; justify-content: space-between;
+      border-bottom: 1px solid rgba(255,255,255,0.2); position: relative; z-index: 20;
+    }
+  </style>
+</head>
+<body class="min-h-screen pb-12">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-[1400px] mx-auto p-4 sm:p-6">
+    <div id="adminTabs"></div>
+
+    <div id="loadingState" class="bg-white rounded-2xl border p-12 text-center text-sm text-slate-500">
+      <div class="inline-block animate-spin text-2xl mb-2">🎨</div>
+      <p class="font-medium">Cargando catálogo de presets y configuración del sitio...</p>
+    </div>
+
+    <section id="content" class="hidden">
+      <div class="mb-6 bg-white p-5 rounded-2xl border border-slate-200 flex flex-wrap items-center justify-between gap-4 shadow-sm">
+        <div>
+          <h1 class="text-2xl font-extrabold text-slate-900 flex items-center gap-2">🎨 Diseño Global, Presets y Encabezado</h1>
+          <p class="text-xs sm:text-sm text-slate-500 mt-1">Explora los 20 presets temáticos, cambia los colores de marca/encabezado y personaliza los fondos de pantalla.</p>
+        </div>
+      </div>
+
+      <div class="design-layout">
+        <div>
+
+          <!-- CARRUSEL DE PRESETS TEMÁTICOS (20 OPCIONES EN 2 PESTAÑAS) -->
+          <details class="panel-section" open>
+            <summary>
+              <span class="sec-icon">🎪</span>
+              Presets Temáticos (20 Diseños en 2 Pestañas)
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body">
+
+              <div class="flex items-center gap-2 mb-4">
+                <button type="button" class="category-tab-btn active" id="tabConfort" onclick="filterCategory('confort')">👓 Confort Visual (10)</button>
+                <button type="button" class="category-tab-btn" id="tabFestivos" onclick="filterCategory('festivos')">🇬🇹 Ferias y Festividades (10)</button>
+              </div>
+
+              <div class="carousel-track-container">
+                <button type="button" class="carousel-nav-btn prev" onclick="scrollCarousel(-280)">‹</button>
+                <button type="button" class="carousel-nav-btn next" onclick="scrollCarousel(280)">›</button>
+
+                <div class="carousel-track" id="presetsTrack">
+
+                  <!-- 10 CONFORT VISUAL -->
+                  <div class="preset-card confort-item" onclick="applyPreset('lectura_calida')">
+                    <span class="pc-badge bg-amber-100 text-amber-800">📖 Cuidado</span>
+                    <div class="font-extrabold text-sm text-slate-900">1. Sepia Papel</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Lectura cálida sin luz azul.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#FBF0D9"></div><div class="preset-swatch" style="background:#78350F"></div><div class="preset-swatch" style="background:#D97706"></div></div>
+                  </div>
+
+                  <div class="preset-card confort-item" onclick="applyPreset('oled_descanso')">
+                    <span class="pc-badge bg-slate-800 text-slate-200">🌙 Antirreflejo</span>
+                    <div class="font-extrabold text-sm text-slate-900">2. Noche Suave</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Pizarra oscuro balanceado.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#0F172A"></div><div class="preset-swatch" style="background:#E2E8F0"></div><div class="preset-swatch" style="background:#14B8A6"></div></div>
+                  </div>
+
+                  <div class="preset-card confort-item" onclick="applyPreset('menta_bosque')">
+                    <span class="pc-badge bg-emerald-100 text-emerald-800">🌿 Sensibilidad</span>
+                    <div class="font-extrabold text-sm text-slate-900">3. Menta & Bosque</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Verde sabina descanso ocular.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#064E3B"></div><div class="preset-swatch" style="background:#D1FAE5"></div><div class="preset-swatch" style="background:#10B981"></div></div>
+                  </div>
+
+                  <div class="preset-card confort-item" onclick="applyPreset('niebla_nordica')">
+                    <span class="pc-badge bg-blue-100 text-blue-800">🌁 Diurno</span>
+                    <div class="font-extrabold text-sm text-slate-900">4. Niebla Nórdica</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Gris mate pulcro de oficina.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#F1F5F9"></div><div class="preset-swatch" style="background:#1E293B"></div><div class="preset-swatch" style="background:#2563EB"></div></div>
+                  </div>
+
+                  <div class="preset-card confort-item" onclick="applyPreset('cafe_mocha')">
+                    <span class="pc-badge bg-stone-200 text-stone-800">☕ Tostado</span>
+                    <div class="font-extrabold text-sm text-slate-900">5. Café Mocha</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Café oscuro y crema de leche.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#1C1917"></div><div class="preset-swatch" style="background:#E7E5E4"></div><div class="preset-swatch" style="background:#D97706"></div></div>
+                  </div>
+
+                  <div class="preset-card confort-item" onclick="applyPreset('pergamino')">
+                    <span class="pc-badge bg-orange-100 text-orange-800">📜 Editorial</span>
+                    <div class="font-extrabold text-sm text-slate-900">6. Pergamino Editorial</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Efecto libro impreso clásico.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#F5EBE0"></div><div class="preset-swatch" style="background:#2B2B2B"></div><div class="preset-swatch" style="background:#C85A32"></div></div>
+                  </div>
+
+                  <div class="preset-card confort-item" onclick="applyPreset('oled_puro')">
+                    <span class="pc-badge bg-black text-white">🌑 AMOLED</span>
+                    <div class="font-extrabold text-sm text-slate-900">7. OLED Noche Profunda</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Negro absoluto para ahorro batería.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#000000"></div><div class="preset-swatch" style="background:#E5E7EB"></div><div class="preset-swatch" style="background:#10B981"></div></div>
+                  </div>
+
+                  <div class="preset-card confort-item" onclick="applyPreset('oceano_profundo')">
+                    <span class="pc-badge bg-cyan-100 text-cyan-800">🌊 Calma</span>
+                    <div class="font-extrabold text-sm text-slate-900">8. Océano Profundo</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Azul abisal relajante muscular.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#0A192F"></div><div class="preset-swatch" style="background:#CCD6F6"></div><div class="preset-swatch" style="background:#64FFDA"></div></div>
+                  </div>
+
+                  <div class="preset-card confort-item" onclick="applyPreset('sombra_cerezo')">
+                    <span class="pc-badge bg-purple-100 text-purple-800">🌸 Místico</span>
+                    <div class="font-extrabold text-sm text-slate-900">9. Sombra de Cerezo</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Ciruela con rosado atenuado.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#1A1625"></div><div class="preset-swatch" style="background:#F3E8EE"></div><div class="preset-swatch" style="background:#EC4899"></div></div>
+                  </div>
+
+                  <div class="preset-card confort-item" onclick="applyPreset('luz_atenuada')">
+                    <span class="pc-badge bg-emerald-50 text-emerald-700">☀️ Hueso</span>
+                    <div class="font-extrabold text-sm text-slate-900">10. Luz Atenuada</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Blanco mate antideslumbrante.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#F8FAF8"></div><div class="preset-swatch" style="background:#334155"></div><div class="preset-swatch" style="background:#16A34A"></div></div>
+                  </div>
+
+                  <!-- 10 FESTIVIDADES -->
+                  <div class="preset-card festivo-item hidden" onclick="applyPreset('independencia')">
+                    <span class="pc-badge bg-blue-100 text-blue-800">🇬🇹 15 de Sept.</span>
+                    <div class="font-extrabold text-sm text-slate-900">11. Independencia</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Azul patrio y blanco cristalino.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#0066FF"></div><div class="preset-swatch" style="background:#0F172A"></div><div class="preset-swatch" style="background:#60A5FA"></div></div>
+                  </div>
+
+                  <div class="preset-card festivo-item hidden" onclick="applyPreset('feria_xelaju')">
+                    <span class="pc-badge bg-indigo-100 text-indigo-800">🎡 Xelafer</span>
+                    <div class="font-extrabold text-sm text-slate-900">12. Feria de Xelajú</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Azul noche altense y rojo festivo.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#1E1B4B"></div><div class="preset-swatch" style="background:#3B82F6"></div><div class="preset-swatch" style="background:#EF4444"></div></div>
+                  </div>
+
+                  <div class="preset-card festivo-item hidden" onclick="applyPreset('semana_santa')">
+                    <span class="pc-badge bg-purple-100 text-purple-900">🟣 Tradición</span>
+                    <div class="font-extrabold text-sm text-slate-900">13. Semana Santa</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Púrpura túnica y oro procesional.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#2E1065"></div><div class="preset-swatch" style="background:#7C3AED"></div><div class="preset-swatch" style="background:#FBBF24"></div></div>
+                  </div>
+
+                  <div class="preset-card festivo-item hidden" onclick="applyPreset('fiambre')">
+                    <span class="pc-badge bg-fuchsia-100 text-fuchsia-900">🥗 1 de Nov.</span>
+                    <div class="font-extrabold text-sm text-slate-900">14. Fiambre Chapín</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Violeta, remolacha y feria.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#3B0764"></div><div class="preset-swatch" style="background:#9333EA"></div><div class="preset-swatch" style="background:#FACC15"></div></div>
+                  </div>
+
+                  <div class="preset-card festivo-item hidden" onclick="applyPreset('barriletes_gigantes')">
+                    <span class="pc-badge bg-orange-100 text-orange-900">🪁 Sumpango</span>
+                    <div class="font-extrabold text-sm text-slate-900">15. Barriletes Gigantes</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Explosión neón de color popular.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#0F172A"></div><div class="preset-swatch" style="background:#F97316"></div><div class="preset-swatch" style="background:#06B6D4"></div></div>
+                  </div>
+
+                  <div class="preset-card festivo-item hidden" onclick="applyPreset('navidad_chapina')">
+                    <span class="pc-badge bg-red-100 text-red-900">🎄 Nochebuena</span>
+                    <div class="font-extrabold text-sm text-slate-900">16. Navidad Chapina</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Rojo pascua, pinabete y estrella.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#052E16"></div><div class="preset-swatch" style="background:#DC2626"></div><div class="preset-swatch" style="background:#FBBF24"></div></div>
+                  </div>
+
+                  <div class="preset-card festivo-item hidden" onclick="applyPreset('ano_nuevo')">
+                    <span class="pc-badge bg-yellow-100 text-yellow-900">🍾 Gala</span>
+                    <div class="font-extrabold text-sm text-slate-900">17. Año Nuevo</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Dorado champaña y negro gala.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#09090B"></div><div class="preset-swatch" style="background:#FBBF24"></div><div class="preset-swatch" style="background:#F59E0B"></div></div>
+                  </div>
+
+                  <div class="preset-card festivo-item hidden" onclick="applyPreset('halloween')">
+                    <span class="pc-badge bg-purple-900 text-purple-100">🎃 Brujas</span>
+                    <div class="font-extrabold text-sm text-slate-900">18. Halloween</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Naranja calabaza y morado neón.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#180228"></div><div class="preset-swatch" style="background:#EA580C"></div><div class="preset-swatch" style="background:#A855F7"></div></div>
+                  </div>
+
+                  <div class="preset-card festivo-item hidden" onclick="applyPreset('rabin_ajau')">
+                    <span class="pc-badge bg-teal-100 text-teal-900">👑 Folclor</span>
+                    <div class="font-extrabold text-sm text-slate-900">19. Rabin Ajau (Cobán)</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Verde quetzal y textil ancestral.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#064E3B"></div><div class="preset-swatch" style="background:#0D9488"></div><div class="preset-swatch" style="background:#F43F5E"></div></div>
+                  </div>
+
+                  <div class="preset-card festivo-item hidden" onclick="applyPreset('quema_del_diablo')">
+                    <span class="pc-badge bg-red-900 text-red-100">🔥 7 de Dic.</span>
+                    <div class="font-extrabold text-sm text-slate-900">20. La Quema del Diablo</div>
+                    <div class="text-[11px] text-slate-500 mt-0.5">Rojo fuego y chispa encendida.</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#1C1917"></div><div class="preset-swatch" style="background:#EF4444"></div><div class="preset-swatch" style="background:#F97316"></div></div>
+                  </div>
+
+                </div>
+              </div>
+
+            </div>
+          </details>
+
+          <!-- ENCABEZADO Y TÍTULO COMERCIAL -->
+          <details class="panel-section" open>
+            <summary>
+              <span class="sec-icon">🪟</span>
+              Encabezado Principal y Marca
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body space-y-4">
+
+              <div>
+                <label class="field-label">Título Comercial del Sitio</label>
+                <input type="text" id="siteTitle" value="Pasaje de los Altos" class="input-text">
+              </div>
+
+              <!-- LOGOTIPO -->
+              <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <label class="field-label">Logotipo de la Plataforma</label>
+                <div class="flex items-center gap-4 mt-2">
+                  <div class="w-16 h-16 rounded-xl bg-white border flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm">
+                    <img id="logoPreviewImg" src="../img/logo.png" class="w-full h-full object-cover" onerror="this.src='../img/logo.png'">
+                  </div>
+                  <div class="flex-1 space-y-2">
+                    <input type="file" id="logoFileInput" accept="image/*" class="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-emerald-600 file:text-white hover:file:bg-emerald-700 cursor-pointer">
+                    <input type="text" id="logoUrl" placeholder="o URL pública del logo..." class="input-text">
+                  </div>
+                </div>
+              </div>
+
+              <!-- CRISTAL DEL ENCABEZADO -->
+              <div class="p-4 bg-slate-50 rounded-xl border border-slate-200 space-y-3">
+                <div class="toggle-row mb-0">
+                  <span class="text-xs font-bold text-slate-800">Activar Cristal/Vidrio en Encabezado</span>
+                  <label class="toggle-switch">
+                    <input type="checkbox" id="headerGlassEnabled" checked>
+                    <span class="slider"></span>
+                  </label>
+                </div>
+
+                <div class="grid-2">
+                  <div>
+                    <label class="field-label">Tinte Encabezado</label>
+                    <div class="color-group"><input type="color" id="headerGlassTint" value="#FFFFFF"><input type="text" id="headerGlassTintHex" value="#FFFFFF" class="input-text input-mono"></div>
+                  </div>
+                  <div>
+                    <div class="range-row"><span>Opacidad</span><span class="range-value" id="headerGlassOpacityLabel">85%</span></div>
+                    <input type="range" id="headerGlassOpacity" min="10" max="100" step="1" value="85">
+                  </div>
+                </div>
+
+                <div class="grid-2">
+                  <div>
+                    <div class="range-row"><span>Desenfoque (Blur)</span><span class="range-value" id="headerGlassBlurLabel">18px</span></div>
+                    <input type="range" id="headerGlassBlur" min="0" max="32" step="1" value="18">
+                  </div>
+                  <div>
+                    <div class="range-row"><span>Radio Bordes</span><span class="range-value" id="headerRadiusLabel">1.0rem</span></div>
+                    <input type="range" id="headerRadius" min="0" max="32" step="1" value="16">
+                  </div>
+                </div>
+              </div>
+
+            </div>
+          </details>
+
+          <!-- COLORES DE MARCA Y TÍTULO RESTAURADOS -->
+          <details class="panel-section" open>
+            <summary>
+              <span class="sec-icon">🎨</span>
+              Colores Base de Marca y Títulos
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body space-y-4">
+              <div class="grid-2">
+                <div>
+                  <label class="field-label">Color Título Encabezado/Sitio</label>
+                  <div class="color-group"><input type="color" id="headingColor" value="#0F172A"><input type="text" id="headingHex" value="#0F172A" class="input-text input-mono"></div>
+                </div>
+                <div>
+                  <label class="field-label">Color Primario</label>
+                  <div class="color-group"><input type="color" id="primaryColor" value="#10B981"><input type="text" id="primaryHex" value="#10B981" class="input-text input-mono"></div>
+                </div>
+              </div>
+              <div class="grid-2">
+                <div>
+                  <label class="field-label">Fondo de Pantalla / Secundario</label>
+                  <div class="color-group"><input type="color" id="secondaryColor" value="#F1F5F9"><input type="text" id="secondaryHex" value="#F1F5F9" class="input-text input-mono"></div>
+                </div>
+                <div>
+                  <label class="field-label">Acento / Destacados</label>
+                  <div class="color-group"><input type="color" id="accentColor" value="#2563EB"><input type="text" id="accentHex" value="#2563EB" class="input-text input-mono"></div>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- IMAGEN DE FONDO Y PRESETS DE TEXTURA -->
+          <details class="panel-section" open>
+            <summary>
+              <span class="sec-icon">🖼️</span>
+              Textura e Imagen de Fondo de Pantalla
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body space-y-4">
+              <div class="p-4 bg-slate-50 rounded-xl border border-slate-200">
+                <label class="field-label">Imagen o Textura Personalizada</label>
+                <div class="flex items-center gap-4 mt-2">
+                  <div class="w-16 h-16 rounded-xl bg-white border flex items-center justify-center overflow-hidden flex-shrink-0 shadow-sm relative">
+                    <div id="bgPreviewBox" class="w-full h-full bg-cover bg-center"></div>
+                  </div>
+                  <div class="flex-1 space-y-2">
+                    <input type="file" id="bgFileInput" accept="image/*" class="block w-full text-xs text-slate-500 file:mr-3 file:py-2 file:px-3 file:rounded-lg file:border-0 file:text-xs file:font-bold file:bg-blue-600 file:text-white hover:file:bg-blue-700 cursor-pointer">
+                    <input type="text" id="bgImageUrl" placeholder="o URL de textura de fondo..." class="input-text">
+                  </div>
+                </div>
+
+                <div class="mt-4 pt-3 border-t border-slate-200">
+                  <span class="field-label">Presets de Textura para Fondo</span>
+                  <div class="bg-preset-grid">
+                    <div class="bg-preset-card" onclick="applyBgPreset('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'><rect width=\'100\' height=\'100\' fill=\'%230f172a\'/><circle cx=\'50\' cy=\'50\' r=\'40\' fill=\'%231e293b\' opacity=\'0.3\'/></svg>')">
+                      <div class="bg-preset-thumb" style="background:#0f172a;"></div>
+                      <span class="text-[10px] font-bold text-slate-700">Pizarra Noche</span>
+                    </div>
+
+                    <div class="bg-preset-card" onclick="applyBgPreset('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'60\' height=\'60\'><rect width=\'60\' height=\'60\' fill=\'%23f5ebe0\'/><circle cx=\'30\' cy=\'30\' r=\'2\' fill=\'%23d5bdaf\' opacity=\'0.5\'/></svg>')">
+                      <div class="bg-preset-thumb" style="background:#f5ebe0;"></div>
+                      <span class="text-[10px] font-bold text-slate-700">Papel Granulado</span>
+                    </div>
+
+                    <div class="bg-preset-card" onclick="applyBgPreset('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'80\' height=\'80\'><rect width=\'80\' height=\'80\' fill=\'%23022c22\'/><circle cx=\'20\' cy=\'20\' r=\'10\' fill=\'%23065f46\' opacity=\'0.3\'/></svg>')">
+                      <div class="bg-preset-thumb" style="background:#022c22;"></div>
+                      <span class="text-[10px] font-bold text-slate-700">Sabina Mate</span>
+                    </div>
+
+                    <div class="bg-preset-card" onclick="applyBgPreset('data:image/svg+xml;utf8,<svg xmlns=\'http://www.w3.org/2000/svg\' width=\'100\' height=\'100\'><rect width=\'100\' height=\'100\' fill=\'%231c1917\'/><circle cx=\'50\' cy=\'50\' r=\'45\' fill=\'%23292524\' opacity=\'0.4\'/></svg>')">
+                      <div class="bg-preset-thumb" style="background:#1c1917;"></div>
+                      <span class="text-[10px] font-bold text-slate-700">Tostado Moca</span>
+                    </div>
+
+                    <div class="bg-preset-card" onclick="applyBgPreset('')">
+                      <div class="bg-preset-thumb bg-slate-100 flex items-center justify-center text-xs font-bold text-slate-400">🚫</div>
+                      <span class="text-[10px] font-bold text-slate-700">Sin Fondo</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <div class="save-bar">
+            <div class="save-bar-inner">
+              <div>
+                <p class="text-sm font-bold text-slate-800">¿Guardar marca y encabezado?</p>
+                <p class="text-[11px] text-slate-500">Se aplicará a toda la plataforma pública.</p>
+              </div>
+              <div class="flex gap-2">
+                <button type="button" id="resetBtn" class="btn btn-ghost">↩️ Descartar</button>
+                <button type="button" id="saveBtn" class="btn btn-primary">💾 Guardar Cambios</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- PREVIEW VIVO CON FORMAS EN FONDO PARA HACER VISIBLE EL DESENFOQUE (BLUR) -->
+        <div class="sticky top-20">
+          <div class="bg-white rounded-2xl border border-slate-200 p-5 shadow-sm">
+            <h3 class="font-extrabold text-sm text-slate-800 mb-3">👁️ Vista Previa en Tiempo Real</h3>
+
+            <div id="previewContainer" class="preview-box">
+
+              <!-- FORMAS COLORIDAS DE FONDO PARA PERCIBIR EL FILTRO BLUR DEL ENCABEZADO -->
+              <div class="absolute -top-6 -left-6 w-28 h-28 bg-emerald-500/80 rounded-full blur-md pointer-events-none z-0"></div>
+              <div class="absolute top-8 right-4 w-24 h-24 bg-blue-600/80 rounded-full blur-md pointer-events-none z-0"></div>
+              <div class="absolute top-20 left-12 w-32 h-12 bg-amber-500/80 rounded-full blur-md pointer-events-none z-0"></div>
+
+              <div id="previewHeader" class="preview-mock-header">
+                <div class="flex items-center gap-2">
+                  <img id="previewLogo" src="../img/logo.png" class="w-7 h-7 rounded-lg object-cover">
+                  <div class="font-extrabold text-xs sm:text-sm" id="previewTitle">Pasaje de los Altos</div>
+                </div>
+                <button id="previewBtn" class="px-3 py-1 rounded-lg text-xs font-bold text-white">Menú</button>
+              </div>
+
+              <div class="p-6 flex-1 flex items-center justify-center relative z-10">
+                <div class="bg-white/80 backdrop-blur-md p-4 rounded-xl border border-white/40 shadow-sm text-center">
+                  <span class="text-xs font-extrabold px-2 py-1 rounded-md text-white" id="previewBadge">Color Primario</span>
+                  <p class="text-xs text-slate-600 mt-2">Muestra de contraste entre fondo y cristal.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] bg-emerald-600 text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-2xl transition-opacity duration-300"></div>
+
+  <script>
+    let activePresetKey = 'default';
+
+    // 20 PRESETS DE MARCA Y ENCABEZADOS INTEGRADOS
+    const BRAND_PRESETS = {
+      lectura_calida: { primary: '#D97706', secondary: '#FBF0D9', accent: '#78350F', heading_color: '#451A03', header_glass_tint: '#FBF0D9' },
+      oled_descanso:  { primary: '#14B8A6', secondary: '#0F172A', accent: '#38BDF8', heading_color: '#F8FAFC', header_glass_tint: '#1E293B' },
+      menta_bosque:   { primary: '#10B981', secondary: '#064E3B', accent: '#34D399', heading_color: '#ECFDF5', header_glass_tint: '#065F46' },
+      niebla_nordica: { primary: '#2563EB', secondary: '#F1F5F9', accent: '#0284C7', heading_color: '#0F172A', header_glass_tint: '#FFFFFF' },
+      cafe_mocha:     { primary: '#D97706', secondary: '#1C1917', accent: '#F59E0B', heading_color: '#FEF3C7', header_glass_tint: '#292524' },
+      pergamino:      { primary: '#C85A32', secondary: '#F5EBE0', accent: '#9A3412', heading_color: '#2B2B2B', header_glass_tint: '#F5EBE0' },
+      oled_puro:      { primary: '#10B981', secondary: '#000000', accent: '#06B6D4', heading_color: '#FFFFFF', header_glass_tint: '#111111' },
+      oceano_profundo:{ primary: '#64FFDA', secondary: '#0A192F', accent: '#38BDF8', heading_color: '#CCD6F6', header_glass_tint: '#112240' },
+      sombra_cerezo:  { primary: '#EC4899', secondary: '#1A1625', accent: '#F43F5E', heading_color: '#F3E8EE', header_glass_tint: '#2D2438' },
+      luz_atenuada:   { primary: '#16A34A', secondary: '#F8FAF8', accent: '#059669', heading_color: '#1E293B', header_glass_tint: '#FFFFFF' },
+
+      independencia:  { primary: '#0066FF', secondary: '#0F172A', accent: '#60A5FA', heading_color: '#FFFFFF', header_glass_tint: '#0066FF' },
+      feria_xelaju:   { primary: '#EF4444', secondary: '#1E1B4B', accent: '#3B82F6', heading_color: '#F8FAFC', header_glass_tint: '#1E1B4B' },
+      semana_santa:   { primary: '#FBBF24', secondary: '#2E1065', accent: '#7C3AED', heading_color: '#FEF3C7', header_glass_tint: '#2E1065' },
+      fiambre:        { primary: '#FACC15', secondary: '#3B0764', accent: '#9333EA', heading_color: '#FDF4FF', header_glass_tint: '#3B0764' },
+      barriletes_gigantes: { primary: '#F97316', secondary: '#0F172A', accent: '#06B6D4', heading_color: '#F8FAFC', header_glass_tint: '#1E293B' },
+      navidad_chapina:{ primary: '#DC2626', secondary: '#052E16', accent: '#FBBF24', heading_color: '#FEF3C7', header_glass_tint: '#052E16' },
+      ano_nuevo:      { primary: '#FBBF24', secondary: '#09090B', accent: '#F59E0B', heading_color: '#FFFFFF', header_glass_tint: '#18181B' },
+      halloween:      { primary: '#EA580C', secondary: '#180228', accent: '#A855F7', heading_color: '#FAF5FF', header_glass_tint: '#180228' },
+      rabin_ajau:     { primary: '#0D9488', secondary: '#064E3B', accent: '#F43F5E', heading_color: '#ECFDF5', header_glass_tint: '#064E3B' },
+      quema_del_diablo:{ primary: '#EF4444', secondary: '#1C1917', accent: '#F97316', heading_color: '#FEF2F2', header_glass_tint: '#1C1917' }
+    };
+
+    (async () => {
+      const session = await adminGuardPage();
+      if (!session) return;
+      await initAdminNav({ user: session.user });
+
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+
+      bindColorPairs();
+      bindSliders();
+      bindFileUploads();
+      bindActions();
+      loadSettings();
+    })();
+
+    function scrollCarousel(amount) {
+      document.getElementById('presetsTrack').scrollBy({ left: amount, behavior: 'smooth' });
+    }
+
+    function filterCategory(cat) {
+      document.getElementById('tabConfort').classList.toggle('active', cat === 'confort');
+      document.getElementById('tabFestivos').classList.toggle('active', cat === 'festivos');
+
+      document.querySelectorAll('.confort-item').forEach(el => el.classList.toggle('hidden', cat !== 'confort'));
+      document.querySelectorAll('.festivo-item').forEach(el => el.classList.toggle('hidden', cat !== 'festivos'));
+
+      document.getElementById('presetsTrack').scrollLeft = 0;
+    }
+
+    function applyPreset(key) {
+      const p = BRAND_PRESETS[key] || (window.PasajeTheme && window.PasajeTheme.PRESETS ? window.PasajeTheme.PRESETS[key] : null);
+      if (!p) return;
+      activePresetKey = key;
+
+      setVal('primaryColor', p.primary); setVal('primaryHex', p.primary);
+      setVal('secondaryColor', p.secondary); setVal('secondaryHex', p.secondary);
+      setVal('accentColor', p.accent); setVal('accentHex', p.accent);
+      setVal('headingColor', p.heading_color); setVal('headingHex', p.heading_color);
+      setVal('headerGlassTint', p.header_glass_tint); setVal('headerGlassTintHex', p.header_glass_tint);
+
+      updatePreview();
+      showToast(`✨ Preset "${key.replace(/_/g,' ')}" aplicado al 100%`);
+    }
+
+    function applyBgPreset(url) {
+      document.getElementById('bgImageUrl').value = url;
+      updatePreview();
+      showToast('🖼️ Textura de fondo seleccionada');
+    }
+
+    function bindColorPairs() {
+      [['primaryColor','primaryHex'], ['secondaryColor','secondaryHex'], ['accentColor','accentHex'],
+       ['headingColor','headingHex'], ['headerGlassTint','headerGlassTintHex']].forEach(([pickerId, hexId]) => {
+        const picker = document.getElementById(pickerId);
+        const hex = document.getElementById(hexId);
+        if (!picker || !hex) return;
+        picker.addEventListener('input', () => { hex.value = picker.value.toUpperCase(); updatePreview(); });
+        hex.addEventListener('input', () => { if (/^#[0-9A-F]{6}$/i.test(hex.value)) { picker.value = hex.value; updatePreview(); } });
+      });
+
+      document.getElementById('siteTitle').addEventListener('input', updatePreview);
+      document.getElementById('logoUrl').addEventListener('input', updatePreview);
+      document.getElementById('bgImageUrl').addEventListener('input', updatePreview);
+      document.getElementById('headerGlassEnabled').addEventListener('change', updatePreview);
+    }
+
+    function bindSliders() {
+      ['headerGlassOpacity', 'headerGlassBlur', 'headerRadius'].forEach(id => {
+        document.getElementById(id).addEventListener('input', () => { updateLabels(); updatePreview(); });
+      });
+    }
+
+    function updateLabels() {
+      document.getElementById('headerGlassOpacityLabel').textContent = document.getElementById('headerGlassOpacity').value + '%';
+      document.getElementById('headerGlassBlurLabel').textContent = document.getElementById('headerGlassBlur').value + 'px';
+      document.getElementById('headerRadiusLabel').textContent = (parseFloat(document.getElementById('headerRadius').value) / 16).toFixed(1) + 'rem';
+    }
+
+    function hexToRgbStr(hex) {
+      const c = String(hex || '').replace('#', '').trim();
+      if (c.length !== 6) return '255,255,255';
+      return `${parseInt(c.slice(0,2),16)}, ${parseInt(c.slice(2,4),16)}, ${parseInt(c.slice(4,6),16)}`;
+    }
+
+    function bindFileUploads() {
+      const handleFile = (fileInput, targetUrlInput) => {
+        const file = fileInput.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (e) => { targetUrlInput.value = e.target.result; updatePreview(); };
+        reader.readAsDataURL(file);
+      };
+
+      document.getElementById('logoFileInput').addEventListener('change', function() { handleFile(this, document.getElementById('logoUrl')); });
+      document.getElementById('bgFileInput').addEventListener('change', function() { handleFile(this, document.getElementById('bgImageUrl')); });
+    }
+
+    function updatePreview() {
+      const pri = document.getElementById('primaryColor').value;
+      const sec = document.getElementById('secondaryColor').value;
+      const acc = document.getElementById('accentColor').value;
+      const head = document.getElementById('headingColor').value;
+      const logo = document.getElementById('logoUrl').value || '../img/logo.png';
+      const bgImg = document.getElementById('bgImageUrl').value;
+      const title = document.getElementById('siteTitle').value || 'Pasaje de los Altos';
+
+      const hEnabled = document.getElementById('headerGlassEnabled').checked;
+      const hTint = document.getElementById('headerGlassTint').value;
+      const hOpacity = parseFloat(document.getElementById('headerGlassOpacity').value) / 100;
+      const hBlur = document.getElementById('headerGlassBlur').value;
+      const hRadius = (parseFloat(document.getElementById('headerRadius').value) / 16).toFixed(2);
+
+      const headerEl = document.getElementById('previewHeader');
+      if (hEnabled) {
+        headerEl.style.backgroundColor = `rgba(${hexToRgbStr(hTint)}, ${hOpacity})`;
+        headerEl.style.backdropFilter = `blur(${hBlur}px)`;
+        headerEl.style.webkitBackdropFilter = `blur(${hBlur}px)`;
+        headerEl.style.borderRadius = `${hRadius}rem ${hRadius}rem 0 0`;
+      } else {
+        headerEl.style.backgroundColor = hTint;
+        headerEl.style.backdropFilter = 'none';
+        headerEl.style.webkitBackdropFilter = 'none';
+        headerEl.style.borderRadius = '0px';
+      }
+
+      document.getElementById('previewTitle').textContent = title;
+      document.getElementById('previewTitle').style.color = head;
+      document.getElementById('logoPreviewImg').src = logo;
+      document.getElementById('previewLogo').src = logo;
+
+      const container = document.getElementById('previewContainer');
+      container.style.backgroundColor = sec;
+      container.style.backgroundImage = bgImg ? `url("${bgImg}")` : 'none';
+      document.getElementById('bgPreviewBox').style.backgroundImage = bgImg ? `url("${bgImg}")` : 'none';
+
+      document.getElementById('previewBtn').style.backgroundColor = acc;
+      document.getElementById('previewBadge').style.backgroundColor = pri;
+    }
+
+    async function loadSettings() {
+      try {
+        const { data } = await _supabase.from('site_settings').select('*').eq('id', 'global').maybeSingle();
+        if (data) {
+          if (data.active_theme) activePresetKey = data.active_theme;
+          if (data.primary_color) setVal('primaryColor', data.primary_color), setVal('primaryHex', data.primary_color);
+          if (data.secondary_color) setVal('secondaryColor', data.secondary_color), setVal('secondaryHex', data.secondary_color);
+          if (data.accent_color) setVal('accentColor', data.accent_color), setVal('accentHex', data.accent_color);
+          if (data.heading_color) setVal('headingColor', data.heading_color), setVal('headingHex', data.heading_color);
+          if (data.site_title) setVal('siteTitle', data.site_title);
+          if (data.logo_url) setVal('logoUrl', data.logo_url);
+          if (data.bg_image_url) setVal('bgImageUrl', data.bg_image_url);
+
+          if (data.header_glass_enabled !== undefined) document.getElementById('headerGlassEnabled').checked = data.header_glass_enabled;
+          if (data.header_glass_tint) setVal('headerGlassTint', data.header_glass_tint), setVal('headerGlassTintHex', data.header_glass_tint);
+          if (data.header_glass_opacity) setVal('headerGlassOpacity', Math.round(data.header_glass_opacity * 100));
+          if (data.header_glass_blur) setVal('headerGlassBlur', parseInt(data.header_glass_blur));
+          if (data.header_radius) setVal('headerRadius', Math.round(parseFloat(data.header_radius) * 16));
+        }
+      } catch (e) { console.warn(e); }
+      updateLabels();
+      updatePreview();
+    }
+
+    function setVal(id, val) { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; }
+
+    function bindActions() {
+      document.getElementById('saveBtn').addEventListener('click', async () => {
+        const payload = {
+          id: 'global',
+          active_theme: activePresetKey,
+          primary_color: document.getElementById('primaryColor').value,
+          secondary_color: document.getElementById('secondaryColor').value,
+          accent_color: document.getElementById('accentColor').value,
+          heading_color: document.getElementById('headingColor').value,
+          site_title: document.getElementById('siteTitle').value.trim(),
+          logo_url: document.getElementById('logoUrl').value.trim(),
+          bg_image_url: document.getElementById('bgImageUrl').value.trim(),
+
+          header_glass_enabled: document.getElementById('headerGlassEnabled').checked,
+          header_glass_tint: document.getElementById('headerGlassTint').value,
+          header_glass_opacity: (parseFloat(document.getElementById('headerGlassOpacity').value) / 100).toFixed(2),
+          header_glass_blur: document.getElementById('headerGlassBlur').value + 'px',
+          header_radius: (parseFloat(document.getElementById('headerRadius').value) / 16).toFixed(3) + 'rem',
+
+          updated_at: new Date().toISOString()
+        };
+
+        try {
+          const { error } = await _supabase.from('site_settings').upsert(payload, { onConflict: 'id' });
+          if (error) throw error;
+
+          if (window.PasajeTheme) {
+            window.PasajeTheme.clearCache();
+            await window.PasajeTheme.refresh();
+          }
+
+          showToast('✅ Marca, presets y encabezado guardados con éxito');
+        } catch (e) { showToast('❌ Error al guardar en Supabase'); }
+      });
+
+      document.getElementById('resetBtn').addEventListener('click', loadSettings);
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2500);
+    }
+  </script>
+</body>
+</html>

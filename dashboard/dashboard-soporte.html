@@ -1,0 +1,392 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <title>Soporte · Pasaje de los Altos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=4"></script>
+  <script src="../js/theme-loader.js?v=4"></script>
+  <script src="../js/dashboard-utils.js?v=4"></script>
+  <script src="../js/dashboard-sidebar.js?v=4"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .filter-chip {
+      white-space: nowrap; font-size: 12px; font-weight: 700; padding: 6px 14px;
+      border-radius: 12px; transition: all .15s ease; cursor: pointer; border: 1px solid #e2e8f0;
+    }
+    .filter-chip-active { background: #1e3a8a; color: white; border-color: #1e3a8a; shadow: 0 2px 6px rgba(30,58,138,.2); }
+    .filter-chip-idle { background: rgba(255,255,255,0.8); color: #475569; }
+    .filter-chip-idle:hover { background: #ffffff; color: #0f172a; }
+  </style>
+  <script>
+    (function () {
+      if (typeof window.dashEscapeHtml === 'undefined') {
+        window.dashEscapeHtml = function (s) {
+          return String(s ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        };
+      }
+      if (typeof window.dashFormatDateTime === 'undefined') {
+        window.dashFormatDateTime = function (iso) {
+          if (!iso) return '—';
+          return new Date(iso).toLocaleString('es-GT', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' });
+        };
+      }
+      if (typeof window.dashReasonLabel === 'undefined') {
+        window.dashReasonLabel = function (r) {
+          const map = { scam: '⚠️ Posible Estafa', quality: '📦 Calidad de Producto', delay: '⏰ Demora en Entrega', other: '❓ Otro Motivo' };
+          return map[r] || r || 'Reporte general';
+        };
+      }
+      if (typeof window.dashSupportStatus === 'undefined') {
+        window.dashSupportStatus = function (r) {
+          if (r.status === 'resolved') return { label: '✅ Resuelto', cls: 'bg-emerald-100 text-emerald-800' };
+          if (r.status === 'dismissed') return { label: '🚫 Descartado', cls: 'bg-gray-100 text-gray-700' };
+          if (r.vendor_response) return { label: '💬 Aclarado', cls: 'bg-blue-100 text-blue-800' };
+          return { label: '⏳ Pendiente', cls: 'bg-amber-100 text-amber-800' };
+        };
+      }
+    })();
+  </script>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+  <div id="dashboardHeader"></div>
+
+  <main class="max-w-6xl mx-auto p-4 pb-16">
+    <div id="dashboardTabs"></div>
+
+    <div id="loadingState" class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-8 text-center text-sm text-slate-500 shadow-sm">
+      Cargando casos de soporte...
+    </div>
+
+    <section id="content" class="hidden space-y-5">
+
+      <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-5 shadow-sm">
+        <div class="flex items-start gap-3">
+          <div class="text-3xl">🎧</div>
+          <div>
+            <h3 class="text-lg font-bold text-slate-900">Centro de Soporte y Reclamos</h3>
+            <p class="text-sm text-slate-500">Revisa los reportes sobre tus productos o tienda y envía tu aclaración al equipo de administración.</p>
+          </div>
+        </div>
+      </div>
+
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3">
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-4 border-l-4 border-slate-400 shadow-sm">
+          <p class="text-xs font-bold text-slate-500 uppercase tracking-wider">Total casos</p>
+          <p id="statTotal" class="text-2xl font-extrabold text-slate-800 mt-1">—</p>
+        </div>
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-4 border-l-4 border-amber-500 shadow-sm">
+          <p class="text-xs font-bold text-amber-700 uppercase tracking-wider">⏳ Pendientes</p>
+          <p id="statPending" class="text-2xl font-extrabold text-amber-600 mt-1">—</p>
+        </div>
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-4 border-l-4 border-blue-500 shadow-sm">
+          <p class="text-xs font-bold text-blue-700 uppercase tracking-wider">💬 Aclarados</p>
+          <p id="statAnswered" class="text-2xl font-extrabold text-blue-600 mt-1">—</p>
+        </div>
+        <div class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-4 border-l-4 border-emerald-500 shadow-sm">
+          <p class="text-xs font-bold text-emerald-700 uppercase tracking-wider">✅ Cerrados</p>
+          <p id="statClosed" class="text-2xl font-extrabold text-emerald-600 mt-1">—</p>
+        </div>
+      </div>
+
+      <div class="bg-white/80 backdrop-blur p-3 rounded-2xl border border-slate-200/80 flex flex-col sm:flex-row gap-3 items-center justify-between">
+        <div class="flex gap-2 overflow-x-auto w-full sm:w-auto no-scrollbar" id="supportFilterChips">
+          <button data-support-filter="all" class="filter-chip filter-chip-active">📋 Todos</button>
+          <button data-support-filter="attention" class="filter-chip filter-chip-idle">⚡ Requieren atención</button>
+          <button data-support-filter="resolved" class="filter-chip filter-chip-idle">✅ Resueltos / Descartados</button>
+        </div>
+        <input type="text" id="supportSearch" placeholder="Buscar en reportes..." class="w-full sm:w-64 border border-slate-200 px-3 py-1.5 rounded-xl text-xs bg-white outline-none focus:ring-2 focus:ring-blue-500">
+      </div>
+
+      <div id="supportList" class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 overflow-hidden divide-y divide-slate-100 shadow-sm">
+        <p class="p-8 text-center text-sm text-slate-500">Cargando casos...</p>
+      </div>
+    </section>
+  </main>
+
+  <div id="supportModal" class="hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto">
+      <div id="supportModalContent" class="p-6"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentStore = null;
+    let allStoreReports = [];
+    let currentSupportFilter = 'all';
+    let supportSearchTerm = '';
+    const supportModal = document.getElementById('supportModal');
+
+    (async () => {
+      try {
+        const { session, store } = await guardDashboardPage();
+        if (!session || !store) return;
+        currentStore = store;
+        await initDashboardNav({ store, user: session.user });
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+
+        await loadSupportCases();
+
+        document.getElementById('supportFilterChips').addEventListener('click', (e) => {
+          const btn = e.target.closest('button[data-support-filter]');
+          if (!btn) return;
+          document.querySelectorAll('#supportFilterChips .filter-chip').forEach(b => {
+            b.classList.remove('filter-chip-active');
+            b.classList.add('filter-chip-idle');
+          });
+          btn.classList.remove('filter-chip-idle');
+          btn.classList.add('filter-chip-active');
+          currentSupportFilter = btn.dataset.supportFilter;
+          renderSupportCases();
+        });
+
+        document.getElementById('supportSearch').addEventListener('input', (e) => {
+          supportSearchTerm = e.target.value.toLowerCase().trim();
+          renderSupportCases();
+        });
+
+      } catch(err) {
+        console.error('[Soporte] Error de carga:', err);
+      }
+    })();
+
+    async function loadSupportCases() {
+      const container = document.getElementById('supportList');
+      container.innerHTML = '<p class="p-8 text-center text-sm text-slate-500">Cargando casos...</p>';
+
+      const { data, error } = await _supabase
+        .from('reports')
+        .select(`id, reason, comment, status, created_at, updated_at,
+                 reporter_email, product_id, store_id,
+                 admin_response, vendor_response,
+                 products ( id, title, image_url, price )`)
+        .eq('store_id', currentStore.id)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        container.innerHTML = '<p class="p-8 text-center text-sm text-red-500">Error al cargar casos.</p>';
+        console.error(error);
+        return;
+      }
+
+      allStoreReports = data || [];
+      updateStats();
+      renderSupportCases();
+    }
+
+    function updateStats() {
+      const total    = allStoreReports.length;
+      const pending  = allStoreReports.filter(r => r.status === 'pending' && !r.vendor_response).length;
+      const answered = allStoreReports.filter(r => r.status === 'pending' && r.vendor_response).length;
+      const closed   = allStoreReports.filter(r => r.status === 'resolved' || r.status === 'dismissed').length;
+      document.getElementById('statTotal').textContent    = total;
+      document.getElementById('statPending').textContent  = pending;
+      document.getElementById('statAnswered').textContent = answered;
+      document.getElementById('statClosed').textContent   = closed;
+    }
+
+    function renderSupportCases() {
+      const container = document.getElementById('supportList');
+      const e = window.dashEscapeHtml;
+
+      let list = allStoreReports;
+      if (currentSupportFilter === 'attention') {
+        list = allStoreReports.filter(r => r.status === 'pending');
+      } else if (currentSupportFilter === 'resolved') {
+        list = allStoreReports.filter(r => r.status === 'resolved' || r.status === 'dismissed');
+      }
+
+      if (supportSearchTerm) {
+        list = list.filter(r => {
+          const hay = [r.comment, r.reporter_email, r.products?.title, r.vendor_response].filter(Boolean).join(' ').toLowerCase();
+          return hay.includes(supportSearchTerm);
+        });
+      }
+
+      if (list.length === 0) {
+        container.innerHTML = `
+          <div class="p-10 text-center">
+            <div class="text-4xl mb-2">🎉</div>
+            <p class="text-sm text-slate-500">
+              ${allStoreReports.length === 0
+                ? 'Aún no has recibido reportes. ¡Todo en orden!'
+                : 'No hay casos en esta vista.'}
+            </p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = list.map(r => {
+        const st = window.dashSupportStatus(r);
+        const product = r.products;
+        const img = product?.image_url || window.PLACEHOLDER_IMG;
+        return `
+          <div class="p-4 hover:bg-slate-50 cursor-pointer transition" data-case-id="${r.id}">
+            <div class="flex items-start justify-between gap-3 flex-wrap">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <span class="text-[10px] ${st.cls} font-bold px-2 py-0.5 rounded-full">${st.label}</span>
+                  <span class="text-[11px] font-semibold text-slate-700">${window.dashReasonLabel(r.reason)}</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-1">
+                  ${window.dashFormatDateTime(r.created_at)}
+                  ${r.reporter_email ? ` · 👤 ${e(r.reporter_email)}` : ' · anónimo'}
+                </p>
+              </div>
+              <span class="text-[10px] text-blue-700 font-bold flex-shrink-0">Ver detalle →</span>
+            </div>
+            ${product ? `
+              <div class="flex items-center gap-3 mt-2 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                <img src="${img}" alt="${e(product.title)}"
+                     onerror="this.onerror=null;this.src='${window.PLACEHOLDER_IMG}'"
+                     class="w-10 h-10 rounded-lg object-cover bg-white border flex-shrink-0">
+                <div class="min-w-0 flex-1">
+                  <p class="text-xs font-bold text-slate-800 truncate">${e(product.title)}</p>
+                  <p class="text-[11px] text-emerald-600 font-bold">Q ${parseFloat(product.price || 0).toFixed(2)}</p>
+                </div>
+              </div>` : `
+              <div class="mt-2 p-2 bg-slate-50 rounded-xl border border-slate-100">
+                <p class="text-xs text-slate-600">Reporte sobre la tienda general</p>
+              </div>`}
+            ${r.comment ? `<p class="text-xs text-slate-700 mt-2 italic line-clamp-2">"${e(r.comment)}"</p>` : ''}
+            ${r.vendor_response ? `<p class="text-[11px] text-blue-700 mt-1.5 font-medium">💬 Tu aclaración: <span class="italic">"${e(r.vendor_response.slice(0, 80))}${r.vendor_response.length > 80 ? '…' : ''}"</span></p>` : ''}
+          </div>`;
+      }).join('');
+
+      container.querySelectorAll('[data-case-id]').forEach(el => {
+        el.addEventListener('click', () => openSupportModal(el.dataset.caseId));
+      });
+    }
+
+    function openSupportModal(reportId) {
+      const r = allStoreReports.find(x => String(x.id) === String(reportId));
+      if (!r) return;
+      const e = window.dashEscapeHtml;
+      const st = window.dashSupportStatus(r);
+      const product = r.products;
+      const canRespond = r.status === 'pending';
+
+      document.getElementById('supportModalContent').innerHTML = `
+        <div class="flex items-start justify-between mb-4">
+          <div class="min-w-0">
+            <h3 class="text-lg font-extrabold text-slate-800">Caso de soporte #${e(String(r.id).slice(0, 8))}</h3>
+            <p class="text-xs text-slate-500 mt-0.5">${window.dashFormatDateTime(r.created_at)}</p>
+          </div>
+          <button id="closeSupportModalBtn"
+            class="bg-slate-100 hover:bg-slate-200 text-slate-700 w-9 h-9 rounded-lg flex items-center justify-center transition flex-shrink-0">✕</button>
+        </div>
+
+        <div class="flex items-center gap-2 flex-wrap mb-3">
+          <span class="text-[10px] ${st.cls} font-bold px-2.5 py-0.5 rounded-full">${st.label}</span>
+          <span class="text-[11px] font-semibold text-slate-700">${window.dashReasonLabel(r.reason)}</span>
+        </div>
+
+        ${r.comment ? `
+          <div class="bg-slate-50 border border-slate-200/80 rounded-xl p-3 mb-3">
+            <p class="text-[10px] font-bold text-slate-500 uppercase tracking-wider mb-1">Comentario del comprador</p>
+            <p class="text-xs text-slate-800 italic">"${e(r.comment)}"</p>
+          </div>` : ''}
+
+        ${product ? `
+          <div class="flex items-center gap-3 p-3 bg-slate-50 border border-slate-200/80 rounded-xl mb-3">
+            <img src="${product.image_url || window.PLACEHOLDER_IMG}" alt="${e(product.title)}"
+                 onerror="this.onerror=null;this.src='${window.PLACEHOLDER_IMG}'"
+                 class="w-14 h-14 rounded-xl object-cover bg-white border flex-shrink-0">
+            <div class="min-w-0 flex-1">
+              <p class="text-[10px] font-bold text-blue-700 uppercase tracking-wider">Producto reportado</p>
+              <p class="text-sm font-bold text-slate-800 truncate">${e(product.title)}</p>
+              <p class="text-xs text-emerald-600 font-extrabold">Q ${parseFloat(product.price || 0).toFixed(2)}</p>
+            </div>
+          </div>` : ''}
+
+        ${r.admin_response ? `
+          <div class="bg-amber-50 border border-amber-200 rounded-xl p-3 mb-3">
+            <p class="text-[10px] font-bold text-amber-800 uppercase tracking-wider mb-1">📢 Nota del administrador</p>
+            <p class="text-xs text-amber-900 whitespace-pre-line">${e(r.admin_response)}</p>
+          </div>` : ''}
+
+        ${r.vendor_response ? `
+          <div class="bg-blue-50 border border-blue-200 rounded-xl p-3 mb-3">
+            <p class="text-[10px] font-bold text-blue-800 uppercase tracking-wider mb-1">💬 Tu aclaración enviada</p>
+            <p class="text-xs text-blue-900 whitespace-pre-line">${e(r.vendor_response)}</p>
+            ${r.updated_at ? `<p class="text-[10px] text-blue-700 mt-2">Enviado: ${window.dashFormatDateTime(r.updated_at)}</p>` : ''}
+          </div>` : ''}
+
+        ${canRespond ? `
+          <div class="border-t border-slate-200 pt-3 mt-3">
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">
+              ${r.vendor_response ? 'Actualizar tu aclaración' : 'Tu aclaración / descargo'}
+            </label>
+            <textarea id="vendorResponse" rows="4"
+              placeholder="Explica tu versión, menciona si ya contactaste al comprador o si el producto fue corregido..."
+              class="w-full border border-slate-300 p-2.5 rounded-xl text-xs focus:ring-2 focus:ring-blue-500 outline-none"></textarea>
+            <div class="flex justify-end mt-3">
+              <button id="sendVendorResponseBtn"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition disabled:opacity-60 shadow-sm">
+                Enviar Aclaración
+              </button>
+            </div>
+          </div>` : `
+          <div class="border-t border-slate-200 pt-3 mt-3 text-center">
+            <p class="text-xs text-slate-500">Este caso ya está cerrado. No se pueden enviar más aclaraciones.</p>
+          </div>`}
+      `;
+
+      supportModal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+
+      document.getElementById('closeSupportModalBtn').addEventListener('click', closeSupportModal);
+
+      if (canRespond) {
+        if (r.vendor_response) document.getElementById('vendorResponse').value = r.vendor_response;
+        document.getElementById('sendVendorResponseBtn').addEventListener('click', async () => {
+          const btn = document.getElementById('sendVendorResponseBtn');
+          const text = document.getElementById('vendorResponse').value.trim();
+          if (!text) { alert('Escribe una aclaración antes de enviar.'); return; }
+
+          btn.disabled = true; btn.textContent = 'Enviando...';
+          try {
+            const now = new Date().toISOString();
+            const { error } = await _supabase.from('reports')
+              .update({ vendor_response: text, updated_at: now })
+              .eq('id', r.id);
+            if (error) throw error;
+            r.vendor_response = text;
+            r.updated_at = now;
+            btn.textContent = '✅ Enviado';
+            setTimeout(() => {
+              closeSupportModal();
+              updateStats();
+              renderSupportCases();
+            }, 600);
+          } catch (err) {
+            console.error(err);
+            alert('Error: ' + (err.message || 'desconocido'));
+            btn.disabled = false; btn.textContent = 'Enviar Aclaración';
+          }
+        });
+      }
+    }
+
+    function closeSupportModal() {
+      supportModal.classList.add('hidden');
+      document.body.style.overflow = '';
+      document.getElementById('supportModalContent').innerHTML = '';
+    }
+
+    document.addEventListener('keydown', (e) => {
+      if (e.key === 'Escape' && !supportModal.classList.contains('hidden')) closeSupportModal();
+    });
+  </script>
+</body>
+</html>

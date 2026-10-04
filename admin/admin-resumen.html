@@ -1,0 +1,562 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Resumen · Admin · Pasaje de los Altos</title>
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=4"></script>
+  <script src="../js/theme-loader.js?v=3"></script>
+  <script src="../js/admin-utils.js?v=2"></script>
+  <script src="../js/admin-sidebar.js?v=2"></script>
+  <script src="../js/liquid-glass.js?v=1"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <script>
+    (function () {
+      if (typeof window.PLACEHOLDER_IMG === 'undefined') {
+        window.PLACEHOLDER_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="120" height="120"><rect width="120" height="120" fill="#f3f4f6"/><text x="50%" y="50%" text-anchor="middle" dy=".35em" fill="#9ca3af" font-family="sans-serif" font-size="16">Sin logo</text></svg>'
+        );
+      }
+      if (typeof window.adminEscapeHtml === 'undefined') {
+        window.adminEscapeHtml = function (s) {
+          return String(s ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        };
+      }
+    })();
+  </script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+
+    .admin-card {
+      background: rgba(255,255,255,.85);
+      backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+      border: 1px solid rgba(255,255,255,.6);
+      box-shadow: 0 6px 22px -4px rgba(15,23,42,.08);
+    }
+
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50%     { opacity: .5; }
+    }
+    .skeleton {
+      animation: pulse 1.4s ease-in-out infinite;
+      background: linear-gradient(90deg, #e5e7eb 0%, #f3f4f6 50%, #e5e7eb 100%);
+      border-radius: 6px;
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp .35s ease both; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-7xl mx-auto p-4 pb-16">
+    <div id="adminTabs"></div>
+
+    <!-- Loading inicial -->
+    <div id="loadingState" class="admin-card rounded-2xl p-8 text-center text-sm text-gray-500">
+      Cargando panel…
+    </div>
+
+    <!-- Error global -->
+    <div id="errorState" class="hidden admin-card rounded-2xl p-6 border-l-4 border-red-400 mb-4">
+      <p class="text-sm font-semibold text-red-700">No se pudieron cargar las métricas.</p>
+      <p id="errorMsg" class="text-xs text-red-500 mt-1"></p>
+    </div>
+
+    <!-- Contenido -->
+    <section id="content" class="hidden space-y-6 fade-up">
+
+      <!-- Barra superior -->
+      <div class="flex flex-wrap items-center justify-between gap-3">
+        <div>
+          <h1 class="text-2xl font-extrabold text-gray-900 leading-tight">📈 Resumen Global</h1>
+          <p class="text-xs text-gray-500 mt-0.5">
+            Última actualización: <span id="lastUpdated" class="font-semibold text-gray-700">—</span>
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" id="refreshBtn"
+            class="text-xs bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm">
+            <span id="refreshIcon">⟳</span> Refrescar
+          </button>
+          <a href="admin-reportes.html"
+             class="text-xs bg-amber-500 hover:bg-amber-600 text-white font-bold px-3.5 py-2 rounded-xl transition shadow-sm">
+            🚨 Ver reportes
+          </a>
+        </div>
+      </div>
+
+      <!-- Fila 1 · KPIs principales -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+
+        <div class="admin-card rounded-2xl p-4 lg:p-5 border-l-4 border-blue-500">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-blue-700">Tiendas</span>
+            <span class="text-lg">🏪</span>
+          </div>
+          <p id="statStores" class="text-2xl lg:text-3xl font-extrabold text-gray-900 leading-tight">
+            <span class="skeleton inline-block w-16 h-8"></span>
+          </p>
+          <p id="statStoresSub" class="text-[11px] text-gray-500 mt-1">Emprendedores registrados</p>
+        </div>
+
+        <div class="admin-card rounded-2xl p-4 lg:p-5 border-l-4 border-emerald-500">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Productos</span>
+            <span class="text-lg">📦</span>
+          </div>
+          <p id="statProducts" class="text-2xl lg:text-3xl font-extrabold text-gray-900 leading-tight">
+            <span class="skeleton inline-block w-16 h-8"></span>
+          </p>
+          <p id="statProductsSub" class="text-[11px] text-gray-500 mt-1">Publicados en total</p>
+        </div>
+
+        <div class="admin-card rounded-2xl p-4 lg:p-5 border-l-4 border-purple-500">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-purple-700">Clics WhatsApp</span>
+            <span class="text-lg">💬</span>
+          </div>
+          <p id="statClicks" class="text-2xl lg:text-3xl font-extrabold text-gray-900 leading-tight">
+            <span class="skeleton inline-block w-16 h-8"></span>
+          </p>
+          <p id="statClicksSub" class="text-[11px] text-gray-500 mt-1">Acumulado histórico</p>
+        </div>
+
+        <div class="admin-card rounded-2xl p-4 lg:p-5 border-l-4 border-red-500">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-red-700">Reportes pendientes</span>
+            <span class="text-lg">🚨</span>
+          </div>
+          <p id="statReports" class="text-2xl lg:text-3xl font-extrabold text-gray-900 leading-tight">
+            <span class="skeleton inline-block w-16 h-8"></span>
+          </p>
+          <p id="statReportsSub" class="text-[11px] text-gray-500 mt-1">Sin revisar</p>
+        </div>
+      </div>
+
+      <!-- Fila 2 · Métricas secundarias -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+
+        <div class="admin-card rounded-2xl p-4 lg:p-5">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500">Clics de hoy</p>
+          <p id="statClicksToday" class="text-2xl font-extrabold text-purple-700 mt-1.5">
+            <span class="skeleton inline-block w-12 h-6"></span>
+          </p>
+          <p class="text-[11px] text-gray-500 mt-1">Desde las 00:00 hora local</p>
+        </div>
+
+        <div class="admin-card rounded-2xl p-4 lg:p-5">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500">Tiendas suspendidas</p>
+          <p id="statSuspended" class="text-2xl font-extrabold text-red-600 mt-1.5">
+            <span class="skeleton inline-block w-12 h-6"></span>
+          </p>
+          <p class="text-[11px] text-gray-500 mt-1">No visibles al público</p>
+        </div>
+
+        <div class="admin-card rounded-2xl p-4 lg:p-5">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500">Productos agotados</p>
+          <p id="statOutOfStock" class="text-2xl font-extrabold text-amber-600 mt-1.5">
+            <span class="skeleton inline-block w-12 h-6"></span>
+          </p>
+          <p class="text-[11px] text-gray-500 mt-1">Stock = 0</p>
+        </div>
+
+        <div class="admin-card rounded-2xl p-4 lg:p-5">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-gray-500">Categorías activas</p>
+          <p id="statCategories" class="text-2xl font-extrabold text-blue-700 mt-1.5">
+            <span class="skeleton inline-block w-12 h-6"></span>
+          </p>
+          <p class="text-[11px] text-gray-500 mt-1">Visibles en el catálogo</p>
+        </div>
+      </div>
+
+      <!-- Fila 3 · Top tiendas + Actividad reciente -->
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-4">
+
+        <div class="admin-card rounded-2xl p-5 lg:col-span-2">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-extrabold text-gray-900">🏪 Top tiendas</h3>
+              <p class="text-[11px] text-gray-500 mt-0.5">Ordenadas por productos publicados</p>
+            </div>
+            <a href="admin-tiendas.html"
+               class="text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-1.5 rounded-lg transition">
+              Ver todas →
+            </a>
+          </div>
+          <div id="topStores" class="space-y-2">
+            <p class="text-sm text-gray-400 italic">Cargando…</p>
+          </div>
+        </div>
+
+        <div class="admin-card rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-extrabold text-gray-900">💬 Clics recientes</h3>
+              <p class="text-[11px] text-gray-500 mt-0.5">Últimos 7 días</p>
+            </div>
+          </div>
+          <div id="recentClicks" class="space-y-2">
+            <p class="text-sm text-gray-400 italic">Cargando…</p>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <script>
+    // ═════════════════════════════════════════════════════════════
+    // ADMIN-RESUMEN · Panel de métricas globales
+    // ═════════════════════════════════════════════════════════════
+
+    const $ = (id) => document.getElementById(id);
+    const esc = window.adminEscapeHtml;
+
+    function setVal(id, value) {
+      const el = $(id);
+      if (!el) return;
+      el.textContent = String(value);
+      el.classList.remove('text-red-600');
+    }
+
+    function setError(id, message, subId) {
+      const el = $(id);
+      if (el) {
+        el.textContent = '—';
+        el.title = message || 'Error';
+      }
+      if (subId) {
+        const sub = $(subId);
+        if (sub) {
+          sub.textContent = message || 'Error al cargar';
+          sub.classList.add('text-red-500');
+        }
+      }
+    }
+
+    function setLastUpdated() {
+      const el = $('lastUpdated');
+      if (!el) return;
+      const now = new Date();
+      el.textContent = now.toLocaleTimeString('es-GT', { hour: '2-digit', minute: '2-digit', second: '2-digit' });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // init
+    // ═══════════════════════════════════════════════════════════
+    (async () => {
+      try {
+        const session = await adminGuardPage();
+        if (!session) return;
+        await initAdminNav({ user: session.user });
+
+        $('loadingState').classList.add('hidden');
+        $('content').classList.remove('hidden');
+
+        await loadAll();
+
+        // Auto-refresh cada 60s
+        setInterval(() => { loadAll(true); }, 60000);
+
+        $('refreshBtn').addEventListener('click', () => loadAll(true));
+      } catch (err) {
+        console.error('[AdminResumen] init:', err);
+        $('loadingState').classList.add('hidden');
+        $('errorState').classList.remove('hidden');
+        $('errorMsg').textContent = err && err.message ? err.message : '';
+      }
+    })();
+
+    let refreshing = false;
+    async function loadAll(silent) {
+      if (refreshing) return;
+      refreshing = true;
+      if (silent) {
+        const icon = $('refreshIcon');
+        if (icon) icon.style.transform = 'rotate(360deg)';
+      }
+      try {
+        await Promise.all([
+          loadSummary(),
+          loadExtraStats(),
+          loadTopStores(),
+          loadRecentClicks()
+        ]);
+        setLastUpdated();
+      } catch (err) {
+        console.warn('[AdminResumen] loadAll:', err);
+      } finally {
+        refreshing = false;
+        const icon = $('refreshIcon');
+        if (icon) {
+          setTimeout(() => { icon.style.transform = ''; }, 350);
+        }
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Fila 1 · KPIs principales
+    // ═══════════════════════════════════════════════════════════
+    async function loadSummary() {
+      const [storesRes, productsRes, clicksRes, reportsRes] = await Promise.all([
+        _supabase.from('stores').select('*', { count: 'exact', head: true }),
+        _supabase.from('products').select('*', { count: 'exact', head: true }),
+        _supabase.from('whatsapp_clicks').select('*', { count: 'exact', head: true }),
+        _supabase.from('reports').select('*', { count: 'exact', head: true }).eq('status', 'pending')
+      ]);
+
+      // Tiendas
+      if (storesRes.error) {
+        setError('statStores', storesRes.error.message, 'statStoresSub');
+      } else {
+        setVal('statStores', storesRes.count ?? 0);
+        const sub = $('statStoresSub');
+        if (sub) {
+          sub.textContent = 'Emprendedores registrados';
+          sub.classList.remove('text-red-500');
+        }
+      }
+
+      // Productos
+      if (productsRes.error) {
+        setError('statProducts', productsRes.error.message, 'statProductsSub');
+      } else {
+        setVal('statProducts', productsRes.count ?? 0);
+      }
+
+      // Clics WhatsApp
+      if (clicksRes.error) {
+        setError('statClicks', clicksRes.error.message, 'statClicksSub');
+      } else {
+        setVal('statClicks', clicksRes.count ?? 0);
+      }
+
+      // Reportes pendientes
+      if (reportsRes.error) {
+        setError('statReports', reportsRes.error.message, 'statReportsSub');
+      } else {
+        const n = reportsRes.count ?? 0;
+        setVal('statReports', n);
+        const sub = $('statReportsSub');
+        if (sub) {
+          if (n > 0) {
+            sub.textContent = 'Requieren atención';
+            sub.classList.add('text-red-600', 'font-bold');
+          } else {
+            sub.textContent = 'Todo al día ✓';
+            sub.classList.remove('text-red-600');
+            sub.classList.add('text-emerald-600');
+          }
+        }
+      }
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Fila 2 · Métricas secundarias
+    // ═══════════════════════════════════════════════════════════
+    async function loadExtraStats() {
+      const startOfToday = new Date();
+      startOfToday.setHours(0, 0, 0, 0);
+
+      const [clicksTodayRes, suspendedRes, outRes, categoriesRes] = await Promise.all([
+        _supabase.from('whatsapp_clicks')
+          .select('*', { count: 'exact', head: true })
+          .gte('created_at', startOfToday.toISOString()),
+        _supabase.from('stores')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_suspended', true),
+        _supabase.from('products')
+          .select('*', { count: 'exact', head: true })
+          .eq('stock_quantity', 0),
+        _supabase.from('categories')
+          .select('*', { count: 'exact', head: true })
+          .eq('is_active', true)
+      ]);
+
+      if (clicksTodayRes.error) setError('statClicksToday', clicksTodayRes.error.message);
+      else setVal('statClicksToday', clicksTodayRes.count ?? 0);
+
+      if (suspendedRes.error) setError('statSuspended', suspendedRes.error.message);
+      else setVal('statSuspended', suspendedRes.count ?? 0);
+
+      if (outRes.error) setError('statOutOfStock', outRes.error.message);
+      else setVal('statOutOfStock', outRes.count ?? 0);
+
+      if (categoriesRes.error) setError('statCategories', categoriesRes.error.message);
+      else setVal('statCategories', categoriesRes.count ?? 0);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Top tiendas
+    // ═══════════════════════════════════════════════════════════
+    async function loadTopStores() {
+      const container = $('topStores');
+      const { data, error } = await _supabase
+        .from('stores')
+        .select(`
+          id, name, slug, logo_url, is_active, is_suspended,
+          categories ( name, icon ),
+          products ( count )
+        `);
+
+      if (error) {
+        console.warn('[AdminResumen] topStores:', error);
+        container.innerHTML = `
+          <p class="text-sm text-red-500">
+            No se pudo cargar el ranking: ${esc(error.message || 'error')}
+          </p>`;
+        return;
+      }
+
+      const top = (data || [])
+        .map(s => ({
+          ...s,
+          nProd: s.products?.[0]?.count ?? 0
+        }))
+        .sort((a, b) => b.nProd - a.nProd)
+        .slice(0, 5);
+
+      if (top.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 italic">Aún no hay tiendas registradas.</p>';
+        return;
+      }
+
+      container.innerHTML = top.map((s, i) => {
+        const suspended = s.is_suspended === true;
+        const inactive = s.is_active === false;
+        const cat = s.categories ? `${s.categories.icon || ''} ${s.categories.name || ''}`.trim() : '';
+        const badge = suspended
+          ? '<span class="text-[10px] bg-red-100 text-red-800 font-bold px-2 py-0.5 rounded-full ml-1">Suspendida</span>'
+          : (inactive
+              ? '<span class="text-[10px] bg-gray-200 text-gray-700 font-bold px-2 py-0.5 rounded-full ml-1">Inactiva</span>'
+              : '');
+
+        return `
+          <div class="flex items-center gap-3 p-3 bg-gray-50/70 hover:bg-gray-100/70 rounded-xl transition">
+            <div class="w-8 h-8 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 text-white flex items-center justify-center font-extrabold flex-shrink-0 text-sm shadow-sm">
+              ${i + 1}
+            </div>
+            <img src="${esc(s.logo_url || PLACEHOLDER_IMG)}" alt="${esc(s.name)}"
+                 onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"
+                 class="w-10 h-10 rounded-full object-cover bg-white border border-gray-200 flex-shrink-0">
+            <div class="min-w-0 flex-1">
+              <p class="text-sm font-bold text-gray-800 truncate">
+                ${esc(s.name)} ${badge}
+              </p>
+              <p class="text-[11px] text-gray-500 truncate">
+                ${cat ? cat + ' · ' : ''}${s.nProd} producto${s.nProd === 1 ? '' : 's'}
+              </p>
+            </div>
+            ${s.slug
+              ? `<a href="../tienda.html?slug=${encodeURIComponent(s.slug)}" target="_blank" rel="noopener"
+                    class="text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-1.5 rounded-lg transition flex-shrink-0">
+                   Ver
+                 </a>`
+              : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Clics recientes (últimos 7 días, agregados por tienda)
+    // ═══════════════════════════════════════════════════════════
+    async function loadRecentClicks() {
+      const container = $('recentClicks');
+      const since = new Date();
+      since.setDate(since.getDate() - 7);
+
+      const { data, error } = await _supabase
+        .from('whatsapp_clicks')
+        .select(`
+          id, source, created_at, store_id,
+          stores ( id, name, slug, logo_url )
+        `)
+        .gte('created_at', since.toISOString())
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      if (error) {
+        console.warn('[AdminResumen] recentClicks:', error);
+        container.innerHTML = `
+          <p class="text-xs text-red-500">
+            No se pudieron cargar los clics: ${esc(error.message || 'error')}
+          </p>`;
+        return;
+      }
+
+      const rows = data || [];
+      if (rows.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 italic">Sin clics en los últimos 7 días.</p>';
+        return;
+      }
+
+      // Agrupar por tienda
+      const byStore = new Map();
+      rows.forEach(r => {
+        const sid = r.store_id || 'unknown';
+        const storeName = r.stores?.name || 'Tienda eliminada';
+        const logo = r.stores?.logo_url || PLACEHOLDER_IMG;
+        const slug = r.stores?.slug || null;
+        if (!byStore.has(sid)) {
+          byStore.set(sid, { name: storeName, logo, slug, count: 0, last: r.created_at });
+        }
+        const item = byStore.get(sid);
+        item.count += 1;
+        if (new Date(r.created_at) > new Date(item.last)) item.last = r.created_at;
+      });
+
+      const top = [...byStore.values()]
+        .sort((a, b) => b.count - a.count)
+        .slice(0, 6);
+
+      const max = top[0]?.count || 1;
+
+      container.innerHTML = top.map(item => {
+        const pct = Math.round((item.count / max) * 100);
+        return `
+          <div class="space-y-1">
+            <div class="flex items-center gap-2">
+              <img src="${esc(item.logo)}" alt=""
+                   onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"
+                   class="w-7 h-7 rounded-full object-cover bg-white border border-gray-200 flex-shrink-0">
+              <span class="text-xs font-bold text-gray-800 truncate flex-1">${esc(item.name)}</span>
+              <span class="text-xs font-extrabold text-purple-700">${item.count}</span>
+            </div>
+            <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden">
+              <div class="h-full bg-gradient-to-r from-purple-400 to-purple-600 rounded-full transition-all" style="width:${pct}%"></div>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      // Total
+      const totalRow = document.createElement('div');
+      totalRow.className = 'pt-3 mt-3 border-t border-gray-200 text-center';
+      totalRow.innerHTML = `
+        <span class="text-[11px] text-gray-500">
+          Total últimos 7 días: <strong class="text-gray-800">${rows.length}</strong> clic${rows.length === 1 ? '' : 's'}
+        </span>
+      `;
+      container.appendChild(totalRow);
+    }
+  </script>
+</body>
+</html>

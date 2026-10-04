@@ -1,0 +1,663 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Efectos de Vidrio y Módulos · Admin</title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="../js/theme-loader.js?v=7"></script>
+  <script src="../js/admin-utils.js?v=6"></script>
+  <script src="../js/admin-sidebar.js?v=3"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: #1e293b; }
+
+    .design-layout { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
+    @media (min-width: 1100px) { .design-layout { grid-template-columns: minmax(0, 1fr) 440px; } }
+
+    .panel-section {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+      margin-bottom: 12px; overflow: hidden; transition: box-shadow .15s, border-color .3s;
+    }
+    .panel-section > summary {
+      list-style: none; cursor: pointer; padding: 14px 18px;
+      display: flex; align-items: center; gap: 10px;
+      font-weight: 700; font-size: 14px; color: #1f2937; user-select: none;
+    }
+    .panel-section > summary::-webkit-details-marker { display: none; }
+    .panel-section > summary:hover { background: #f8fafc; }
+    .panel-section > summary .chev { margin-left: auto; transition: transform .2s ease; color: #94a3b8; }
+    .panel-section[open] > summary .chev { transform: rotate(180deg); }
+    .panel-section > summary .sec-icon {
+      display: inline-flex; align-items: center; justify-content: center;
+      width: 30px; height: 30px; border-radius: 8px; background: #f1f5f9; font-size: 16px;
+    }
+
+    .panel-body { padding: 18px; border-top: 1px solid #f1f5f9; }
+    .field-label { display: block; font-size: 11px; font-weight: 600; color: #475569; margin-bottom: 5px; text-transform: uppercase; }
+    .input-text { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; font-size: 13px; color: #1e293b; }
+    .input-mono { font-family: ui-monospace, monospace; font-size: 12px; text-transform: uppercase; }
+
+    .color-group { display: flex; align-items: center; gap: 8px; }
+    .color-group input[type="color"] { width: 52px; height: 40px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; padding: 2px; }
+
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none; width: 100%; height: 5px;
+      background: #e2e8f0; border-radius: 999px; outline: none; margin: 8px 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 18px; height: 18px;
+      border-radius: 50%; background: #fff; border: 3px solid #10b981; cursor: pointer;
+    }
+
+    .range-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; font-weight: 600; color: #475569; }
+    .range-value { font-family: ui-monospace, monospace; color: #059669; background: #ecfdf5; padding: 1px 7px; border-radius: 5px; font-size: 11px; }
+
+    .toggle-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 10px 12px; background: #f8fafc; border: 1px solid #e2e8f0; border-radius: 10px; margin-bottom: 10px; }
+    .toggle-switch { position: relative; width: 42px; height: 24px; flex-shrink: 0; }
+    .toggle-switch input { opacity: 0; width: 0; height: 0; }
+    .toggle-switch .slider { position: absolute; inset: 0; background: #cbd5e1; border-radius: 999px; cursor: pointer; transition: background .2s; }
+    .toggle-switch .slider::before { content: ''; position: absolute; width: 18px; height: 18px; left: 3px; top: 3px; background: #fff; border-radius: 50%; transition: transform .2s; }
+    .toggle-switch input:checked + .slider { background: #10b981; }
+    .toggle-switch input:checked + .slider::before { transform: translateX(18px); }
+
+    .category-tab-btn {
+      padding: 8px 16px; border-radius: 10px; font-weight: 700; font-size: 12px;
+      cursor: pointer; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; transition: all .15s;
+    }
+    .category-tab-btn.active { background: #10b981; color: #fff; border-color: #10b981; }
+
+    .carousel-track-container { position: relative; overflow: hidden; border-radius: 14px; padding: 4px 0; }
+    .carousel-track {
+      display: flex; gap: 12px; overflow-x: auto; scroll-behavior: smooth;
+      padding: 6px 2px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    }
+    .carousel-track::-webkit-scrollbar { height: 6px; }
+    .carousel-track::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+
+    .preset-card {
+      flex: 0 0 240px; scroll-snap-align: start;
+      background: #fff; border: 2px solid #e2e8f0; border-radius: 12px; padding: 12px;
+      cursor: pointer; text-align: left; transition: all .2s cubic-bezier(.2,.7,.2,1);
+      position: relative; overflow: hidden;
+    }
+    .preset-card:hover { border-color: #10b981; transform: translateY(-2px); box-shadow: 0 6px 16px -4px rgba(15,23,42,.1); }
+    .preset-swatches { display: flex; height: 12px; border-radius: 5px; overflow: hidden; margin-top: 10px; border: 1px solid rgba(0,0,0,.08); }
+    .preset-swatch { flex: 1; height: 100%; }
+
+    .carousel-nav-btn {
+      position: absolute; top: 50%; transform: translateY(-50%); z-index: 10;
+      width: 32px; height: 32px; border-radius: 50%; background: #fff; border: 1px solid #cbd5e1;
+      display: flex; align-items: center; justify-content: center; font-weight: 800; color: #0f172a;
+      box-shadow: 0 4px 10px rgba(0,0,0,.1); cursor: pointer; transition: all .15s;
+    }
+    .carousel-nav-btn:hover { background: #10b981; color: #fff; border-color: #10b981; }
+    .carousel-nav-btn.prev { left: 4px; }
+    .carousel-nav-btn.next { right: 4px; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+    .grid-3 { display: grid; grid-template-columns: repeat(3, 1fr); gap: 10px; }
+
+    @keyframes pvPulse { 0%,100%{transform:scale(1)} 50%{transform:scale(1.02)} }
+    @keyframes pvFloat { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-6px)} }
+    .mock-effect-card.anim-pulse { animation: pvPulse 3s ease-in-out infinite; }
+    .mock-effect-card.anim-float { animation: pvFloat 3s ease-in-out infinite; }
+
+    @keyframes rgbGlow {
+      0% { border-color: #ef4444; box-shadow: 0 0 12px rgba(239, 68, 68, var(--pv-rgb-intensity, 0.75)); }
+      33% { border-color: #10b981; box-shadow: 0 0 12px rgba(16, 185, 129, var(--pv-rgb-intensity, 0.75)); }
+      66% { border-color: #3b82f6; box-shadow: 0 0 12px rgba(59, 130, 246, var(--pv-rgb-intensity, 0.75)); }
+      100% { border-color: #ef4444; box-shadow: 0 0 12px rgba(239, 68, 68, var(--pv-rgb-intensity, 0.75)); }
+    }
+    .mock-effect-card.rgb-active {
+      animation: rgbGlow var(--pv-rgb-speed, 6s) linear infinite !important;
+    }
+
+    .mock-effect-card {
+      border-radius: 14px;
+      padding: 14px;
+      transition: background-color .15s ease, backdrop-filter .15s ease;
+      position: relative;
+      z-index: 10;
+    }
+
+    .save-bar { position: sticky; bottom: 0; z-index: 20; padding-top: 12px; background: linear-gradient(to top, #f1f5f9 60%, transparent); margin-top: 10px; }
+    .save-bar-inner { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+    .btn { padding: 9px 16px; border-radius: 9px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; }
+    .btn-primary { background: #10b981; color: #fff; }
+    .btn-ghost { background: #f1f5f9; color: #475569; }
+  </style>
+</head>
+<body class="min-h-screen pb-12">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-[1400px] mx-auto p-4">
+    <div id="adminTabs"></div>
+
+    <div id="loadingState" class="bg-white rounded-xl border p-8 text-center text-sm text-gray-500">
+      Cargando configuración de efectos de vidrio y módulos...
+    </div>
+
+    <section id="content" class="hidden">
+      <div class="mb-4 bg-white p-4 rounded-xl border border-slate-200">
+        <h1 class="text-xl font-extrabold text-slate-900 flex items-center gap-2">✨ Efectos Liquid Glass en Módulos y Contenedores</h1>
+        <p class="text-xs text-slate-500 mt-0.5">Ajusta transparencia, desenfoque, color de títulos de contenedores, animaciones y bordes RGB globales.</p>
+      </div>
+
+      <div class="design-layout">
+        <div>
+
+          <!-- CARRUSEL CON LOS 20 PRESETS DE EFECTOS DIVIDIDOS EN 2 PESTAÑAS -->
+          <details class="panel-section" open>
+            <summary>
+              <span class="sec-icon">🧪</span>
+              20 Presets Completos de Vidrio y Módulos
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body">
+
+              <div class="flex items-center gap-2 mb-4">
+                <button type="button" class="category-tab-btn active" id="tabConfortFx" onclick="filterCategoryFx('confort')">👓 Confort Visual (10)</button>
+                <button type="button" class="category-tab-btn" id="tabFestivosFx" onclick="filterCategoryFx('festivos')">🇬🇹 Ferias y Festividades (10)</button>
+              </div>
+
+              <div class="carousel-track-container">
+                <button type="button" class="carousel-nav-btn prev" onclick="scrollCarousel(-260)">‹</button>
+                <button type="button" class="carousel-nav-btn next" onclick="scrollCarousel(260)">›</button>
+
+                <div class="carousel-track" id="presetsFxTrack">
+
+                  <!-- 10 CONFORT VISUAL -->
+                  <div class="preset-card fx-confort-item" onclick="applyFxPreset(1)">
+                    <span class="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">1. Sepia Mate</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Cero Luz Azul</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#FDF6E2"></div><div class="preset-swatch" style="background:#D97706"></div></div>
+                  </div>
+                  <div class="preset-card fx-confort-item" onclick="applyFxPreset(2)">
+                    <span class="text-[10px] font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded-full">2. Slate Soft</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Desenfoque Pizarra</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#1E293B"></div><div class="preset-swatch" style="background:#14B8A6"></div></div>
+                  </div>
+                  <div class="preset-card fx-confort-item" onclick="applyFxPreset(3)">
+                    <span class="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">3. Sabina Glass</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Verde Relajante</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#065F46"></div><div class="preset-swatch" style="background:#10B981"></div></div>
+                  </div>
+                  <div class="preset-card fx-confort-item" onclick="applyFxPreset(4)">
+                    <span class="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">4. Cristal Nórdico</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Sin Reflejos Diurnos</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#FFFFFF"></div><div class="preset-swatch" style="background:#2563EB"></div></div>
+                  </div>
+                  <div class="preset-card fx-confort-item" onclick="applyFxPreset(5)">
+                    <span class="text-[10px] font-bold text-stone-800 bg-stone-200 px-2 py-0.5 rounded-full">5. Mocha Glass</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Café Tostado Ocular</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#292524"></div><div class="preset-swatch" style="background:#D97706"></div></div>
+                  </div>
+                  <div class="preset-card fx-confort-item" onclick="applyFxPreset(6)">
+                    <span class="text-[10px] font-bold text-orange-800 bg-orange-100 px-2 py-0.5 rounded-full">6. Pergamino Fx</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Tono Papel Lectura</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#EAE0D5"></div><div class="preset-swatch" style="background:#C85A32"></div></div>
+                  </div>
+                  <div class="preset-card fx-confort-item" onclick="applyFxPreset(7)">
+                    <span class="text-[10px] font-bold text-slate-200 bg-black px-2 py-0.5 rounded-full">7. OLED Stealth</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Sin Parpadeos</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#111111"></div><div class="preset-swatch" style="background:#10B981"></div></div>
+                  </div>
+                  <div class="preset-card fx-confort-item" onclick="applyFxPreset(8)">
+                    <span class="text-[10px] font-bold text-cyan-800 bg-cyan-100 px-2 py-0.5 rounded-full">8. Océano Glass</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Azul Ciliar Calma</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#112240"></div><div class="preset-swatch" style="background:#64FFDA"></div></div>
+                  </div>
+                  <div class="preset-card fx-confort-item" onclick="applyFxPreset(9)">
+                    <span class="text-[10px] font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded-full">9. Ciruela Glass</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Sombra Mística</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#2D2438"></div><div class="preset-swatch" style="background:#EC4899"></div></div>
+                  </div>
+                  <div class="preset-card fx-confort-item" onclick="applyFxPreset(10)">
+                    <span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full">10. Hueso Mate</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Vidrio Antideslumbrante</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#FFFFFF"></div><div class="preset-swatch" style="background:#16A34A"></div></div>
+                  </div>
+
+                  <!-- 10 FERIAS Y FESTIVIDADES -->
+                  <div class="preset-card fx-festivo-item hidden" onclick="applyFxPreset(11)">
+                    <span class="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">11. Independencia</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Azul Patrio Vidrio</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#0066FF"></div><div class="preset-swatch" style="background:#60A5FA"></div></div>
+                  </div>
+                  <div class="preset-card fx-festivo-item hidden" onclick="applyFxPreset(12)">
+                    <span class="text-[10px] font-bold text-indigo-800 bg-indigo-100 px-2 py-0.5 rounded-full">12. Xelafer Glass</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Azul Altense Fx</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#1E1B4B"></div><div class="preset-swatch" style="background:#EF4444"></div></div>
+                  </div>
+                  <div class="preset-card fx-festivo-item hidden" onclick="applyFxPreset(13)">
+                    <span class="text-[10px] font-bold text-purple-900 bg-purple-100 px-2 py-0.5 rounded-full">13. Semana Santa</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Túnica y Oro Fx</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#2E1065"></div><div class="preset-swatch" style="background:#FBBF24"></div></div>
+                  </div>
+                  <div class="preset-card fx-festivo-item hidden" onclick="applyFxPreset(14)">
+                    <span class="text-[10px] font-bold text-fuchsia-900 bg-fuchsia-100 px-2 py-0.5 rounded-full">14. Fiambre Chapín</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Remolacha Neón</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#3B0764"></div><div class="preset-swatch" style="background:#FACC15"></div></div>
+                  </div>
+                  <div class="preset-card fx-festivo-item hidden" onclick="applyFxPreset(15)">
+                    <span class="text-[10px] font-bold text-orange-900 bg-orange-100 px-2 py-0.5 rounded-full">15. Barriletes Gigantes</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Sumpango Neón</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#0F172A"></div><div class="preset-swatch" style="background:#F97316"></div></div>
+                  </div>
+                  <div class="preset-card fx-festivo-item hidden" onclick="applyFxPreset(16)">
+                    <span class="text-[10px] font-bold text-red-900 bg-red-100 px-2 py-0.5 rounded-full">16. Navidad Chapina</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Pinabete Cristal</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#052E16"></div><div class="preset-swatch" style="background:#DC2626"></div></div>
+                  </div>
+                  <div class="preset-card fx-festivo-item hidden" onclick="applyFxPreset(17)">
+                    <span class="text-[10px] font-bold text-yellow-900 bg-yellow-100 px-2 py-0.5 rounded-full">17. Año Nuevo</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Champaña Gala</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#09090B"></div><div class="preset-swatch" style="background:#FBBF24"></div></div>
+                  </div>
+                  <div class="preset-card fx-festivo-item hidden" onclick="applyFxPreset(18)">
+                    <span class="text-[10px] font-bold text-purple-100 bg-purple-900 px-2 py-0.5 rounded-full">18. Halloween</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Calabaza Neón Fx</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#180228"></div><div class="preset-swatch" style="background:#EA580C"></div></div>
+                  </div>
+                  <div class="preset-card fx-festivo-item hidden" onclick="applyFxPreset(19)">
+                    <span class="text-[10px] font-bold text-teal-900 bg-teal-100 px-2 py-0.5 rounded-full">19. Rabín Ajau</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Verde Quetzal Fx</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#064E3B"></div><div class="preset-swatch" style="background:#F43F5E"></div></div>
+                  </div>
+                  <div class="preset-card fx-festivo-item hidden" onclick="applyFxPreset(20)">
+                    <span class="text-[10px] font-bold text-red-100 bg-red-900 px-2 py-0.5 rounded-full">20. Quema del Diablo</span>
+                    <div class="font-bold text-xs text-slate-800 mt-1">Fuego Místico</div>
+                    <div class="preset-swatches"><div class="preset-swatch" style="background:#1C1917"></div><div class="preset-swatch" style="background:#EF4444"></div></div>
+                  </div>
+
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- COLORES Y TINTE DE MÓDULOS -->
+          <details class="panel-section" open>
+            <summary>
+              <span class="sec-icon">🎨</span> Colores de Texto y Tinte de Vidrio de Módulos
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body space-y-3">
+              <div class="grid-3">
+                <div>
+                  <label class="field-label">Color Títulos Contenedores</label>
+                  <div class="color-group"><input type="color" id="headingColor" value="#0F172A"><input type="text" id="headingHex" value="#0F172A" class="input-text input-mono"></div>
+                </div>
+                <div>
+                  <label class="field-label">Color Texto Cuerpo</label>
+                  <div class="color-group"><input type="color" id="textColor" value="#334155"><input type="text" id="textHex" value="#334155" class="input-text input-mono"></div>
+                </div>
+                <div>
+                  <label class="field-label">Tinte Base de Vidrio</label>
+                  <div class="color-group"><input type="color" id="glassTint" value="#FFFFFF"><input type="text" id="glassTintHex" value="#FFFFFF" class="input-text input-mono"></div>
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- LIQUID GLASS GLOBAL EN MÓDULOS -->
+          <details class="panel-section" open>
+            <summary>
+              <span class="sec-icon">🪟</span> Parámetros Liquid Glass
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body">
+              <div class="grid-2">
+                <div>
+                  <div class="range-row"><span>Desenfoque (Blur)</span><span class="range-value" id="glassBlurLabel">20px</span></div>
+                  <input type="range" id="glassBlur" min="0" max="32" step="1" value="20">
+                </div>
+                <div>
+                  <div class="range-row"><span>Opacidad Cristal</span><span class="range-value" id="glassOpacityLabel">75%</span></div>
+                  <input type="range" id="glassOpacity" min="10" max="100" step="1" value="75">
+                </div>
+              </div>
+              <div class="grid-2 mt-3">
+                <div>
+                  <div class="range-row"><span>Opacidad de Bordes</span><span class="range-value" id="glassBorderOpacityLabel">30%</span></div>
+                  <input type="range" id="glassBorderOpacity" min="0" max="100" step="1" value="30">
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <!-- ANIMACIONES Y RGB EN MÓDULOS -->
+          <details class="panel-section" open>
+            <summary>
+              <span class="sec-icon">🎬</span> Animaciones y Bordes RGB
+              <svg class="chev" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="6 9 12 15 18 9"></polyline></svg>
+            </summary>
+            <div class="panel-body">
+              <div class="toggle-row">
+                <span class="text-xs font-semibold">Activar Animación en Módulos</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="animationEnabled">
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="mb-3">
+                <label class="field-label">Efecto de Animación</label>
+                <select id="animationType" class="input-text">
+                  <option value="none">Sin animación (Estático)</option>
+                  <option value="pulse">💓 Pulso suave</option>
+                  <option value="float">🎈 Flotación continua</option>
+                </select>
+              </div>
+
+              <div class="toggle-row mt-4">
+                <span class="text-xs font-semibold">Activar Borde RGB Resplandeciente</span>
+                <label class="toggle-switch">
+                  <input type="checkbox" id="rgbEnabled">
+                  <span class="slider"></span>
+                </label>
+              </div>
+
+              <div class="grid-2 mt-2">
+                <div>
+                  <div class="range-row"><span>Velocidad RGB</span><span class="range-value" id="rgbSpeedLabel">6s</span></div>
+                  <input type="range" id="rgbSpeed" min="1" max="20" step="0.5" value="6">
+                </div>
+                <div>
+                  <div class="range-row"><span>Intensidad RGB</span><span class="range-value" id="rgbIntensityLabel">75%</span></div>
+                  <input type="range" id="rgbIntensity" min="10" max="100" step="5" value="75">
+                </div>
+              </div>
+            </div>
+          </details>
+
+          <div class="save-bar">
+            <div class="save-bar-inner">
+              <div>
+                <p class="text-sm font-bold text-slate-800">¿Guardar efectos de módulos?</p>
+                <p class="text-[11px] text-slate-500">Se aplicará a contenedores y banners globales.</p>
+              </div>
+              <div class="flex gap-2">
+                <button type="button" id="resetBtn" class="btn btn-ghost">↩️ Descartar</button>
+                <button type="button" id="saveBtn" class="btn btn-primary">💾 Guardar Cambios</button>
+              </div>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- PREVIEW EN TIEMPO REAL CON MÓDULOS Y BANNER -->
+        <div class="sticky top-4">
+          <div class="bg-white rounded-2xl border p-4 shadow-sm">
+            <h3 class="font-extrabold text-sm mb-3 text-slate-800 flex items-center justify-between">
+              <span>👁️ Previsualización de Módulos (En Vivo)</span>
+            </h3>
+
+            <div id="previewCanvas" class="bg-slate-900 p-4 rounded-xl relative overflow-hidden space-y-3 min-h-[420px]">
+
+              <div class="absolute -top-10 -left-10 w-32 h-32 bg-emerald-500/40 rounded-full blur-xl pointer-events-none"></div>
+              <div class="absolute top-1/2 -right-10 w-36 h-36 bg-blue-500/40 rounded-full blur-xl pointer-events-none"></div>
+              <div class="absolute -bottom-10 left-1/3 w-28 h-28 bg-purple-500/40 rounded-full blur-xl pointer-events-none"></div>
+
+              <!-- MÓDULO 1: BUSCADOR DE TIENDAS -->
+              <div class="mock-effect-card">
+                <div class="mock-title text-[10px] font-extrabold uppercase tracking-wider mb-1">🔍 Buscador de Tiendas</div>
+                <div class="flex gap-2">
+                  <div class="flex-1 bg-black/20 border border-white/20 rounded-lg px-3 py-1.5 text-xs mock-body">Buscar artesanías, café...</div>
+                  <button class="bg-emerald-500 text-white font-bold px-3 py-1.5 rounded-lg text-xs">Buscar</button>
+                </div>
+              </div>
+
+              <!-- MÓDULO 2: TIENDA DESTACADA -->
+              <div class="mock-effect-card">
+                <div class="flex items-center gap-3">
+                  <div class="w-11 h-11 rounded-xl bg-amber-500/30 border border-amber-300/40 flex items-center justify-center text-xl">☕</div>
+                  <div>
+                    <div class="font-extrabold text-sm mock-title">Cafetería El Callejón</div>
+                    <div class="text-[11px] mock-body">Zona 1, Quetzaltenango · ⭐ 4.9</div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- MÓDULO 3: INFORMACIÓN DE TIENDA -->
+              <div class="mock-effect-card">
+                <div class="mock-title text-[10px] font-extrabold uppercase tracking-wider mb-1">ℹ️ Información Comercial</div>
+                <div class="text-xs space-y-1 mock-body">
+                  <p>📍 14 Avenida 3-12, Pasaje Enríquez</p>
+                  <p>🕒 Lunes a Sábado: 8:00 AM - 7:00 PM</p>
+                </div>
+              </div>
+
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] bg-emerald-600 text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-2xl transition-opacity duration-300"></div>
+
+  <script>
+    const EFFECT_PRESETS = {
+      1: { blur: 16, opacity: 90, borderOp: 20, tint: '#FDF6E2', heading: '#78350F', text: '#92400E', animEnabled: false, animType: 'none', rgbEnabled: false, rgbSpeed: 6, rgbIntensity: 75 },
+      2: { blur: 22, opacity: 85, borderOp: 15, tint: '#1E293B', heading: '#F8FAFC', text: '#CBD5E1', animEnabled: true, animType: 'pulse', rgbEnabled: true, rgbSpeed: 4, rgbIntensity: 80 },
+      3: { blur: 20, opacity: 85, borderOp: 25, tint: '#065F46', heading: '#ECFDF5', text: '#A7F3D0', animEnabled: true, animType: 'float', rgbEnabled: false, rgbSpeed: 6, rgbIntensity: 75 },
+      4: { blur: 18, opacity: 92, borderOp: 20, tint: '#FFFFFF', heading: '#0F172A', text: '#334155', animEnabled: false, animType: 'none', rgbEnabled: false, rgbSpeed: 6, rgbIntensity: 75 },
+      5: { blur: 20, opacity: 85, borderOp: 20, tint: '#292524', heading: '#FEF3C7', text: '#FDE68A', animEnabled: false, animType: 'none', rgbEnabled: true, rgbSpeed: 8, rgbIntensity: 60 },
+      6: { blur: 16, opacity: 90, borderOp: 20, tint: '#EAE0D5', heading: '#431407', text: '#7C2D12', animEnabled: false, animType: 'none', rgbEnabled: false, rgbSpeed: 6, rgbIntensity: 75 },
+      7: { blur: 24, opacity: 95, borderOp: 10, tint: '#111111', heading: '#10B981', text: '#E5E7EB', animEnabled: true, animType: 'pulse', rgbEnabled: true, rgbSpeed: 3, rgbIntensity: 90 },
+      8: { blur: 20, opacity: 88, borderOp: 20, tint: '#112240', heading: '#64FFDA', text: '#CCD6F6', animEnabled: false, animType: 'none', rgbEnabled: false, rgbSpeed: 6, rgbIntensity: 75 },
+      9: { blur: 20, opacity: 85, borderOp: 20, tint: '#2D2438', heading: '#F472B6', text: '#F3E8EE', animEnabled: true, animType: 'float', rgbEnabled: true, rgbSpeed: 5, rgbIntensity: 70 },
+      10: { blur: 16, opacity: 94, borderOp: 15, tint: '#FFFFFF', heading: '#065F46', text: '#1F2937', animEnabled: false, animType: 'none', rgbEnabled: false, rgbSpeed: 6, rgbIntensity: 75 },
+
+      11: { blur: 18, opacity: 90, borderOp: 20, tint: '#0066FF', heading: '#FFFFFF', text: '#E0F2FE', animEnabled: true, animType: 'pulse', rgbEnabled: true, rgbSpeed: 5, rgbIntensity: 80 },
+      12: { blur: 22, opacity: 88, borderOp: 20, tint: '#1E1B4B', heading: '#F8FAFC', text: '#E0E7FF', animEnabled: true, animType: 'float', rgbEnabled: true, rgbSpeed: 4, rgbIntensity: 85 },
+      13: { blur: 20, opacity: 85, borderOp: 25, tint: '#2E1065', heading: '#FEF3C7', text: '#E9D5FF', animEnabled: false, animType: 'none', rgbEnabled: true, rgbSpeed: 6, rgbIntensity: 75 },
+      14: { blur: 18, opacity: 88, borderOp: 20, tint: '#3B0764', heading: '#FDE047', text: '#F5D0FE', animEnabled: true, animType: 'pulse', rgbEnabled: true, rgbSpeed: 5, rgbIntensity: 80 },
+      15: { blur: 20, opacity: 85, borderOp: 20, tint: '#0F172A', heading: '#F97316', text: '#E2E8F0', animEnabled: true, animType: 'float', rgbEnabled: true, rgbSpeed: 3, rgbIntensity: 90 },
+      16: { blur: 20, opacity: 90, borderOp: 20, tint: '#052E16', heading: '#FEF3C7', text: '#DC2626', animEnabled: false, animType: 'none', rgbEnabled: true, rgbSpeed: 6, rgbIntensity: 75 },
+      17: { blur: 24, opacity: 92, borderOp: 15, tint: '#09090B', heading: '#FBBF24', text: '#F59E0B', animEnabled: true, animType: 'pulse', rgbEnabled: true, rgbSpeed: 4, rgbIntensity: 85 },
+      18: { blur: 20, opacity: 88, borderOp: 20, tint: '#180228', heading: '#EA580C', text: '#E9D5FF', animEnabled: true, animType: 'float', rgbEnabled: true, rgbSpeed: 4, rgbIntensity: 80 },
+      19: { blur: 18, opacity: 88, borderOp: 20, tint: '#064E3B', heading: '#CCFBF1', text: '#F43F5E', animEnabled: false, animType: 'none', rgbEnabled: true, rgbSpeed: 6, rgbIntensity: 70 },
+      20: { blur: 18, opacity: 90, borderOp: 25, tint: '#1C1917', heading: '#EF4444', text: '#F97316', animEnabled: true, animType: 'pulse', rgbEnabled: true, rgbSpeed: 3, rgbIntensity: 90 }
+    };
+
+    (async () => {
+      const session = await adminGuardPage();
+      if (!session) return;
+      await initAdminNav({ user: session.user });
+
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+
+      bindColorPairs();
+      bindInputs();
+      bindActions();
+      loadSettings();
+    })();
+
+    function scrollCarousel(amount) {
+      document.getElementById('presetsFxTrack').scrollBy({ left: amount, behavior: 'smooth' });
+    }
+
+    function filterCategoryFx(cat) {
+      document.getElementById('tabConfortFx').classList.toggle('active', cat === 'confort');
+      document.getElementById('tabFestivosFx').classList.toggle('active', cat === 'festivos');
+
+      document.querySelectorAll('.fx-confort-item').forEach(el => el.classList.toggle('hidden', cat !== 'confort'));
+      document.querySelectorAll('.fx-festivo-item').forEach(el => el.classList.toggle('hidden', cat !== 'festivos'));
+
+      document.getElementById('presetsFxTrack').scrollLeft = 0;
+    }
+
+    function applyFxPreset(id) {
+      const p = EFFECT_PRESETS[id];
+      if (!p) return;
+
+      setVal('glassBlur', p.blur);
+      setVal('glassOpacity', p.opacity);
+      setVal('glassBorderOpacity', p.borderOp);
+      setVal('glassTint', p.tint); setVal('glassTintHex', p.tint);
+      setVal('headingColor', p.heading); setVal('headingHex', p.heading);
+      setVal('textColor', p.text); setVal('textHex', p.text);
+
+      setCheck('animationEnabled', p.animEnabled);
+      setVal('animationType', p.animType);
+      setCheck('rgbEnabled', p.rgbEnabled);
+      setVal('rgbSpeed', p.rgbSpeed);
+      setVal('rgbIntensity', p.rgbIntensity);
+
+      updateLabels();
+      updatePreview();
+      showToast(`✨ Preset #${id} de módulos aplicado al 100%`);
+    }
+
+    function bindColorPairs() {
+      [['headingColor','headingHex'], ['textColor','textHex'], ['glassTint','glassTintHex']].forEach(([pickerId, hexId]) => {
+        const picker = document.getElementById(pickerId);
+        const hex = document.getElementById(hexId);
+        if (!picker || !hex) return;
+        picker.addEventListener('input', () => { hex.value = picker.value.toUpperCase(); updatePreview(); });
+        hex.addEventListener('input', () => { if (/^#[0-9A-F]{6}$/i.test(hex.value)) { picker.value = hex.value; updatePreview(); } });
+      });
+    }
+
+    function bindInputs() {
+      document.querySelectorAll('input[type="range"]').forEach(el => {
+        el.addEventListener('input', () => { updateLabels(); updatePreview(); });
+      });
+      document.querySelectorAll('input[type="checkbox"], select').forEach(el => {
+        el.addEventListener('change', updatePreview);
+      });
+    }
+
+    function updateLabels() {
+      const setLbl = (id, lblId, suf) => {
+        const el = document.getElementById(id);
+        const lbl = document.getElementById(lblId);
+        if (el && lbl) lbl.textContent = el.value + suf;
+      };
+      setLbl('glassBlur', 'glassBlurLabel', 'px');
+      setLbl('glassOpacity', 'glassOpacityLabel', '%');
+      setLbl('glassBorderOpacity', 'glassBorderOpacityLabel', '%');
+      setLbl('rgbSpeed', 'rgbSpeedLabel', 's');
+      setLbl('rgbIntensity', 'rgbIntensityLabel', '%');
+    }
+
+    function hexToRgbStr(hex) {
+      const c = String(hex || '').replace('#', '').trim();
+      if (c.length !== 6) return '255,255,255';
+      return `${parseInt(c.slice(0,2),16)}, ${parseInt(c.slice(2,4),16)}, ${parseInt(c.slice(4,6),16)}`;
+    }
+
+    function updatePreview() {
+      const blur = document.getElementById('glassBlur').value;
+      const opacity = parseFloat(document.getElementById('glassOpacity').value) / 100;
+      const borderOp = parseFloat(document.getElementById('glassBorderOpacity').value) / 100;
+      const tintHex = document.getElementById('glassTint').value;
+      const headColor = document.getElementById('headingColor').value;
+      const txtColor = document.getElementById('textColor').value;
+      const rgbTint = hexToRgbStr(tintHex);
+
+      const animEnabled = document.getElementById('animationEnabled').checked;
+      const animType = document.getElementById('animationType').value;
+      const rgbEnabled = document.getElementById('rgbEnabled').checked;
+      const rgbSpeed = document.getElementById('rgbSpeed').value;
+      const rgbIntensity = parseFloat(document.getElementById('rgbIntensity').value) / 100;
+
+      document.querySelectorAll('.mock-effect-card').forEach(card => {
+        card.style.backgroundColor = `rgba(${rgbTint}, ${opacity})`;
+        card.style.backdropFilter = `blur(${blur}px)`;
+        card.style.webkitBackdropFilter = `blur(${blur}px)`;
+        card.style.borderColor = `rgba(255, 255, 255, ${borderOp})`;
+        card.style.borderWidth = '1px';
+        card.style.borderStyle = 'solid';
+
+        card.querySelectorAll('.mock-title').forEach(el => el.style.color = headColor);
+        card.querySelectorAll('.mock-body').forEach(el => el.style.color = txtColor);
+
+        card.classList.remove('anim-pulse', 'anim-float', 'rgb-active');
+
+        if (animEnabled && animType !== 'none') {
+          card.classList.add('anim-' + animType);
+        }
+
+        if (rgbEnabled) {
+          card.classList.add('rgb-active');
+          card.style.setProperty('--pv-rgb-speed', rgbSpeed + 's');
+          card.style.setProperty('--pv-rgb-intensity', rgbIntensity);
+        }
+      });
+    }
+
+    async function loadSettings() {
+      try {
+        const { data } = await _supabase.from('site_settings').select('*').eq('id', 'global').maybeSingle();
+        if (data) {
+          if (data.glass_blur) setVal('glassBlur', parseInt(data.glass_blur));
+          if (data.glass_opacity) setVal('glassOpacity', Math.round(data.glass_opacity * 100));
+          if (data.glass_border_opacity) setVal('glassBorderOpacity', Math.round(data.glass_border_opacity * 100));
+          if (data.glass_tint) setVal('glassTint', data.glass_tint), setVal('glassTintHex', data.glass_tint);
+          if (data.heading_color) setVal('headingColor', data.heading_color), setVal('headingHex', data.heading_color);
+          if (data.text_color) setVal('textColor', data.text_color), setVal('textHex', data.text_color);
+
+          if (data.animation_enabled !== undefined) setCheck('animationEnabled', data.animation_enabled);
+          if (data.animation_type) setVal('animationType', data.animation_type);
+          if (data.rgb_enabled !== undefined) setCheck('rgbEnabled', data.rgb_enabled);
+          if (data.rgb_speed) setVal('rgbSpeed', parseFloat(data.rgb_speed));
+          if (data.rgb_intensity) setVal('rgbIntensity', Math.round(data.rgb_intensity * 100));
+        }
+      } catch (e) { console.warn(e); }
+      updateLabels();
+      updatePreview();
+    }
+
+    function setVal(id, val) { const el = document.getElementById(id); if (el && val !== undefined) el.value = val; }
+    function setCheck(id, val) { const el = document.getElementById(id); if (el) el.checked = !!val; }
+
+    function bindActions() {
+      document.getElementById('saveBtn').addEventListener('click', async () => {
+        const payload = {
+          glass_blur: document.getElementById('glassBlur').value + 'px',
+          glass_opacity: (parseFloat(document.getElementById('glassOpacity').value) / 100).toFixed(2),
+          glass_border_opacity: (parseFloat(document.getElementById('glassBorderOpacity').value) / 100).toFixed(2),
+          glass_tint: document.getElementById('glassTint').value,
+          heading_color: document.getElementById('headingColor').value,
+          text_color: document.getElementById('textColor').value,
+
+          animation_enabled: document.getElementById('animationEnabled').checked,
+          animation_type: document.getElementById('animationType').value,
+          rgb_enabled: document.getElementById('rgbEnabled').checked,
+          rgb_speed: String(parseFloat(document.getElementById('rgbSpeed').value) || 6),
+          rgb_intensity: (parseFloat(document.getElementById('rgbIntensity').value) / 100).toFixed(2)
+        };
+
+        try {
+          const { error } = await _supabase.from('site_settings').update(payload).eq('id', 'global');
+          if (error) throw error;
+          showToast('✅ Efectos de módulos guardados con éxito');
+        } catch (e) { showToast('❌ Error al guardar en Supabase'); }
+      });
+
+      document.getElementById('resetBtn').addEventListener('click', loadSettings);
+    }
+
+    function showToast(msg) {
+      const t = document.getElementById('toast');
+      t.textContent = msg; t.classList.remove('hidden');
+      setTimeout(() => t.classList.add('hidden'), 2500);
+    }
+  </script>
+</body>
+</html>

@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Categorías · Admin</title>
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="../js/theme-loader.js?v=3"></script>
+  <script src="../js/admin-utils.js?v=6"></script>
+  <script src="../js/admin-sidebar.js?v=1"></script>
+  <script src="../js/liquid-glass.js?v=1"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+    .cat-row { transition: background .15s, opacity .15s; }
+    .cat-row.dragging { opacity: 0.35; }
+    .cat-row.drop-target { box-shadow: inset 0 3px 0 0 #f59e0b; }
+    .cat-row.just-moved { animation: pulseOk 0.6s ease; }
+    @keyframes pulseOk { 0% { background: #d1fae5; } 100% { background: transparent; } }
+    .drag-handle { cursor: grab; }
+    .drag-handle:active { cursor: grabbing; }
+    .toast {
+      position: fixed; bottom: 20px; left: 50%; transform: translateX(-50%);
+      padding: 10px 18px; border-radius: 10px; color: white; font-weight: 600;
+      font-size: 13px; box-shadow: 0 10px 25px rgba(0,0,0,.2); opacity: 0;
+      transition: opacity .25s; z-index: 100; pointer-events: none; max-width: 90vw; text-align: center;
+    }
+    .toast.show { opacity: 1; }
+    .toast-ok { background: #059669; }
+    .toast-err { background: #dc2626; }
+
+    #catModal .modal-panel {
+      background: rgba(255,255,255,.92);
+      -webkit-backdrop-filter: blur(20px) saturate(180%);
+      backdrop-filter: blur(20px) saturate(180%);
+    }
+  </style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-7xl mx-auto p-4">
+    <div id="adminTabs"></div>
+
+    <div id="loadingState" class="bg-white rounded-xl shadow-sm border p-8 text-center text-sm text-gray-500">
+      Cargando categorías...
+    </div>
+
+    <section id="content" class="hidden space-y-4">
+
+      <!-- Barra superior -->
+      <div class="bg-white rounded-xl shadow-sm border p-4 flex items-center justify-between flex-wrap gap-3">
+        <div class="flex items-center gap-3">
+          <div class="text-3xl">🏷️</div>
+          <div>
+            <h2 class="text-lg font-extrabold text-gray-800">Categorías Jerárquicas</h2>
+            <p class="text-xs text-gray-500">Organiza categorías principales y subcategorías multinivel estilo Kemik.</p>
+          </div>
+        </div>
+        <button id="newCatBtn"
+          class="bg-amber-500 hover:bg-amber-600 text-white font-bold text-sm px-4 py-2.5 rounded-lg transition">
+          + Nueva categoría
+        </button>
+      </div>
+
+      <div class="bg-blue-50 border border-blue-200 rounded-lg p-3 text-xs text-blue-800">
+        💡 <strong>Jerarquía:</strong> Las subcategorías se muestran sangradas debajo de su categoría padre.
+      </div>
+
+      <!-- Lista -->
+      <div id="categoriesList" class="bg-white rounded-xl shadow-sm border overflow-hidden divide-y">
+        <p class="p-8 text-center text-sm text-gray-500">Cargando categorías...</p>
+      </div>
+
+    </section>
+  </main>
+
+  <!-- Modal crear/editar -->
+  <div id="catModal" class="hidden fixed inset-0 z-[70] flex items-center justify-center p-4 bg-black/50">
+    <div class="modal-panel rounded-2xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto border border-white/40">
+
+      <div class="p-5 border-b border-gray-200 flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h3 id="catModalTitle" class="text-lg font-extrabold text-gray-800">Nueva categoría</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Define si es una categoría principal o una subcategoría.</p>
+        </div>
+        <button id="closeCatModalBtn" type="button"
+          class="bg-gray-100 hover:bg-gray-200 text-gray-700 w-9 h-9 rounded-lg flex items-center justify-center transition flex-shrink-0">
+          ✕
+        </button>
+      </div>
+
+      <form id="catForm" class="p-5 space-y-4">
+
+        <input type="hidden" id="catIdField">
+
+        <!-- Selección de Categoría Padre -->
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase tracking-wider mb-1">Categoría Padre (Opcional)</label>
+          <select id="catParentId" class="w-full border border-gray-300 p-2.5 rounded-xl text-xs font-semibold bg-white focus:ring-2 focus:ring-amber-500 outline-none">
+            <option value="">— Es una Categoría Principal (Raíz) —</option>
+          </select>
+        </div>
+
+        <div class="grid grid-cols-3 gap-3">
+          <div class="col-span-2">
+            <label class="block text-xs font-medium text-gray-700">Nombre *</label>
+            <input type="text" id="catName" required placeholder="Ej. Panadería"
+              class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700">Ícono</label>
+            <input type="text" id="catIcon" placeholder="🥐" maxlength="4"
+              class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm text-center focus:ring-2 focus:ring-amber-500 outline-none">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-medium text-gray-700">Slug (autogenerado)</label>
+          <input type="text" id="catSlug" placeholder="panaderia"
+            class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm bg-gray-50 focus:ring-2 focus:ring-amber-500 outline-none">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-medium text-gray-700">Etiqueta estacional</label>
+            <select id="catSeasonalTag"
+              class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none">
+              <option value="">— Ninguna —</option>
+              <option value="halloween">🎃 Especial Halloween</option>
+              <option value="navidad">🎄 Navideño</option>
+              <option value="fiambre">🪴 Tradición Fiambre</option>
+              <option value="patrio">🇬🇹 Patrio</option>
+              <option value="semana_santa">🟣 Semana Santa</option>
+              <option value="ano_nuevo">🎆 Año Nuevo</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700">Color de badge</label>
+            <div class="flex items-center gap-2 mt-1">
+              <input type="color" id="catBadgeColor" value="#10B981"
+                class="w-12 h-10 rounded-lg border border-gray-300 cursor-pointer">
+              <input type="text" id="catBadgeColorHex" value="#10B981" maxlength="7"
+                class="flex-1 border border-gray-300 p-2 rounded-lg text-sm font-mono focus:ring-2 focus:ring-amber-500 outline-none uppercase">
+            </div>
+          </div>
+        </div>
+
+        <label class="inline-flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="catIsFeatured" class="w-4 h-4 accent-amber-500">
+          <span class="text-sm font-medium text-gray-700">⭐ Destacar en inicio</span>
+        </label>
+
+        <label class="inline-flex items-center gap-2 cursor-pointer">
+          <input type="checkbox" id="catIsActive" class="w-4 h-4 accent-emerald-600" checked>
+          <span class="text-sm font-medium text-gray-700">✅ Activa (visible al público)</span>
+        </label>
+
+        <div class="flex gap-2 pt-2 border-t">
+          <button type="button" id="cancelCatBtn"
+            class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold py-2.5 rounded-lg transition">
+            Cancelar
+          </button>
+          <button type="submit" id="saveCatBtn"
+            class="flex-1 bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2.5 rounded-lg transition disabled:opacity-60">
+            Guardar
+          </button>
+        </div>
+
+      </form>
+    </div>
+  </div>
+
+  <div id="toast" class="toast"></div>
+
+  <script>
+    let allCategories = [];
+    let lastMovedId = null;
+
+    const listEl = document.getElementById('categoriesList');
+    const modal = document.getElementById('catModal');
+    const parentSelect = document.getElementById('catParentId');
+
+    const SEASONAL_LABELS = {
+      halloween:    { emoji: '🎃', label: 'Halloween' },
+      navidad:      { emoji: '🎄', label: 'Navidad' },
+      fiambre:      { emoji: '🪴', label: 'Fiambre' },
+      patrio:       { emoji: '🇬🇹', label: 'Patrio' },
+      semana_santa: { emoji: '🟣', label: 'Semana Santa' },
+      ano_nuevo:    { emoji: '🎆', label: 'Año Nuevo' },
+    };
+
+    (async () => {
+      try {
+        const session = await adminGuardPage();
+        if (!session) return;
+
+        await initAdminNav({ user: session.user });
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+
+        await loadCategories();
+
+        listEl.addEventListener('click', onListClick);
+
+        document.getElementById('newCatBtn').addEventListener('click', () => openCatModal());
+        document.getElementById('closeCatModalBtn').addEventListener('click', closeCatModal);
+        document.getElementById('cancelCatBtn').addEventListener('click', closeCatModal);
+        modal.addEventListener('click', (e) => { if (e.target === modal) closeCatModal(); });
+
+        document.getElementById('catName').addEventListener('input', (e) => {
+          const slugEl = document.getElementById('catSlug');
+          if (!slugEl.dataset.touched) slugEl.value = adminGenerateSlug(e.target.value);
+        });
+        document.getElementById('catSlug').addEventListener('input', (e) => {
+          e.target.dataset.touched = '1';
+        });
+
+        document.getElementById('catBadgeColor').addEventListener('input', (e) => {
+          document.getElementById('catBadgeColorHex').value = e.target.value.toUpperCase();
+        });
+        document.getElementById('catBadgeColorHex').addEventListener('input', (e) => {
+          const v = e.target.value.trim().toUpperCase();
+          if (/^#[0-9A-F]{6}$/.test(v)) document.getElementById('catBadgeColor').value = v;
+        });
+
+        document.getElementById('catForm').addEventListener('submit', onSubmit);
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && !modal.classList.contains('hidden')) closeCatModal();
+        });
+
+      } catch (err) {
+        console.error('[Categorías] Init:', err);
+        showToast('Error al inicializar: ' + (err.message || 'desconocido'), 'err');
+      }
+    })();
+
+    function idEq(a, b) { return String(a) === String(b); }
+    function findById(id) { return allCategories.find(c => idEq(c.id, id)); }
+
+    async function loadCategories() {
+      listEl.innerHTML = '<p class="p-8 text-center text-sm text-gray-500">Cargando categorías...</p>';
+
+      const { data, error } = await _supabase
+        .from('categories')
+        .select('*')
+        .order('sort_order', { ascending: true });
+
+      if (error) {
+        console.error('[Categorías] loadCategories:', error);
+        listEl.innerHTML = '<p class="p-8 text-center text-sm text-red-500">Error al cargar categorías.</p>';
+        return;
+      }
+      allCategories = data || [];
+
+      const { data: prods } = await _supabase.from('products').select('id, category_id');
+      const counts = {};
+      (prods || []).forEach(p => {
+        if (p.category_id != null) {
+          const key = String(p.category_id);
+          counts[key] = (counts[key] || 0) + 1;
+        }
+      });
+      allCategories.forEach(c => { c._productCount = counts[String(c.id)] || 0; });
+
+      populateParentSelect();
+      renderCategories();
+    }
+
+    function populateParentSelect(currentCatId = null) {
+      parentSelect.innerHTML = '<option value="">— Es una Categoría Principal (Raíz) —</option>';
+      
+      const mainCats = allCategories.filter(c => !c.parent_id && !idEq(c.id, currentCatId));
+      mainCats.forEach(m => {
+        parentSelect.innerHTML += `<option value="${m.id}">${adminEscapeHtml(m.icon || '📦')} ${adminEscapeHtml(m.name)}</option>`;
+      });
+    }
+
+    function renderCategories() {
+      const e = adminEscapeHtml;
+
+      if (allCategories.length === 0) {
+        listEl.innerHTML = `
+          <div class="p-10 text-center">
+            <div class="text-4xl mb-2">🏷️</div>
+            <p class="text-sm text-gray-500">Sin categorías. Crea la primera.</p>
+          </div>`;
+        return;
+      }
+
+      // Ordenar por árbol jerárquico
+      const mainCats = allCategories.filter(c => !c.parent_id);
+      const subMap = new Map();
+      allCategories.filter(c => c.parent_id).forEach(c => {
+        const pid = String(c.parent_id);
+        if (!subMap.has(pid)) subMap.set(pid, []);
+        subMap.get(pid).push(c);
+      });
+
+      const orderedList = [];
+      mainCats.forEach(m => {
+        orderedList.push({ cat: m, level: 0 });
+        const subs = subMap.get(String(m.id)) || [];
+        subs.forEach(s => orderedList.push({ cat: s, level: 1 }));
+      });
+
+      listEl.innerHTML = orderedList.map(({ cat: c, level }) => {
+        const isSub = level === 1;
+        const seasonal = c.seasonal_tag && SEASONAL_LABELS[c.seasonal_tag]
+          ? SEASONAL_LABELS[c.seasonal_tag]
+          : null;
+
+        const badges = [];
+        if (isSub) {
+          badges.push(`<span class="text-[10px] bg-slate-200 text-slate-700 font-bold px-2 py-0.5 rounded-full">↳ Subcategoría</span>`);
+        }
+        if (seasonal) {
+          badges.push(`<span class="text-[10px] font-bold px-2 py-0.5 rounded-full" style="background:${e(c.badge_color || '#10B981')}22; color:${e(c.badge_color || '#10B981')};">${seasonal.emoji} ${seasonal.label}</span>`);
+        }
+        if (c.is_featured) {
+          badges.push(`<span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">⭐ Destacada</span>`);
+        }
+        if (c.is_active === false) {
+          badges.push(`<span class="text-[10px] bg-gray-200 text-gray-700 font-bold px-2 py-0.5 rounded-full">⛔ Inactiva</span>`);
+        }
+
+        return `
+          <div class="cat-row flex items-center gap-3 p-3 ${isSub ? 'pl-10 bg-slate-50/60' : 'bg-white'} hover:bg-amber-50/40"
+               data-cat-row="${c.id}">
+            <span class="text-2xl w-10 text-center flex-shrink-0">${e(c.icon || (isSub ? '📌' : '📦'))}</span>
+
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 class="font-bold text-gray-800 truncate">${e(c.name)}</h3>
+                ${badges.join('')}
+              </div>
+              <p class="text-xs text-gray-500">
+                slug: <span class="font-mono">${e(c.slug)}</span> · ${c._productCount} producto${c._productCount === 1 ? '' : 's'}
+              </p>
+            </div>
+
+            <div class="flex gap-1 flex-shrink-0">
+              <button type="button" data-cat-action="edit" data-id="${c.id}"
+                class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-2.5 py-1.5 rounded-lg" title="Editar">✏️ Editar</button>
+              <button type="button" data-cat-action="delete" data-id="${c.id}"
+                class="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-semibold px-2.5 py-1.5 rounded-lg" title="Eliminar">🗑️</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    function onListClick(ev) {
+      const btn = ev.target.closest('button[data-cat-action]');
+      if (!btn || btn.disabled) return;
+      ev.preventDefault();
+      ev.stopPropagation();
+
+      const id = btn.dataset.id;
+      const action = btn.dataset.catAction;
+
+      if (action === 'edit') openCatModal(id);
+      if (action === 'delete') deleteCategory(id);
+    }
+
+    function openCatModal(id) {
+      const form = document.getElementById('catForm');
+      form.reset();
+
+      const editing = id !== undefined && id !== null && id !== '';
+      document.getElementById('catModalTitle').textContent = editing ? 'Editar categoría' : 'Nueva categoría';
+      document.getElementById('catIdField').value = editing ? id : '';
+
+      populateParentSelect(id);
+
+      if (editing) {
+        const c = findById(id);
+        if (!c) return;
+        parentSelect.value = c.parent_id || '';
+        document.getElementById('catName').value = c.name || '';
+        document.getElementById('catSlug').value = c.slug || '';
+        document.getElementById('catSlug').dataset.touched = '1';
+        document.getElementById('catIcon').value = c.icon || '';
+        document.getElementById('catSeasonalTag').value = c.seasonal_tag || '';
+        document.getElementById('catBadgeColor').value = c.badge_color || '#10B981';
+        document.getElementById('catBadgeColorHex').value = (c.badge_color || '#10B981').toUpperCase();
+        document.getElementById('catIsFeatured').checked = !!c.is_featured;
+        document.getElementById('catIsActive').checked = c.is_active !== false;
+      } else {
+        document.getElementById('catSlug').dataset.touched = '';
+        document.getElementById('catBadgeColor').value = '#10B981';
+        document.getElementById('catBadgeColorHex').value = '#10B981';
+        document.getElementById('catIsFeatured').checked = false;
+        document.getElementById('catIsActive').checked = true;
+      }
+
+      modal.classList.remove('hidden');
+    }
+
+    function closeCatModal() {
+      modal.classList.add('hidden');
+      document.getElementById('catForm').reset();
+      document.getElementById('catIdField').value = '';
+    }
+
+    async function onSubmit(ev) {
+      ev.preventDefault();
+      const btn = document.getElementById('saveCatBtn');
+      btn.disabled = true; btn.textContent = 'Guardando...';
+
+      try {
+        const id = document.getElementById('catIdField').value;
+        const parent_id = parentSelect.value ? parseInt(parentSelect.value, 10) : null;
+        const name = document.getElementById('catName').value.trim();
+        const rawSlug = document.getElementById('catSlug').value.trim();
+        const slug = rawSlug || adminGenerateSlug(name);
+        const icon = document.getElementById('catIcon').value.trim() || null;
+        const seasonal_tag = document.getElementById('catSeasonalTag').value || null;
+        const badge_color = document.getElementById('catBadgeColor').value.toUpperCase();
+        const is_featured = document.getElementById('catIsFeatured').checked;
+        const is_active = document.getElementById('catIsActive').checked;
+
+        if (!name || !slug) throw new Error('Nombre y slug son obligatorios.');
+
+        if (id) {
+          const { data, error } = await _supabase
+            .from('categories')
+            .update({ parent_id, name, slug, icon, seasonal_tag, badge_color, is_featured, is_active })
+            .eq('id', id)
+            .select()
+            .single();
+          if (error) throw error;
+
+          showToast('Categoría actualizada', 'ok');
+        } else {
+          const nextSort = allCategories.length;
+          const { data, error } = await _supabase
+            .from('categories')
+            .insert([{ parent_id, name, slug, icon, seasonal_tag, badge_color, is_featured, is_active, sort_order: nextSort }])
+            .select()
+            .single();
+          if (error) throw error;
+
+          showToast('Categoría creada', 'ok');
+        }
+
+        await loadCategories();
+        closeCatModal();
+      } catch (err) {
+        console.error('[Categorías] Submit:', err);
+        showToast('Error: ' + (err.message || 'desconocido'), 'err');
+      } finally {
+        btn.disabled = false; btn.textContent = 'Guardar';
+      }
+    }
+
+    async function deleteCategory(id) {
+      const cat = findById(id);
+      if (!cat) return;
+
+      const msg = cat._productCount > 0
+        ? `Esta categoría tiene ${cat._productCount} producto(s). ¿Seguro que deseas eliminarla?`
+        : `¿Eliminar la categoría "${cat.name}"?`;
+      if (!confirm(msg)) return;
+
+      const { error } = await _supabase.from('categories').delete().eq('id', id);
+
+      if (error) {
+        showToast('Error al eliminar: ' + error.message, 'err');
+        return;
+      }
+      showToast('Categoría eliminada', 'ok');
+      await loadCategories();
+    }
+
+    let toastTimer = null;
+    function showToast(msg, type) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.remove('toast-ok', 'toast-err');
+      t.classList.add(type === 'err' ? 'toast-err' : 'toast-ok', 'show');
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => t.classList.remove('show'), 2400);
+    }
+  </script>
+</body>
+</html>

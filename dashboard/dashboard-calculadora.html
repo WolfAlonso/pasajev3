@@ -1,0 +1,1271 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <title>Calculadora Financiera · Pasaje de los Altos</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=4"></script>
+  <script src="../js/theme-loader.js?v=4"></script>
+  <script src="../js/dashboard-utils.js?v=4"></script>
+  <script src="../js/dashboard-sidebar.js?v=4"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--color-secondary, #f8fafc);
+      color: var(--color-text, #1e293b);
+      background-image: var(--bg-image, none);
+      background-size: cover;
+      background-attachment: fixed;
+      background-position: center;
+      min-height: 100vh;
+    }
+
+    /* ====== COMPONENTES UNIFICADOS ====== */
+    .pasaje-card {
+      background-color: rgba(var(--color-secondary-rgb, 255, 255, 255), var(--glass-opacity, 0.85));
+      backdrop-filter: blur(var(--glass-blur, 16px));
+      -webkit-backdrop-filter: blur(var(--glass-blur, 16px));
+      border: 1px solid rgba(226, 232, 240, var(--glass-border-opacity, 0.8));
+      border-radius: var(--theme-radius, 1rem);
+      color: var(--color-text, #1e293b);
+      box-shadow: 0 1px 3px 0 rgba(15, 23, 42, .05);
+    }
+
+    h1, h2, h3, h4 { color: var(--color-heading, #0f172a); }
+
+    /* ====== CHIPS / TABS ====== */
+    .pasaje-chip {
+      transition: all .2s ease;
+      border: 1px solid #e2e8f0;
+      background: rgba(255, 255, 255, .7);
+      color: #64748b;
+    }
+    .pasaje-chip.active {
+      background: #ffffff;
+      border-color: rgba(16, 185, 129, .4);
+      box-shadow: 0 2px 8px rgba(16, 185, 129, .12);
+      color: #065f46;
+      font-weight: 700;
+    }
+    .pasaje-chip:not(.active):hover {
+      color: #0f172a;
+      background: rgba(255, 255, 255, .95);
+    }
+
+    /* ====== SLIDER ====== */
+    input[type="range"].pasaje-range {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 100%;
+      height: 8px;
+      border-radius: 9999px;
+      background: linear-gradient(to right,
+        #10b981 0%,
+        #10b981 var(--range-progress, 50%),
+        #e2e8f0 var(--range-progress, 50%),
+        #e2e8f0 100%);
+      outline: none;
+      cursor: pointer;
+    }
+    input[type="range"].pasaje-range::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid #10b981;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, .18);
+      transition: transform .15s ease;
+    }
+    input[type="range"].pasaje-range::-webkit-slider-thumb:hover {
+      transform: scale(1.12);
+    }
+    input[type="range"].pasaje-range::-moz-range-thumb {
+      width: 24px;
+      height: 24px;
+      border-radius: 50%;
+      background: #ffffff;
+      border: 3px solid #10b981;
+      cursor: pointer;
+      box-shadow: 0 2px 8px rgba(15, 23, 42, .18);
+    }
+
+    /* ====== QUITAR SPINNERS DE NUMBER ====== */
+    input[type=number]::-webkit-inner-spin-button,
+    input[type=number]::-webkit-outer-spin-button {
+      -webkit-appearance: none;
+      margin: 0;
+    }
+    input[type=number] { -moz-appearance: textfield; }
+
+    /* ====== ANIMACIONES ====== */
+    @keyframes pulseGlow {
+      0%,100% { box-shadow: 0 0 0 0 rgba(16,185,129,.45); }
+      50%     { box-shadow: 0 0 0 10px rgba(16,185,129,0); }
+    }
+    .pulse-glow { animation: pulseGlow 2s infinite; }
+
+    @keyframes flashGreen {
+      0%,100% { background-color: transparent; }
+      50%     { background-color: rgba(16,185,129,.15); }
+    }
+    .flash-green { animation: flashGreen .8s; }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp .3s ease both; }
+
+    /* ====== HISTORY ITEM ====== */
+    .history-item {
+      transition: background .15s ease, transform .15s ease;
+    }
+    .history-item:hover {
+      background: rgba(16,185,129,.06);
+    }
+
+    /* ====== SCROLLBAR SUAVE ====== */
+    .soft-scroll::-webkit-scrollbar { width: 6px; height: 6px; }
+    .soft-scroll::-webkit-scrollbar-track { background: transparent; }
+    .soft-scroll::-webkit-scrollbar-thumb { background: rgba(100,116,139,.35); border-radius: 9999px; }
+
+    /* ====== DONUT ====== */
+    .donut-seg { transition: stroke-dasharray .35s ease, stroke-dashoffset .35s ease; }
+  </style>
+</head>
+<body class="min-h-screen text-slate-800">
+
+  <div id="dashboardHeader"></div>
+  <aside id="sidebar-container"></aside>
+
+  <main class="min-h-screen text-slate-800 max-w-7xl mx-auto p-4 pb-16">
+    <div id="dashboardTabs"></div>
+
+    <div id="loadingState" class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-8 text-center text-sm text-slate-500 shadow-sm">
+      Cargando calculadora financiera...
+    </div>
+
+    <div id="errorState" class="hidden pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-6 text-center border-l-4 border-red-400 shadow-sm">
+      <p class="text-sm font-semibold text-red-700">No se pudo inicializar la calculadora.</p>
+      <p id="errorStateMsg" class="text-xs text-red-500 mt-1"></p>
+    </div>
+
+    <div id="content" class="hidden space-y-6 fade-up">
+
+      <!-- ════════════════════════════════════════════════════
+           FILA 1 · KPIs EJECUTIVOS
+           ════════════════════════════════════════════════════ -->
+      <section class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+
+        <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 lg:p-5 border-l-4 border-emerald-500 shadow-sm">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Precio sugerido</span>
+            <span class="text-lg">💵</span>
+          </div>
+          <p id="kpiPrice" class="text-2xl lg:text-3xl font-extrabold text-slate-900 leading-tight">Q 0.00</p>
+          <p id="kpiPriceSub" class="text-[11px] text-slate-500 mt-1">Precio de venta al público</p>
+        </div>
+
+        <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 lg:p-5 border-l-4 border-blue-500 shadow-sm">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-blue-700">Margen real neto</span>
+            <span class="text-lg">📊</span>
+          </div>
+          <p id="kpiMargin" class="text-2xl lg:text-3xl font-extrabold text-slate-900 leading-tight">0.0%</p>
+          <p id="kpiMarginSub" class="text-[11px] text-slate-500 mt-1">Ganancia por unidad: Q 0.00</p>
+        </div>
+
+        <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 lg:p-5 border-l-4 border-indigo-500 shadow-sm">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-indigo-700">Costo primo total</span>
+            <span class="text-lg">🧾</span>
+          </div>
+          <p id="kpiPrimeCost" class="text-2xl lg:text-3xl font-extrabold text-slate-900 leading-tight">Q 0.00</p>
+          <p id="kpiPrimeCostSub" class="text-[11px] text-slate-500 mt-1">Materiales + empaque + mano de obra</p>
+        </div>
+
+        <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-4 lg:p-5 border-l-4 border-amber-500 shadow-sm">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-700">Punto de equilibrio</span>
+            <span class="text-lg">⚖️</span>
+          </div>
+          <p id="kpiBreakEven" class="text-2xl lg:text-3xl font-extrabold text-slate-900 leading-tight">0 u</p>
+          <p id="kpiBreakEvenSub" class="text-[11px] text-slate-500 mt-1">Unidades/mes para cubrir costos fijos</p>
+        </div>
+
+      </section>
+
+      <!-- ════════════════════════════════════════════════════
+           FILA 2 · FORMULARIO + HISTORIAL
+           ════════════════════════════════════════════════════ -->
+      <div class="grid lg:grid-cols-3 gap-6">
+
+        <!-- ─── COLUMNA IZQUIERDA: FORMULARIO ─── -->
+        <div class="lg:col-span-2">
+          <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl overflow-hidden shadow-sm">
+
+            <!-- Cabecera del formulario -->
+            <div class="px-5 py-4 border-b border-slate-200/60 flex flex-wrap items-center justify-between gap-3">
+              <div class="min-w-0 flex-1">
+                <h2 class="text-lg font-extrabold text-slate-900 leading-tight">🧮 Calculadora de costos</h2>
+                <p class="text-xs text-slate-500 mt-0.5">Ajusta cada sección y mira el impacto en tiempo real.</p>
+              </div>
+
+              <div class="flex items-center gap-2">
+                <button type="button" id="btnNew"
+                  class="text-xs bg-white/80 hover:bg-white border border-slate-200 text-slate-700 font-bold px-3 py-2 rounded-xl transition">
+                  ✨ Nuevo
+                </button>
+                <button type="button" id="btnSave"
+                  class="text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-4 py-2 rounded-xl shadow-sm transition flex items-center gap-1.5">
+                  💾 <span>Guardar</span>
+                </button>
+              </div>
+            </div>
+
+            <!-- Nombre del producto -->
+            <div class="px-5 py-3 border-b border-slate-200/60 bg-slate-50/50">
+              <label class="block text-[10px] font-bold uppercase tracking-wider text-slate-500 mb-1">
+                Nombre del producto <span class="text-slate-400 normal-case font-normal">(opcional, se pide al guardar)</span>
+              </label>
+              <input type="text" id="calcName" placeholder="Ej. Chocoflan Grande, Gelatina de Mosaico…"
+                class="w-full bg-white border border-slate-200 text-sm text-slate-800 rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+            </div>
+
+            <!-- Tabs -->
+            <div class="px-3 pt-3 flex flex-wrap gap-1.5 bg-slate-100/40">
+              <button type="button" data-calc-tab="direct" class="pasaje-chip calc-tab active text-xs px-3 py-2 rounded-xl flex items-center gap-1.5">
+                <span>📦</span><span>Costos Directos</span>
+              </button>
+              <button type="button" data-calc-tab="labor" class="pasaje-chip calc-tab text-xs px-3 py-2 rounded-xl flex items-center gap-1.5">
+                <span>🛠️</span><span>Mano de Obra</span>
+              </button>
+              <button type="button" data-calc-tab="fixed" class="pasaje-chip calc-tab text-xs px-3 py-2 rounded-xl flex items-center gap-1.5">
+                <span>🏬</span><span>Costos Fijos</span>
+              </button>
+              <button type="button" data-calc-tab="margin" class="pasaje-chip calc-tab text-xs px-3 py-2 rounded-xl flex items-center gap-1.5">
+                <span>📈</span><span>Margen e Impuestos</span>
+              </button>
+            </div>
+
+            <!-- Panel: Costos Directos -->
+            <div data-calc-panel="direct" class="p-5 space-y-5">
+
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-sm font-bold text-slate-800">Ingredientes / Materiales</h3>
+                  <button type="button" id="btnAddMaterial"
+                    class="text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-2.5 py-1.5 rounded-lg transition">
+                    + Agregar fila
+                  </button>
+                </div>
+                <div id="materialsList" class="space-y-2"></div>
+                <p class="text-[11px] text-slate-500 mt-2">
+                  Total materiales: <span id="materialsTotal" class="font-bold text-slate-800">Q 0.00</span>
+                </p>
+              </div>
+
+              <div class="pt-4 border-t border-slate-200/80">
+                <h3 class="text-sm font-bold text-slate-800 mb-2">Empaque por unidad</h3>
+                <div class="flex items-center gap-3">
+                  <div class="flex-1">
+                    <label class="block text-[11px] text-slate-500 mb-1">Costo de empaque (Q)</label>
+                    <input type="number" step="0.01" min="0" id="calcPackaging" value="0"
+                      class="w-full bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+                  </div>
+                  <div class="pt-5">
+                    <span class="text-xs text-slate-400">por unidad</span>
+                  </div>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">
+                  Ej: bolsa, caja, etiqueta, sticker, contenedor.
+                </p>
+              </div>
+
+              <div class="pt-4 border-t border-slate-200/80 flex items-center justify-between">
+                <span class="text-xs font-bold uppercase tracking-wider text-slate-500">Costo directo por unidad</span>
+                <span id="directSubtotal" class="text-lg font-extrabold text-slate-900">Q 0.00</span>
+              </div>
+            </div>
+
+            <!-- Panel: Mano de Obra -->
+            <div data-calc-panel="labor" class="hidden p-5 space-y-5">
+
+              <div class="grid sm:grid-cols-2 gap-4">
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Horas invertidas por unidad</label>
+                  <input type="number" step="0.25" min="0" id="calcLaborHours" value="0"
+                    class="w-full bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+                  <p class="text-[11px] text-slate-500 mt-1">Tiempo de preparación, cocción y armado.</p>
+                </div>
+                <div>
+                  <label class="block text-xs font-bold text-slate-700 mb-1.5">Valor de tu hora de trabajo (Q)</label>
+                  <input type="number" step="1" min="0" id="calcLaborRate" value="0"
+                    class="w-full bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+                  <p class="text-[11px] text-slate-500 mt-1">Cuánto vale 1 hora de tu tiempo.</p>
+                </div>
+              </div>
+
+              <div class="bg-blue-50/70 rounded-2xl p-4 flex items-center justify-between border border-blue-100">
+                <div>
+                  <span class="text-xs font-bold uppercase tracking-wider text-blue-700">Costo mano de obra / unidad</span>
+                  <p class="text-[11px] text-blue-600 mt-0.5">Horas × Valor por hora</p>
+                </div>
+                <span id="laborSubtotal" class="text-xl font-extrabold text-blue-900">Q 0.00</span>
+              </div>
+
+              <div class="bg-white/60 border border-dashed border-slate-300 rounded-2xl p-4">
+                <p class="text-[11px] text-slate-600 leading-relaxed">
+                  <strong class="text-slate-800">💡 Consejo:</strong> no dejes la mano de obra en Q0 aunque seas tú quien
+                  produce. Tu tiempo también es un costo real y debe reflejarse en el precio.
+                </p>
+              </div>
+            </div>
+
+            <!-- Panel: Costos Fijos -->
+            <div data-calc-panel="fixed" class="hidden p-5 space-y-5">
+
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <h3 class="text-sm font-bold text-slate-800">Costos fijos mensuales</h3>
+                  <button type="button" id="btnAddFixed"
+                    class="text-[11px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-2.5 py-1.5 rounded-lg transition">
+                    + Agregar fila
+                  </button>
+                </div>
+                <div id="fixedList" class="space-y-2"></div>
+                <p class="text-[11px] text-slate-500 mt-2">
+                  Total mensual: <span id="fixedTotal" class="font-bold text-slate-800">Q 0.00</span>
+                </p>
+              </div>
+
+              <div class="pt-4 border-t border-slate-200/80">
+                <label class="block text-xs font-bold text-slate-700 mb-1.5">Unidades estimadas al mes</label>
+                <input type="number" step="1" min="1" id="calcMonthlyUnits" value="100"
+                  class="w-full bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+                <p class="text-[11px] text-slate-500 mt-1">
+                  Sirve para prorratear los costos fijos entre cada unidad producida.
+                </p>
+              </div>
+
+              <div class="bg-amber-50/70 rounded-2xl p-4 flex items-center justify-between border border-amber-100">
+                <div>
+                  <span class="text-xs font-bold uppercase tracking-wider text-amber-700">Prorrateo por unidad</span>
+                  <p class="text-[11px] text-amber-600 mt-0.5">Costos fijos ÷ Unidades mensuales</p>
+                </div>
+                <span id="fixedPerUnit" class="text-xl font-extrabold text-amber-900">Q 0.00</span>
+              </div>
+
+              <div class="bg-white/60 border border-dashed border-slate-300 rounded-2xl p-4">
+                <p class="text-[11px] text-slate-600 leading-relaxed">
+                  <strong class="text-slate-800">💡 Consejo:</strong> incluye renta, luz, agua, internet, gas,
+                  publicidad y transporte aunque trabajes desde casa. Estimar es mejor que ignorar.
+                </p>
+              </div>
+            </div>
+
+            <!-- Panel: Margen e Impuestos -->
+            <div data-calc-panel="margin" class="hidden p-5 space-y-6">
+
+              <div>
+                <div class="flex items-center justify-between mb-2">
+                  <label class="text-xs font-bold text-slate-700">Margen de ganancia deseado</label>
+                  <span id="marginPill" class="text-xs font-extrabold bg-emerald-100 text-emerald-800 px-2.5 py-1 rounded-full">40%</span>
+                </div>
+                <input type="range" min="10" max="80" step="1" value="40" id="calcMargin" class="pasaje-range">
+                <div class="flex justify-between text-[10px] text-slate-400 font-semibold mt-1.5">
+                  <span>10%</span><span>30%</span><span>50%</span><span>80%</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">
+                  Quieres ganar <strong id="marginQty" class="text-emerald-700">Q 0.00</strong> por unidad sobre tu costo total.
+                </p>
+              </div>
+
+              <div class="pt-4 border-t border-slate-200/80">
+                <label class="block text-xs font-bold text-slate-700 mb-2">Comisión / Retención aplicada al precio (%)</label>
+                <div class="flex flex-wrap gap-1.5 mb-3">
+                  <button type="button" data-tax-preset="0"  class="pasaje-chip tax-chip text-[11px] font-bold px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition">Sin descuentos</button>
+                  <button type="button" data-tax-preset="5"  class="pasaje-chip tax-chip text-[11px] font-bold px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition">Retención 5%</button>
+                  <button type="button" data-tax-preset="10" class="pasaje-chip tax-chip text-[11px] font-bold px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition">Comisión 10%</button>
+                  <button type="button" data-tax-preset="15" class="pasaje-chip tax-chip text-[11px] font-bold px-3 py-1.5 rounded-full border border-slate-200 bg-white hover:bg-slate-50 transition">Comisión + Ret. 15%</button>
+                </div>
+                <div class="flex items-center gap-3">
+                  <input type="number" step="0.1" min="0" max="60" id="calcTaxRate" value="0"
+                    class="w-28 bg-white border border-slate-200 text-sm rounded-xl px-3 py-2.5 focus:ring-2 focus:ring-emerald-500 outline-none font-bold text-center">
+                  <span class="text-sm text-slate-500">%</span>
+                  <span class="text-[11px] text-slate-500 ml-auto">Personalizado</span>
+                </div>
+                <p class="text-[11px] text-slate-500 mt-2">
+                  Aplicable cuando el marketplace, la pasarela o el régimen tributario te retienen un porcentaje.
+                </p>
+              </div>
+
+              <div class="pt-4 border-t border-slate-200/80 bg-rose-50/50 border border-rose-100 rounded-2xl p-4 -mx-1">
+                <div class="flex items-center justify-between mb-1">
+                  <span class="text-xs font-bold uppercase tracking-wider text-rose-700">Descuento por unidad</span>
+                  <span id="taxLoss" class="text-lg font-extrabold text-rose-900">Q 0.00</span>
+                </div>
+                <p class="text-[11px] text-rose-600">
+                  Lo que pierdes del precio final por comisión o retención.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- ─── COLUMNA DERECHA: HISTORIAL ─── -->
+        <aside>
+          <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl overflow-hidden lg:sticky lg:top-20 shadow-sm">
+            <div class="px-5 py-4 border-b border-slate-200/60 flex items-center justify-between">
+              <div>
+                <h2 class="text-base font-extrabold text-slate-900 leading-tight">📚 Historial</h2>
+                <p class="text-[11px] text-slate-500 mt-0.5">Productos ya calculados</p>
+              </div>
+              <button type="button" id="btnReloadHistory"
+                class="text-[11px] bg-white/70 hover:bg-white border border-slate-200 text-slate-600 font-bold w-8 h-8 rounded-lg transition flex items-center justify-center"
+                title="Recargar">
+                ⟳
+              </button>
+            </div>
+
+            <div id="historyList" class="p-3 soft-scroll max-h-[560px] overflow-y-auto space-y-2">
+              <div class="text-xs text-slate-400 text-center py-6">
+                Sin cálculos guardados aún.
+              </div>
+            </div>
+          </div>
+        </aside>
+      </div>
+
+      <!-- ════════════════════════════════════════════════════
+           FILA 3 · SIMULADOR + GRÁFICO
+           ════════════════════════════════════════════════════ -->
+      <div class="grid lg:grid-cols-2 gap-6">
+
+        <!-- ─── SIMULADOR ─── -->
+        <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-5 lg:p-6 shadow-sm">
+          <div class="flex items-center justify-between mb-1">
+            <h2 class="text-base font-extrabold text-slate-900">🎚️ Simulador de escenarios</h2>
+            <span class="text-[10px] font-bold uppercase tracking-wider text-slate-400">En vivo</span>
+          </div>
+          <p class="text-xs text-slate-500 mb-5">
+            Mueve el precio final y observa cómo cambia tu ganancia mensual estimada.
+          </p>
+
+          <div class="rounded-2xl bg-gradient-to-br from-slate-900 to-slate-800 text-white p-5 mb-5 shadow-sm">
+            <div class="flex items-baseline justify-between mb-1">
+              <span class="text-[10px] font-bold uppercase tracking-wider text-slate-300">Precio simulado de venta</span>
+              <span id="simPct" class="text-[10px] font-bold bg-white/15 px-2 py-0.5 rounded-full">100%</span>
+            </div>
+            <p id="simPrice" class="text-3xl font-extrabold mb-4">Q 0.00</p>
+
+            <div class="grid grid-cols-2 gap-3">
+              <div class="bg-white/10 rounded-xl p-3">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-300">Ganancia mensual</div>
+                <div id="simMonthly" class="text-lg font-extrabold text-emerald-300 mt-0.5">Q 0.00</div>
+              </div>
+              <div class="bg-white/10 rounded-xl p-3">
+                <div class="text-[10px] font-bold uppercase tracking-wider text-slate-300">Vs. precio sugerido</div>
+                <div id="simDelta" class="text-lg font-extrabold mt-0.5">Q 0.00</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="mb-2">
+            <input type="range" min="50" max="200" step="1" value="100" id="simSlider" class="pasaje-range">
+            <div class="flex justify-between text-[10px] text-slate-400 font-semibold mt-1.5">
+              <span>−50%</span><span>Sugerido</span><span>+100%</span>
+            </div>
+          </div>
+
+          <div class="mt-5 space-y-3">
+            <div>
+              <div class="flex justify-between text-[11px] font-semibold text-slate-600 mb-1">
+                <span>Precio sugerido</span>
+                <span id="simBarSuggestedLabel" class="text-slate-800 font-bold">Q 0.00</span>
+              </div>
+              <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div id="simBarSuggested" class="h-full bg-emerald-500 rounded-full transition-all" style="width:0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-[11px] font-semibold text-slate-600 mb-1">
+                <span>Precio simulado</span>
+                <span id="simBarCurrentLabel" class="text-slate-800 font-bold">Q 0.00</span>
+              </div>
+              <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div id="simBarCurrent" class="h-full bg-blue-500 rounded-full transition-all" style="width:0%"></div>
+              </div>
+            </div>
+            <div>
+              <div class="flex justify-between text-[11px] font-semibold text-slate-600 mb-1">
+                <span>Punto de equilibrio</span>
+                <span id="simBarBreakLabel" class="text-slate-800 font-bold">Q 0.00</span>
+              </div>
+              <div class="h-2 bg-slate-200 rounded-full overflow-hidden">
+                <div id="simBarBreak" class="h-full bg-amber-500 rounded-full transition-all" style="width:0%"></div>
+              </div>
+            </div>
+          </div>
+
+          <div id="simWarn" class="hidden mt-4 text-[11px] bg-amber-50 border border-amber-200 text-amber-800 rounded-xl px-3 py-2">
+            ⚠️ Con este precio no cubres tus costos fijos mensuales.
+          </div>
+          <div id="simOk" class="hidden mt-4 text-[11px] bg-emerald-50 border border-emerald-200 text-emerald-800 rounded-xl px-3 py-2">
+            ✅ Escenario rentable dentro del rango simulado.
+          </div>
+        </div>
+
+        <!-- ─── GRÁFICO DONUT ─── -->
+        <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-5 lg:p-6 shadow-sm">
+          <h2 class="text-base font-extrabold text-slate-900 mb-1">🥧 Desglose del precio final</h2>
+          <p class="text-xs text-slate-500 mb-5">
+            Cómo se reparte cada quetzal del precio sugerido.
+          </p>
+
+          <div class="relative w-full aspect-square max-w-[260px] mx-auto mb-5">
+            <svg viewBox="0 0 42 42" class="w-full h-full -rotate-90">
+              <circle cx="21" cy="21" r="15.9155" fill="none" stroke="#f1f5f9" stroke-width="6"/>
+              <g id="donutSegments"></g>
+            </svg>
+            <div class="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+              <div class="text-[10px] uppercase tracking-wider text-slate-400 font-bold">Precio final</div>
+              <div id="donutCenterPrice" class="text-2xl font-extrabold text-slate-900">Q 0.00</div>
+              <div id="donutCenterCost" class="text-[11px] text-slate-500 font-semibold mt-0.5">Costo Q 0.00</div>
+            </div>
+          </div>
+
+          <div id="donutLegend" class="space-y-2"></div>
+        </div>
+      </div>
+
+    </div>
+  </main>
+
+  <script>
+  (function () {
+    'use strict';
+
+    const TABLE = 'store_pricing_calculations';
+
+    const state = {
+      id: null,
+      name: '',
+      materials: [{ name: '', cost: 0 }],
+      packaging: 0,
+      labor: { hours: 0, rate: 0 },
+      fixedCosts: [{ name: '', amount: 0 }],
+      monthlyUnits: 100,
+      margin: 40,
+      taxRate: 0,
+      simulatorPct: 100,
+      session: null,
+      store: null
+    };
+
+    let storeRef = null;
+    let sessionRef = null;
+
+    const fmtQ   = (n) => 'Q ' + (Number(n) || 0).toFixed(2);
+    const fmtPct = (n) => (Number(n) || 0).toFixed(1) + '%';
+    const num    = (v) => { const n = parseFloat(v); return isFinite(n) ? n : 0; };
+    const esc    = (s) => String(s ?? '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&#39;');
+    const escAttr = esc;
+
+    function computeTotals() {
+      const materialsTotal = state.materials.reduce((a, m) => a + num(m.cost), 0);
+      const packaging      = num(state.packaging);
+      const laborCost      = num(state.labor.hours) * num(state.labor.rate);
+      const fixedTotal     = state.fixedCosts.reduce((a, f) => a + num(f.amount), 0);
+      const monthlyUnits   = Math.max(1, Math.floor(num(state.monthlyUnits) || 1));
+      const fixedPerUnit   = fixedTotal / monthlyUnits;
+
+      const directCost = materialsTotal + packaging;
+      const primeCost  = directCost + laborCost;
+      const fullCost   = primeCost + fixedPerUnit;
+
+      const margin   = Math.max(0, num(state.margin));
+      const taxRate  = Math.max(0, Math.min(60, num(state.taxRate)));
+      const taxFactor = 1 - (taxRate / 100);
+      const marginFactor = 1 + (margin / 100);
+
+      let suggestedPrice = 0;
+      if (taxFactor > 0.0001) {
+        suggestedPrice = (fullCost * marginFactor) / taxFactor;
+      } else {
+        suggestedPrice = fullCost * marginFactor;
+      }
+
+      const sellerRevenue = suggestedPrice * taxFactor;
+      const netProfit     = sellerRevenue - fullCost;
+      const netMarginPct  = suggestedPrice > 0 ? (netProfit / suggestedPrice) * 100 : 0;
+
+      const contribution  = suggestedPrice * taxFactor - primeCost;
+      const breakEvenUnits = contribution > 0 ? Math.ceil(fixedTotal / contribution) : Infinity;
+
+      const taxLossQ = suggestedPrice * (taxRate / 100);
+      const segments = [
+        { key: 'materials', label: 'Materiales',        value: materialsTotal, color: '#3b82f6' },
+        { key: 'packaging', label: 'Empaque',           value: packaging,      color: '#6366f1' },
+        { key: 'labor',     label: 'Mano de obra',      value: laborCost,      color: '#8b5cf6' },
+        { key: 'fixed',     label: 'Costos fijos',      value: fixedPerUnit,   color: '#f59e0b' },
+        { key: 'tax',       label: 'Comisión / imp.',   value: taxLossQ,       color: '#ef4444' },
+        { key: 'profit',    label: 'Ganancia neta',     value: Math.max(0, netProfit), color: '#10b981' }
+      ];
+
+      return {
+        materialsTotal, packaging, laborCost, fixedTotal, monthlyUnits, fixedPerUnit,
+        directCost, primeCost, fullCost,
+        margin, taxRate, taxFactor,
+        suggestedPrice, sellerRevenue, netProfit, netMarginPct,
+        contribution, breakEvenUnits,
+        taxLossQ,
+        segments
+      };
+    }
+
+    function renderMaterials() {
+      const wrap = document.getElementById('materialsList');
+      if (!wrap) return;
+      if (state.materials.length === 0) state.materials.push({ name: '', cost: 0 });
+
+      wrap.innerHTML = state.materials.map((m, i) => `
+        <div class="flex items-center gap-2">
+          <input type="text" placeholder="Ej. Harina" value="${escAttr(m.name || '')}"
+            data-mat-name="${i}"
+            class="flex-1 min-w-0 bg-white border border-slate-200 text-sm rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none">
+          <input type="number" step="0.01" min="0" placeholder="0.00" value="${m.cost || ''}"
+            data-mat-cost="${i}"
+            class="w-24 bg-white border border-slate-200 text-sm rounded-xl px-3 py-2 text-right focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+          <button type="button" data-mat-del="${i}"
+            class="text-slate-400 hover:text-red-600 hover:bg-red-50 w-9 h-9 rounded-xl transition flex items-center justify-center flex-shrink-0"
+            title="Eliminar">
+            ✕
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function renderFixed() {
+      const wrap = document.getElementById('fixedList');
+      if (!wrap) return;
+      if (state.fixedCosts.length === 0) state.fixedCosts.push({ name: '', amount: 0 });
+
+      wrap.innerHTML = state.fixedCosts.map((f, i) => `
+        <div class="flex items-center gap-2">
+          <input type="text" placeholder="Ej. Renta" value="${escAttr(f.name || '')}"
+            data-fix-name="${i}"
+            class="flex-1 min-w-0 bg-white border border-slate-200 text-sm rounded-xl px-3 py-2 focus:ring-2 focus:ring-emerald-500 outline-none">
+          <input type="number" step="0.01" min="0" placeholder="0.00" value="${f.amount || ''}"
+            data-fix-amount="${i}"
+            class="w-28 bg-white border border-slate-200 text-sm rounded-xl px-3 py-2 text-right focus:ring-2 focus:ring-emerald-500 outline-none font-semibold">
+          <button type="button" data-fix-del="${i}"
+            class="text-slate-400 hover:text-red-600 hover:bg-red-50 w-9 h-9 rounded-xl transition flex items-center justify-center flex-shrink-0"
+            title="Eliminar">
+            ✕
+          </button>
+        </div>
+      `).join('');
+    }
+
+    function renderDonut(segments, price, cost) {
+      const g = document.getElementById('donutSegments');
+      if (!g) return;
+      g.innerHTML = '';
+
+      const total = segments.reduce((a, s) => a + Math.max(0, s.value), 0);
+      document.getElementById('donutCenterPrice').textContent = fmtQ(price);
+      document.getElementById('donutCenterCost').textContent = 'Costo ' + fmtQ(cost);
+
+      const legend = document.getElementById('donutLegend');
+
+      if (total <= 0) {
+        legend.innerHTML = `<div class="text-xs text-slate-400 text-center py-4">Completa los costos para ver el desglose.</div>`;
+        return;
+      }
+
+      let cumulative = 0;
+      const NS = 'http://www.w3.org/2000/svg';
+      segments.forEach((seg) => {
+        const val = Math.max(0, seg.value);
+        if (val <= 0) return;
+        const pct = (val / total) * 100;
+
+        const c = document.createElementNS(NS, 'circle');
+        c.setAttribute('class', 'donut-seg');
+        c.setAttribute('cx', '21');
+        c.setAttribute('cy', '21');
+        c.setAttribute('r', '15.9155');
+        c.setAttribute('fill', 'none');
+        c.setAttribute('stroke', seg.color);
+        c.setAttribute('stroke-width', '6');
+        c.setAttribute('stroke-dasharray', `${pct.toFixed(4)} ${(100 - pct).toFixed(4)}`);
+        c.setAttribute('stroke-dashoffset', `${(-cumulative).toFixed(4)}`);
+        const title = document.createElementNS(NS, 'title');
+        title.textContent = `${seg.label}: ${fmtQ(val)} (${pct.toFixed(1)}%)`;
+        c.appendChild(title);
+        g.appendChild(c);
+
+        cumulative += pct;
+      });
+
+      legend.innerHTML = segments
+        .filter(s => s.value > 0)
+        .map(s => {
+          const pct = (s.value / total) * 100;
+          return `
+            <div class="flex items-center gap-3 text-xs">
+              <span class="w-3 h-3 rounded-full flex-shrink-0" style="background:${s.color}"></span>
+              <span class="flex-1 text-slate-700 font-semibold truncate">${esc(s.label)}</span>
+              <span class="text-slate-400 font-mono text-[11px]">${pct.toFixed(1)}%</span>
+              <span class="text-slate-800 font-bold w-20 text-right">${fmtQ(s.value)}</span>
+            </div>
+          `;
+        }).join('');
+    }
+
+    function renderSimulator(t) {
+      const pct = Math.max(50, Math.min(200, state.simulatorPct || 100));
+      const simPrice = t.suggestedPrice * (pct / 100);
+      const simSellerRev = simPrice * t.taxFactor;
+      const simMonthly = (simSellerRev - t.primeCost) * t.monthlyUnits - t.fixedTotal;
+      const monthlySuggested = t.netProfit * t.monthlyUnits;
+      const delta = simMonthly - monthlySuggested;
+
+      document.getElementById('simPct').textContent = pct + '%';
+      document.getElementById('simPrice').textContent = fmtQ(simPrice);
+      document.getElementById('simMonthly').textContent = fmtQ(simMonthly);
+      const deltaEl = document.getElementById('simDelta');
+      deltaEl.textContent = (delta >= 0 ? '+' : '') + fmtQ(delta);
+      deltaEl.classList.remove('text-emerald-300', 'text-rose-300');
+      deltaEl.classList.add(delta >= 0 ? 'text-emerald-300' : 'text-rose-300');
+
+      const slider = document.getElementById('simSlider');
+      if (slider) {
+        slider.value = pct;
+        const progress = ((pct - 50) / (200 - 50)) * 100;
+        slider.style.setProperty('--range-progress', progress + '%');
+      }
+
+      const maxBar = Math.max(t.suggestedPrice * 2, simPrice, 1);
+      const pctOf = (v) => Math.max(0, Math.min(100, (v / maxBar) * 100));
+
+      const breakEvenPrice = t.contribution > 0
+        ? (t.primeCost + (t.fixedTotal / t.monthlyUnits)) / t.taxFactor
+        : 0;
+
+      document.getElementById('simBarSuggested').style.width = pctOf(t.suggestedPrice) + '%';
+      document.getElementById('simBarSuggestedLabel').textContent = fmtQ(t.suggestedPrice);
+
+      document.getElementById('simBarCurrent').style.width = pctOf(simPrice) + '%';
+      document.getElementById('simBarCurrentLabel').textContent = fmtQ(simPrice);
+
+      document.getElementById('simBarBreak').style.width = pctOf(breakEvenPrice) + '%';
+      document.getElementById('simBarBreakLabel').textContent = breakEvenPrice > 0 ? fmtQ(breakEvenPrice) : '—';
+
+      const warnEl = document.getElementById('simWarn');
+      const okEl   = document.getElementById('simOk');
+      if (t.fixedTotal > 0 && simMonthly < 0) {
+        warnEl.classList.remove('hidden');
+        okEl.classList.add('hidden');
+      } else if (t.suggestedPrice > 0) {
+        warnEl.classList.add('hidden');
+        okEl.classList.remove('hidden');
+      } else {
+        warnEl.classList.add('hidden');
+        okEl.classList.add('hidden');
+      }
+    }
+
+    function recompute() {
+      const t = computeTotals();
+
+      document.getElementById('kpiPrice').textContent = fmtQ(t.suggestedPrice);
+      document.getElementById('kpiPriceSub').textContent = `Sobre costo total ${fmtQ(t.fullCost)}`;
+
+      document.getElementById('kpiMargin').textContent = fmtPct(t.netMarginPct);
+      document.getElementById('kpiMarginSub').textContent = `Ganancia por unidad: ${fmtQ(t.netProfit)}`;
+
+      document.getElementById('kpiPrimeCost').textContent = fmtQ(t.primeCost);
+      document.getElementById('kpiPrimeCostSub').textContent =
+        `Mat ${fmtQ(t.materialsTotal)} · Emp ${fmtQ(t.packaging)} · MO ${fmtQ(t.laborCost)}`;
+
+      const beEl = document.getElementById('kpiBreakEven');
+      const beSub = document.getElementById('kpiBreakEvenSub');
+      if (!isFinite(t.breakEvenUnits)) {
+        beEl.textContent = '—';
+        beSub.textContent = 'Ajusta precio o margen para calcularlo';
+      } else {
+        beEl.textContent = t.breakEvenUnits + ' u';
+        beSub.textContent = `Cubres ${fmtQ(t.fixedTotal)} de costos fijos`;
+      }
+
+      document.getElementById('materialsTotal').textContent = fmtQ(t.materialsTotal);
+      document.getElementById('directSubtotal').textContent = fmtQ(t.directCost);
+      document.getElementById('laborSubtotal').textContent  = fmtQ(t.laborCost);
+      document.getElementById('fixedTotal').textContent     = fmtQ(t.fixedTotal);
+      document.getElementById('fixedPerUnit').textContent   = fmtQ(t.fixedPerUnit);
+
+      document.getElementById('marginPill').textContent = Math.round(t.margin) + '%';
+      document.getElementById('marginQty').textContent = fmtQ(t.netProfit);
+      document.getElementById('taxLoss').textContent = fmtQ(t.taxLossQ);
+
+      const mSlider = document.getElementById('calcMargin');
+      if (mSlider) {
+        const p = ((t.margin - 10) / (80 - 10)) * 100;
+        mSlider.style.setProperty('--range-progress', Math.max(0, Math.min(100, p)) + '%');
+      }
+
+      document.querySelectorAll('.tax-chip').forEach(chip => {
+        const active = Number(chip.dataset.taxPreset) === Number(t.taxRate);
+        chip.classList.toggle('bg-emerald-600', active);
+        chip.classList.toggle('text-white', active);
+        chip.classList.toggle('border-emerald-600', active);
+        chip.classList.toggle('bg-white', !active);
+        chip.classList.toggle('text-slate-700', !active);
+      });
+
+      renderDonut(t.segments, t.suggestedPrice, t.fullCost);
+      renderSimulator(t);
+
+      state.__lastTotals = t;
+    }
+
+    function hydrateUIFromState() {
+      document.getElementById('calcName').value = state.name || '';
+      document.getElementById('calcPackaging').value = state.packaging || 0;
+      document.getElementById('calcLaborHours').value = state.labor.hours || 0;
+      document.getElementById('calcLaborRate').value  = state.labor.rate || 0;
+      document.getElementById('calcMonthlyUnits').value = state.monthlyUnits || 100;
+      document.getElementById('calcMargin').value = state.margin ?? 40;
+      document.getElementById('calcTaxRate').value = state.taxRate ?? 0;
+
+      renderMaterials();
+      renderFixed();
+      recompute();
+    }
+
+    function bindTabs() {
+      document.querySelectorAll('[data-calc-tab]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const id = btn.dataset.calcTab;
+          document.querySelectorAll('[data-calc-tab]').forEach(b =>
+            b.classList.toggle('active', b.dataset.calcTab === id)
+          );
+          document.querySelectorAll('[data-calc-panel]').forEach(p =>
+            p.classList.toggle('hidden', p.dataset.calcPanel !== id)
+          );
+        });
+      });
+    }
+
+    function bindMaterials() {
+      const wrap = document.getElementById('materialsList');
+      if (!wrap) return;
+
+      wrap.addEventListener('input', (e) => {
+        const t = e.target;
+        if (t.dataset.matName !== undefined) {
+          state.materials[+t.dataset.matName].name = t.value;
+        } else if (t.dataset.matCost !== undefined) {
+          state.materials[+t.dataset.matCost].cost = num(t.value);
+        }
+        recompute();
+      });
+
+      wrap.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-mat-del]');
+        if (!btn) return;
+        const i = +btn.dataset.matDel;
+        state.materials.splice(i, 1);
+        if (state.materials.length === 0) state.materials.push({ name: '', cost: 0 });
+        renderMaterials();
+        recompute();
+      });
+    }
+
+    function bindFixed() {
+      const wrap = document.getElementById('fixedList');
+      if (!wrap) return;
+
+      wrap.addEventListener('input', (e) => {
+        const t = e.target;
+        if (t.dataset.fixName !== undefined) {
+          state.fixedCosts[+t.dataset.fixName].name = t.value;
+        } else if (t.dataset.fixAmount !== undefined) {
+          state.fixedCosts[+t.dataset.fixAmount].amount = num(t.value);
+        }
+        recompute();
+      });
+
+      wrap.addEventListener('click', (e) => {
+        const btn = e.target.closest('[data-fix-del]');
+        if (!btn) return;
+        const i = +btn.dataset.fixDel;
+        state.fixedCosts.splice(i, 1);
+        if (state.fixedCosts.length === 0) state.fixedCosts.push({ name: '', amount: 0 });
+        renderFixed();
+        recompute();
+      });
+    }
+
+    function bindScalars() {
+      const nameEl = document.getElementById('calcName');
+      nameEl.addEventListener('input', () => { state.name = nameEl.value; });
+
+      const packEl = document.getElementById('calcPackaging');
+      packEl.addEventListener('input', () => { state.packaging = num(packEl.value); recompute(); });
+
+      const hEl = document.getElementById('calcLaborHours');
+      hEl.addEventListener('input', () => { state.labor.hours = num(hEl.value); recompute(); });
+
+      const rEl = document.getElementById('calcLaborRate');
+      rEl.addEventListener('input', () => { state.labor.rate = num(rEl.value); recompute(); });
+
+      const uEl = document.getElementById('calcMonthlyUnits');
+      uEl.addEventListener('input', () => {
+        state.monthlyUnits = Math.max(1, Math.floor(num(uEl.value) || 1));
+        recompute();
+      });
+
+      const mEl = document.getElementById('calcMargin');
+      mEl.addEventListener('input', () => {
+        state.margin = num(mEl.value);
+        recompute();
+      });
+
+      const tEl = document.getElementById('calcTaxRate');
+      tEl.addEventListener('input', () => {
+        state.taxRate = Math.max(0, Math.min(60, num(tEl.value)));
+        recompute();
+      });
+    }
+
+    function bindTaxPresets() {
+      document.querySelectorAll('.tax-chip').forEach(chip => {
+        chip.addEventListener('click', () => {
+          const v = num(chip.dataset.taxPreset);
+          state.taxRate = v;
+          document.getElementById('calcTaxRate').value = v;
+          recompute();
+        });
+      });
+    }
+
+    function bindSimulator() {
+      const s = document.getElementById('simSlider');
+      s.addEventListener('input', () => {
+        state.simulatorPct = num(s.value);
+        const t = state.__lastTotals || computeTotals();
+        renderSimulator(t);
+      });
+    }
+
+    function bindButtons() {
+      document.getElementById('btnAddMaterial').addEventListener('click', () => {
+        state.materials.push({ name: '', cost: 0 });
+        renderMaterials();
+        recompute();
+        const inputs = document.querySelectorAll('#materialsList [data-mat-name]');
+        if (inputs.length) inputs[inputs.length - 1].focus();
+      });
+
+      document.getElementById('btnAddFixed').addEventListener('click', () => {
+        state.fixedCosts.push({ name: '', amount: 0 });
+        renderFixed();
+        recompute();
+        const inputs = document.querySelectorAll('#fixedList [data-fix-name]');
+        if (inputs.length) inputs[inputs.length - 1].focus();
+      });
+
+      document.getElementById('btnNew').addEventListener('click', () => {
+        if (!confirm('¿Empezar un cálculo nuevo? Se perderán los cambios no guardados.')) return;
+        resetState();
+        hydrateUIFromState();
+      });
+
+      document.getElementById('btnSave').addEventListener('click', saveCurrent);
+      document.getElementById('btnReloadHistory').addEventListener('click', loadHistory);
+    }
+
+    function resetState() {
+      state.id = null;
+      state.name = '';
+      state.materials = [{ name: '', cost: 0 }];
+      state.packaging = 0;
+      state.labor = { hours: 0, rate: 0 };
+      state.fixedCosts = [{ name: '', amount: 0 }];
+      state.monthlyUnits = 100;
+      state.margin = 40;
+      state.taxRate = 0;
+      state.simulatorPct = 100;
+    }
+
+    async function saveCurrent() {
+      if (!storeRef || !sessionRef) {
+        alert('Sesión no disponible.');
+        return;
+      }
+
+      let name = (state.name || '').trim();
+      if (!name) {
+        name = (prompt('Nombre del producto (ej. Chocoflan Grande):', '') || '').trim();
+        if (!name) return;
+        state.name = name;
+        document.getElementById('calcName').value = name;
+      }
+
+      const t = computeTotals();
+      const payload = { 
+        mode: 'production',
+        store_id: storeRef.id,
+        user_id: sessionRef.user.id,
+        name: name,
+        calc_data: {
+          materials: state.materials,
+          packaging: state.packaging,
+          labor: state.labor,
+          fixedCosts: state.fixedCosts,
+          monthlyUnits: state.monthlyUnits,
+          margin: state.margin,
+          taxRate: state.taxRate,
+          simulatorPct: state.simulatorPct
+        },
+        unit_cost: round2(t.fullCost),
+        suggested_price: round2(t.suggestedPrice),
+        net_profit: round2(t.netProfit),
+        margin: round2(t.margin)
+      };
+
+      const btn = document.getElementById('btnSave');
+      const originalHTML = btn.innerHTML;
+      btn.disabled = true;
+      btn.innerHTML = '⏳ <span>Guardando…</span>';
+
+      try {
+        let res;
+        if (state.id) {
+          res = await _supabase.from(TABLE).update(payload).eq('id', state.id).select().single();
+        } else {
+          res = await _supabase.from(TABLE).insert(payload).select().single();
+        }
+
+        if (res.error) {
+          console.error('[Calculadora] save error:', res.error);
+          alert('No se pudo guardar: ' + res.error.message);
+          return;
+        }
+
+        state.id = res.data.id;
+        await loadHistory();
+        flashSaved();
+      } catch (err) {
+        console.error('[Calculadora] save exception:', err);
+        alert('Error inesperado al guardar.');
+      } finally {
+        btn.disabled = false;
+        btn.innerHTML = originalHTML;
+      }
+    }
+
+    function round2(n) { return Math.round((Number(n) || 0) * 100) / 100; }
+
+    function flashSaved() {
+      const btn = document.getElementById('btnSave');
+      const original = btn.innerHTML;
+      btn.classList.add('flash-green');
+      btn.innerHTML = '✅ <span>Guardado</span>';
+      setTimeout(() => {
+        btn.classList.remove('flash-green');
+        btn.innerHTML = original;
+      }, 1400);
+    }
+
+    async function loadHistory() {
+      if (!storeRef) return;
+      const wrap = document.getElementById('historyList');
+      wrap.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">Cargando…</div>`;
+
+      const { data, error } = await _supabase
+        .from(TABLE)
+        .select('id, name, unit_cost, suggested_price, net_profit, margin, calc_data, created_at')
+        .eq('store_id', storeRef.id)
+        .eq('mode', 'production')
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        console.warn('[Calculadora] history error:', error);
+        wrap.innerHTML = `
+          <div class="text-[11px] text-amber-700 bg-amber-50 border border-amber-200 rounded-xl p-3 leading-relaxed">
+            No se pudo cargar el historial. Verifica que exista la tabla
+            <code class="font-mono text-[10px] bg-white px-1 rounded">store_pricing_calculations</code>.
+          </div>`;
+        return;
+      }
+
+      if (!data || data.length === 0) {
+        wrap.innerHTML = `<div class="text-xs text-slate-400 text-center py-6">Sin cálculos guardados aún.</div>`;
+        return;
+      }
+
+      wrap.innerHTML = data.map(item => `
+        <div class="history-item rounded-xl border border-slate-200/80 p-3" data-history-id="${esc(item.id)}">
+          <div class="flex items-start justify-between gap-2 mb-2">
+            <div class="min-w-0 flex-1">
+              <div class="text-sm font-bold text-slate-800 truncate">${esc(item.name)}</div>
+              <div class="text-[10px] text-slate-400 mt-0.5">${new Date(item.created_at).toLocaleDateString('es-GT', { day: '2-digit', month: 'short', year: 'numeric' })}</div>
+            </div>
+            <div class="text-right flex-shrink-0">
+              <div class="text-sm font-extrabold text-emerald-700">${fmtQ(item.suggested_price)}</div>
+              <div class="text-[10px] text-slate-500">${fmtPct(item.margin)} margen</div>
+            </div>
+          </div>
+          <div class="flex gap-1.5">
+            <button type="button" data-action="load" data-id="${esc(item.id)}"
+              class="flex-1 text-[10px] font-bold bg-emerald-600 hover:bg-emerald-700 text-white py-1.5 rounded-lg transition">
+              Cargar
+            </button>
+            <button type="button" data-action="edit" data-id="${esc(item.id)}"
+              class="flex-1 text-[10px] font-bold bg-blue-600 hover:bg-blue-700 text-white py-1.5 rounded-lg transition">
+              Editar
+            </button>
+            <button type="button" data-action="delete" data-id="${esc(item.id)}"
+              class="text-[10px] font-bold bg-white hover:bg-red-50 border border-slate-200 text-red-600 py-1.5 px-2.5 rounded-lg transition">
+              🗑
+            </button>
+          </div>
+        </div>
+      `).join('');
+
+      wrap.querySelectorAll('[data-action]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const action = btn.dataset.action;
+          const id = btn.dataset.id;
+          const item = data.find(d => String(d.id) === String(id));
+          if (!item) return;
+
+          if (action === 'load')      loadCalculation(item);
+          else if (action === 'edit') editCalculation(item);
+          else if (action === 'delete') deleteCalculation(item);
+        });
+      });
+    }
+
+    function applyCalcDataToState(item) {
+      const cd = item.calc_data || {};
+      state.id = item.id;
+      state.name = item.name || '';
+      state.materials = Array.isArray(cd.materials) && cd.materials.length
+        ? cd.materials.map(m => ({ name: m.name || '', cost: num(m.cost) }))
+        : [{ name: '', cost: 0 }];
+      state.packaging = num(cd.packaging);
+      state.labor = {
+        hours: num(cd.labor && cd.labor.hours),
+        rate:  num(cd.labor && cd.labor.rate)
+      };
+      state.fixedCosts = Array.isArray(cd.fixedCosts) && cd.fixedCosts.length
+        ? cd.fixedCosts.map(f => ({ name: f.name || '', amount: num(f.amount) }))
+        : [{ name: '', amount: 0 }];
+      state.monthlyUnits = Math.max(1, Math.floor(num(cd.monthlyUnits) || 100));
+      state.margin = cd.margin !== undefined ? num(cd.margin) : 40;
+      state.taxRate = cd.taxRate !== undefined ? num(cd.taxRate) : 0;
+      state.simulatorPct = cd.simulatorPct !== undefined ? num(cd.simulatorPct) : 100;
+    }
+
+    function loadCalculation(item) {
+      applyCalcDataToState(item);
+      hydrateUIFromState();
+      document.querySelector('[data-calc-tab="direct"]').click();
+      const content = document.getElementById('content');
+      content.classList.remove('flash-green');
+      void content.offsetWidth;
+      content.classList.add('flash-green');
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    }
+
+    function editCalculation(item) {
+      loadCalculation(item);
+      setTimeout(() => {
+        const nameEl = document.getElementById('calcName');
+        nameEl.focus();
+        nameEl.select();
+      }, 350);
+    }
+
+    async function deleteCalculation(item) {
+      if (!confirm(`¿Eliminar "${item.name}"? Esta acción no se puede deshacer.`)) return;
+      const { error } = await _supabase.from(TABLE).delete().eq('id', item.id);
+      if (error) {
+        alert('No se pudo eliminar: ' + error.message);
+        return;
+      }
+      if (String(state.id) === String(item.id)) {
+        resetState();
+        hydrateUIFromState();
+      }
+      await loadHistory();
+    }
+
+    async function init() {
+      try {
+        const { session, store, stores } = await guardDashboardPage();
+        if (!session || !store) return;
+
+        sessionRef = session;
+        storeRef = store;
+
+        await initDashboardNav({ user: session.user, store, stores });
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+
+        bindTabs();
+        bindMaterials();
+        bindFixed();
+        bindScalars();
+        bindTaxPresets();
+        bindSimulator();
+        bindButtons();
+
+        renderMaterials();
+        renderFixed();
+        recompute();
+
+        await loadHistory();
+
+      } catch (err) {
+        console.error('[Calculadora] init error:', err);
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('errorState').classList.remove('hidden');
+        document.getElementById('errorStateMsg').textContent = err && err.message ? err.message : '';
+      }
+    }
+
+    if (document.readyState === 'loading') {
+      document.addEventListener('DOMContentLoaded', init);
+    } else {
+      init();
+    }
+  })();
+  </script>
+</body>
+</html>

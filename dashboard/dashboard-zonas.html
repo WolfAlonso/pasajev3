@@ -1,0 +1,473 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <title>Zonas · Pasaje de los Altos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="../js/theme-loader.js?v=2"></script>
+  <script src="../js/dashboard-utils.js"></script>
+  <script src="../js/dashboard-sidebar.js?v=1"></script>
+  <script src="../js/liquid-glass.js?v=1"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; }
+  </style>
+
+  <script>
+    (function () {
+      if (typeof window.dashEscapeHtml === 'undefined') {
+        window.dashEscapeHtml = function (s) {
+          return String(s ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        };
+      }
+      if (typeof window.cleanPhone === 'undefined') {
+        window.cleanPhone = function (raw) { return String(raw || '').replace(/\D/g, ''); };
+      }
+    })();
+  </script>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <div id="dashboardHeader"></div>
+
+  <main class="max-w-6xl mx-auto p-4">
+    <div id="dashboardTabs"></div>
+
+    <div id="loadingState" class="bg-white rounded-xl shadow-sm border p-8 text-center text-sm text-gray-500">
+      Cargando zonas de clientes...
+    </div>
+
+    <section id="content" class="hidden space-y-6">
+      <div class="bg-white rounded-xl shadow-sm border p-5">
+        <div class="flex items-start justify-between flex-wrap gap-3">
+          <div class="flex items-start gap-3">
+            <div class="text-3xl">🗺️</div>
+            <div>
+              <h3 class="text-lg font-bold text-gray-800">Zonas de clientes y entregas</h3>
+              <p class="text-sm text-gray-500">Agrupados por dirección registrada de compra en Quetzaltenango.</p>
+            </div>
+          </div>
+
+          <div id="myStoreZoneInfo" class="bg-blue-50 border border-blue-200 rounded-xl p-3 text-xs text-blue-900 font-bold">
+            📍 Zona de tu comercio: Cargando...
+          </div>
+        </div>
+      </div>
+
+      <div id="zonesList" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+        <p class="col-span-full text-center text-sm text-gray-500 py-8">Cargando zonas...</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal Mapa -->
+  <div id="mapModal" class="hidden fixed inset-0 bg-black/50 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-3xl w-full overflow-hidden flex flex-col" style="max-height: 90vh;">
+      <div class="p-4 border-b flex items-start justify-between gap-3">
+        <div class="min-w-0">
+          <h3 id="mapModalTitle" class="font-bold text-gray-800 truncate">Zona</h3>
+          <p id="mapModalSubtitle" class="text-xs text-gray-500 truncate"></p>
+        </div>
+        <button id="closeMapModalBtn"
+          class="bg-gray-100 hover:bg-gray-200 text-gray-700 w-9 h-9 rounded-lg flex items-center justify-center transition flex-shrink-0">✕</button>
+      </div>
+      <div id="mapContainer" class="flex-1 bg-gray-100" style="min-height: 400px;"></div>
+      <div id="mapLoading" class="p-8 text-center text-sm text-gray-500 hidden">🌍 Buscando ubicación...</div>
+    </div>
+  </div>
+
+  <!-- Modal Editar Dirección -->
+  <div id="editZoneModal" class="hidden fixed inset-0 bg-black/50 z-[60] flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-md w-full p-6">
+      <div class="flex items-start justify-between mb-4">
+        <div>
+          <h3 class="text-lg font-extrabold text-gray-800">✏️ Editar Dirección de Zona</h3>
+          <p class="text-xs text-gray-500 mt-0.5">Se actualizará en todas las ventas asociadas</p>
+        </div>
+        <button id="closeEditZoneBtn" class="bg-gray-100 hover:bg-gray-200 text-gray-700 w-8 h-8 rounded-lg">✕</button>
+      </div>
+
+      <form id="editZoneForm" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Dirección actual</label>
+          <input type="text" id="ezOldAddress" readonly class="w-full bg-gray-100 border border-gray-200 p-2.5 rounded-lg text-xs font-semibold text-gray-600 outline-none">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-gray-700 uppercase mb-1">Nueva dirección corregida *</label>
+          <input type="text" id="ezNewAddress" required placeholder="Ej. 14 Avenida 4-12, Zona 1, Quetzaltenango"
+            class="w-full border border-gray-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-blue-500 outline-none font-medium">
+          <p class="text-[11px] text-gray-500 mt-1">Sugerencia: incluye la zona y municipio para mejor geolocalización.</p>
+        </div>
+
+        <div class="flex gap-2 pt-2">
+          <button type="button" id="cancelEditZoneBtn" class="flex-1 bg-gray-200 hover:bg-gray-300 text-gray-700 font-bold py-2.5 rounded-xl text-xs transition">Cancelar</button>
+          <button type="submit" id="saveZoneBtn" class="flex-1 bg-blue-600 hover:bg-blue-700 text-white font-bold py-2.5 rounded-xl text-xs transition">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <script>
+    let currentStore = null;
+    let allCustomers = [];
+    let leafletLoaded = false;
+    let mapInstance = null;
+    let editingAddressOriginal = null;
+
+    (async () => {
+      try {
+        const { session, store } = await guardDashboardPage();
+        if (!session || !store) return;
+        currentStore = store;
+        await initDashboardNav({ store, user: session.user });
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+
+        const isPhysical = currentStore.has_physical_store !== false;
+        document.getElementById('myStoreZoneInfo').innerHTML = `
+          📍 Zona del comercio: <span class="font-black text-blue-900">${dashEscapeHtml(currentStore.zone || 'Zona 1')}</span> 
+          (${isPhysical ? 'Local Físico' : 'Venta en Línea'})
+        `;
+
+        await loadCustomersData();
+        renderZones();
+
+        document.getElementById('closeEditZoneBtn').addEventListener('click', closeEditZoneModal);
+        document.getElementById('cancelEditZoneBtn').addEventListener('click', closeEditZoneModal);
+        document.getElementById('editZoneForm').addEventListener('submit', handleSaveZoneAddress);
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape') {
+            closeEditZoneModal();
+            document.getElementById('mapModal').classList.add('hidden');
+          }
+        });
+      } catch (err) {
+        console.error('[Zonas] Error inicial:', err);
+        document.getElementById('loadingState').innerHTML = '<p class="text-red-500 text-sm">Error al cargar el panel de zonas.</p>';
+      }
+    })();
+
+    function normalizeAddress(addr) {
+      return (addr || '').trim().toLowerCase().replace(/\s+/g, ' ').replace(/[.,]/g, '');
+    }
+
+    function tagFromKey(key) {
+      const tags = {
+        vip:        { key: 'vip',        label: 'VIP',         icon: '🏆', color: 'bg-gradient-to-r from-amber-400 to-amber-500 text-white shadow-sm' },
+        frecuente:  { key: 'frecuente',  label: 'Frecuente',   icon: '⭐', color: 'bg-blue-100 text-blue-700' },
+        recurrente: { key: 'recurrente', label: 'Recurrente',  icon: '🔄', color: 'bg-emerald-100 text-emerald-700' },
+        nuevo:      { key: 'nuevo',      label: 'Nuevo',       icon: '🆕', color: 'bg-purple-100 text-purple-700' },
+        inactivo:   { key: 'inactivo',   label: 'Inactivo',    icon: '⏸️', color: 'bg-gray-200 text-gray-600' },
+        regular:    { key: 'regular',    label: 'Regular',     icon: '👤', color: 'bg-gray-100 text-gray-500' },
+      };
+      return tags[key] || tags.regular;
+    }
+
+    function calculateTag(c, daysSinceLast, daysSinceFirst) {
+      if (c.manual_tag) return tagFromKey(c.manual_tag);
+      if (daysSinceLast > 60) return tagFromKey('inactivo');
+      if (c.purchases.length >= 5 || c.totalSpent >= 500) return tagFromKey('vip');
+      if (c.purchases.length >= 3) return tagFromKey('frecuente');
+      if (c.purchases.length >= 2) return tagFromKey('recurrente');
+      if (c.purchases.length === 1 && daysSinceFirst <= 30) return tagFromKey('nuevo');
+      return tagFromKey('regular');
+    }
+
+    async function loadCustomersData() {
+      const [{ data, error }, { data: profiles }] = await Promise.all([
+        _supabase.from('sales_log')
+          .select('id, quantity, total_revenue, created_at, customer_name, customer_phone, customer_reference, customer_address')
+          .eq('store_id', currentStore.id)
+          .order('created_at', { ascending: false }),
+        _supabase.from('customer_profiles').select('*').eq('store_id', currentStore.id)
+      ]);
+
+      if (error) {
+        console.error('[Zonas] Error sales_log:', error);
+        return;
+      }
+
+      const profilesMap = {};
+      (profiles || []).forEach(p => { profilesMap[p.customer_key] = p; });
+
+      const withCustomer = (data || []).filter(s => s.customer_phone || s.customer_name);
+      const map = new Map();
+
+      withCustomer.forEach(s => {
+        const key = s.customer_phone || ('name:' + s.customer_name);
+        if (!map.has(key)) {
+          map.set(key, {
+            key,
+            name: s.customer_name || null,
+            phone: s.customer_phone || null,
+            reference: s.customer_reference || null,
+            address: s.customer_address || null,
+            purchases: [],
+            totalSpent: 0,
+            lastPurchase: s.created_at,
+            firstPurchase: s.created_at,
+            manual_tag: profilesMap[key]?.manual_tag || null,
+          });
+        }
+        const c = map.get(key);
+        if (!c.name && s.customer_name)          c.name = s.customer_name;
+        if (!c.phone && s.customer_phone)        c.phone = s.customer_phone;
+        if (!c.address && s.customer_address)    c.address = s.customer_address;
+        c.purchases.push(s);
+        c.totalSpent += parseFloat(s.total_revenue || 0);
+        if (new Date(s.created_at) > new Date(c.lastPurchase)) c.lastPurchase = s.created_at;
+        if (new Date(s.created_at) < new Date(c.firstPurchase)) c.firstPurchase = s.created_at;
+      });
+
+      allCustomers = Array.from(map.values());
+      allCustomers.forEach(c => {
+        const dLast = (Date.now() - new Date(c.lastPurchase).getTime()) / 86400000;
+        const dFirst = (Date.now() - new Date(c.firstPurchase).getTime()) / 86400000;
+        c.tag = calculateTag(c, dLast, dFirst);
+      });
+    }
+
+    function renderCustomerTagChip(c) {
+      const name = window.dashEscapeHtml(c.name || 'Sin nombre');
+      const initial = (c.name || 'C').charAt(0).toUpperCase();
+      const icon = c.tag ? c.tag.icon : '👤';
+      const color = c.tag ? c.tag.color : 'bg-gray-100 text-gray-500';
+      return '<span class="tag-chip ' + color + ' px-2 py-0.5 text-xs rounded-md" title="' + name + '">' + initial + ' ' + icon + '</span>';
+    }
+
+    function renderZones() {
+      const container = document.getElementById('zonesList');
+      const e = window.dashEscapeHtml;
+      const zonesMap = new Map();
+
+      allCustomers.forEach(c => {
+        if (!c.address) return;
+        const norm = normalizeAddress(c.address);
+        if (!norm) return;
+        if (!zonesMap.has(norm)) {
+          zonesMap.set(norm, { key: norm, address: c.address, customers: [], totalSpent: 0, totalPurchases: 0 });
+        }
+        const z = zonesMap.get(norm);
+        z.customers.push(c);
+        z.totalSpent += c.totalSpent;
+        z.totalPurchases += c.purchases.length;
+      });
+
+      const zones = Array.from(zonesMap.values()).sort((a, b) => b.totalSpent - a.totalSpent);
+
+      if (zones.length === 0) {
+        container.innerHTML = `
+          <div class="col-span-full text-center py-12">
+            <div class="text-4xl mb-2">🗺️</div>
+            <p class="text-sm text-gray-500">Aún no tienes clientes con dirección registrada.</p>
+            <p class="text-xs text-gray-400 mt-2">Agrega una dirección al registrar ventas para ver zonas.</p>
+          </div>`;
+        return;
+      }
+
+      container.innerHTML = zones.map(z => {
+        const chipsHTML = z.customers.slice(0, 6).map(c => renderCustomerTagChip(c)).join('');
+        const extraCount = z.customers.length > 6 ? ('<span class="text-[10px] text-gray-500 font-semibold">+' + (z.customers.length - 6) + '</span>') : '';
+        const encodedAddr = encodeURIComponent(z.address);
+
+        return `
+          <div class="bg-white rounded-xl shadow-sm border p-4 hover:shadow-md transition">
+            <div class="flex items-start gap-3 mb-3">
+              <div class="w-10 h-10 rounded-full bg-blue-100 text-blue-700 flex items-center justify-center flex-shrink-0">📍</div>
+              <div class="min-w-0 flex-1">
+                <h3 class="font-bold text-gray-800 truncate">${e(z.address)}</h3>
+                <p class="text-xs text-gray-500">${z.customers.length} cliente${z.customers.length === 1 ? '' : 's'} · ${z.totalPurchases} compra${z.totalPurchases === 1 ? '' : 's'}</p>
+              </div>
+            </div>
+            <div class="flex items-center justify-between mb-3">
+              <span class="text-xs text-gray-500">Ingresos</span>
+              <span class="text-base font-extrabold text-emerald-600">Q ${z.totalSpent.toFixed(2)}</span>
+            </div>
+            <div class="flex flex-wrap gap-1 mb-3">
+              ${chipsHTML}
+              ${extraCount}
+            </div>
+
+            <div class="grid grid-cols-2 gap-2">
+              <button data-zone-map="${encodedAddr}"
+                class="bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs py-2 rounded-lg transition">
+                🗺️ Mapa
+              </button>
+              <button data-zone-edit="${encodedAddr}"
+                class="bg-gray-100 hover:bg-gray-200 text-gray-700 font-bold text-xs py-2 rounded-lg transition">
+                ✏️ Editar
+              </button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      container.querySelectorAll('[data-zone-map]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const address = decodeURIComponent(btn.dataset.zoneMap);
+          const zone = zones.find(z => z.address === address);
+          if (zone) openMapForAddress(zone.address, zone.customers);
+        });
+      });
+
+      container.querySelectorAll('[data-zone-edit]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          const address = decodeURIComponent(btn.dataset.zoneEdit);
+          openEditZoneModal(address);
+        });
+      });
+    }
+
+    function openEditZoneModal(address) {
+      editingAddressOriginal = address;
+      document.getElementById('ezOldAddress').value = address;
+      document.getElementById('ezNewAddress').value = address;
+      document.getElementById('editZoneModal').classList.remove('hidden');
+    }
+
+    function closeEditZoneModal() {
+      document.getElementById('editZoneModal').classList.add('hidden');
+      editingAddressOriginal = null;
+    }
+
+    async function handleSaveZoneAddress(e) {
+      e.preventDefault();
+      const newAddress = document.getElementById('ezNewAddress').value.trim();
+      if (!newAddress || !editingAddressOriginal) return;
+
+      const btn = document.getElementById('saveZoneBtn');
+      btn.disabled = true;
+      btn.textContent = 'Guardando...';
+
+      try {
+        const { error } = await _supabase
+          .from('sales_log')
+          .update({ customer_address: newAddress })
+          .eq('store_id', currentStore.id)
+          .ilike('customer_address', editingAddressOriginal);
+
+        if (error) throw error;
+
+        closeEditZoneModal();
+        await loadCustomersData();
+        renderZones();
+        alert('✅ Dirección de zona actualizada correctamente.');
+
+      } catch (err) {
+        alert('Error al actualizar la dirección: ' + (err.message || 'Error desconocido'));
+      } finally {
+        btn.disabled = false;
+        btn.textContent = 'Guardar Cambios';
+      }
+    }
+
+    async function loadLeaflet() {
+      if (leafletLoaded && window.L) return;
+      if (!document.querySelector('link[href*="leaflet.css"]')) {
+        const link = document.createElement('link');
+        link.rel = 'stylesheet';
+        link.href = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.css';
+        document.head.appendChild(link);
+      }
+      if (!window.L) {
+        await new Promise((resolve, reject) => {
+          const s = document.createElement('script');
+          s.src = 'https://unpkg.com/leaflet@1.9.4/dist/leaflet.js';
+          s.onload = resolve;
+          s.onerror = () => reject(new Error('No se pudo cargar Leaflet'));
+          document.head.appendChild(s);
+        });
+      }
+      leafletLoaded = true;
+    }
+
+    async function geocodeAddress(address) {
+      const url = 'https://nominatim.openstreetmap.org/search?format=json&limit=1&q=' + encodeURIComponent(address);
+      const res = await fetch(url, { headers: { 'Accept': 'application/json' } });
+      if (!res.ok) throw new Error('Error al buscar la dirección');
+      const data = await res.json();
+      if (!data || data.length === 0) throw new Error('Dirección no encontrada en el mapa.');
+      return { lat: parseFloat(data[0].lat), lon: parseFloat(data[0].lon) };
+    }
+
+    async function openMapForAddress(address, customers) {
+      const modal = document.getElementById('mapModal');
+      const container = document.getElementById('mapContainer');
+      const loading = document.getElementById('mapLoading');
+      const e = window.dashEscapeHtml;
+
+      document.getElementById('mapModalTitle').textContent = address;
+      document.getElementById('mapModalSubtitle').textContent =
+        customers.length === 1
+          ? (customers[0].name || 'Cliente') + (customers[0].phone ? (' · ' + customers[0].phone) : '')
+          : (customers.length + ' clientes en esta zona');
+
+      modal.classList.remove('hidden');
+      container.innerHTML = '';
+      loading.classList.remove('hidden');
+
+      try {
+        await loadLeaflet();
+        const coords = await geocodeAddress(address);
+        loading.classList.add('hidden');
+        container.innerHTML = '';
+
+        if (mapInstance) {
+          try { mapInstance.remove(); } catch (er) {}
+          mapInstance = null;
+        }
+        mapInstance = L.map(container).setView([coords.lat, coords.lon], 15);
+
+        L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+          attribution: '© OpenStreetMap', maxZoom: 19
+        }).addTo(mapInstance);
+
+        const customersHTML = customers.map(c => {
+          const wa = c.phone ? ('https://wa.me/' + window.cleanPhone(c.phone)) : null;
+          const cName = e(c.name || 'Cliente');
+          const cSpent = c.totalSpent.toFixed(2);
+          const cCount = c.purchases.length;
+          const waLink = wa ? ('<br><a href="' + wa + '" target="_blank" style="color: #059669; font-size: 11px;">📱 WhatsApp</a>') : '';
+          return '<div style="margin-bottom: 6px;">' +
+            '<strong>' + cName + '</strong><br>' +
+            '<span style="font-size: 11px; color: #6b7280;">Q ' + cSpent + ' · ' + cCount + ' compra(s)</span>' +
+            waLink +
+          '</div>';
+        }).join('<hr style="margin: 6px 0; border: 0; border-top: 1px solid #e5e7eb;">');
+
+        const popupContent = '<div style="min-width: 200px; max-width: 280px; font-family: Inter, sans-serif;">' +
+          '<strong style="font-size: 13px;">📍 ' + e(address) + '</strong>' +
+          '<hr style="margin: 6px 0; border: 0; border-top: 1px solid #e5e7eb;">' +
+          customersHTML +
+        '</div>';
+
+        L.marker([coords.lat, coords.lon]).addTo(mapInstance)
+          .bindPopup(popupContent).openPopup();
+      } catch (err) {
+        loading.classList.add('hidden');
+        container.innerHTML = '<div class="p-8 text-center">' +
+          '<div class="text-4xl mb-2">😕</div>' +
+          '<p class="text-sm text-red-600 mb-2">' + e(err.message || 'No se pudo geolocalizar') + '</p>' +
+          '<p class="text-xs text-gray-500">Prueba corregir la dirección usando el botón Editar.</p>' +
+        '</div>';
+      }
+    }
+
+    document.getElementById('closeMapModalBtn').addEventListener('click', () => {
+      document.getElementById('mapModal').classList.add('hidden');
+      if (mapInstance) { try { mapInstance.remove(); } catch (e) {} mapInstance = null; }
+    });
+  </script>
+</body>
+</html>

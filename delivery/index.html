@@ -1,0 +1,386 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Pasaje Express · Solicita tu piloto</title>
+  <meta name="theme-color" content="#0d9488">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <!-- Google Maps API se carga dinámicamente desde delivery-express.js
+       con window.GOOGLE_MAPS_API_KEY -->
+
+  <script src="../js/supabase.js?v=8"></script>
+  <script src="../js/theme-loader.js?v=9"></script>
+  <script src="../js/footer.js?v=4"></script>
+  <script src="../js/express-sidebar.js?v=3"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+  <script src="../js/delivery/delivery-express.js?v=4"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background-color: #f0fdf4; }
+
+    .zone-chip {
+      display: inline-flex; align-items: center; gap: 4px;
+      font-size: 11px; font-weight: 700;
+      padding: 6px 12px; border-radius: 999px;
+      background: #fff; color: #475569;
+      border: 1.5px solid #e2e8f0;
+      cursor: pointer; transition: all .15s;
+    }
+    .zone-chip:hover { border-color: #14b8a6; color: #0d9488; }
+    .zone-chip.active { background: #14b8a6; color: #fff; border-color: #14b8a6; }
+
+    .service-tab {
+      display: flex; align-items: center; justify-content: center; gap: 8px;
+      padding: 12px 16px; border-radius: 16px;
+      font-size: 13px; font-weight: 800;
+      cursor: pointer; user-select: none;
+      transition: all .2s ease;
+      position: relative; z-index: 20;
+      background: rgba(255,255,255,.15);
+      color: rgba(255,255,255,.85);
+      border: 2px solid transparent;
+      backdrop-filter: blur(10px);
+    }
+    .service-tab.active {
+      background: #fff !important;
+      color: #0d9488 !important;
+      border-color: #14b8a6 !important;
+      box-shadow: 0 8px 24px -8px rgba(20,184,166,.5);
+    }
+
+    .express-hero {
+      background: linear-gradient(135deg, #059669 0%, #0d9488 50%, #0891b2 100%);
+      position: relative; overflow: hidden;
+    }
+    .express-hero::before {
+      content: '🛵'; position: absolute; right: -20px; bottom: -40px;
+      font-size: 12rem; opacity: 0.08; transform: rotate(-15deg);
+      pointer-events: none; z-index: 1;
+    }
+    .express-hero > * { position: relative; z-index: 10; }
+
+    #expressGoogleMap {
+      height: 320px;
+      width: 100%;
+      border-radius: 14px;
+      background: #e2e8f0;
+    }
+    @media (min-width: 640px) {
+      #expressGoogleMap { height: 380px; }
+    }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+  <!-- Script de configuración del API key de Google Maps -->
+  <script>
+    // ⚠️ Reemplaza con tu propia API key de Google Maps
+    // o define window.GOOGLE_MAPS_API_KEY desde un script externo.
+    window.GOOGLE_MAPS_API_KEY = window.GOOGLE_MAPS_API_KEY || '';
+  </script>
+
+  <div id="expressSidebar"></div>
+
+  <!-- HEADER -->
+  <header class="glass-header text-white shadow-lg sticky top-0 z-40 border-b border-white/10">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <button id="sidebarToggleBtn" type="button"
+          onclick="if (window.PasajeExpressSidebar) window.PasajeExpressSidebar.toggle();"
+          class="bg-white/10 hover:bg-white/20 p-2 rounded-xl transition border border-white/15 text-white lg:hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <a href="../index.html" class="flex items-center gap-2 text-lg font-extrabold tracking-tight min-w-0">
+          <span class="truncate text-white">Pasaje de los <span class="text-emerald-400">Altos</span></span>
+        </a>
+      </div>
+      <div class="flex items-center gap-2">
+        <a href="../index.html" class="bg-white/10 hover:bg-white/20 text-white font-bold text-xs px-3 py-2 rounded-xl border border-white/15 flex items-center gap-1.5 transition">
+          <span>🏬</span><span class="hidden sm:inline">Catálogo</span>
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <!-- HERO -->
+  <section class="express-hero text-white py-8 px-4" id="expressHero">
+    <div class="max-w-6xl mx-auto relative z-10">
+      <div class="inline-flex items-center gap-2 bg-white/15 backdrop-blur-sm px-3 py-1 rounded-full border border-white/20 mb-3">
+        <span class="w-2 h-2 rounded-full bg-emerald-300 animate-pulse"></span>
+        <span class="text-[10px] font-black uppercase tracking-wider">Servicio activo en Xela</span>
+      </div>
+      <h1 class="text-2xl sm:text-4xl font-black tracking-tight">Pasaje Express</h1>
+      <p class="text-sm text-white/90 mt-2 max-w-xl">Mandaditos y viajes en Quetzaltenango. Tú propones el precio, los pilotos compiten.</p>
+
+      <div class="grid grid-cols-2 gap-2 mt-5 max-w-md" id="expressServiceTabs">
+        <button type="button" class="service-tab active" data-service="express_delivery">
+          <span class="text-lg">📦</span><span>Mandadito</span>
+        </button>
+        <button type="button" class="service-tab" data-service="passenger_ride">
+          <span class="text-lg">🚘</span><span>Pasaje Ride</span>
+        </button>
+      </div>
+
+      <div id="expressConfigBar" class="mt-4 max-w-md bg-white/10 backdrop-blur-md border border-white/20 rounded-2xl p-3"></div>
+    </div>
+  </section>
+
+  <main class="max-w-3xl mx-auto p-4 w-full flex-1 space-y-5">
+
+    <!-- BANNER UBICACIÓN -->
+    <section id="expressLocationBanner" class="bg-white rounded-2xl border border-slate-200/80 p-3 flex items-center justify-between gap-3 shadow-sm">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div id="expressLocationIcon" class="w-9 h-9 rounded-xl bg-amber-100 text-amber-700 flex items-center justify-center text-lg flex-shrink-0">📍</div>
+        <div class="min-w-0">
+          <p id="expressLocationTitle" class="text-xs font-black text-slate-900 truncate">Comparte tu ubicación</p>
+          <p id="expressLocationSubtitle" class="text-[10px] text-slate-500 truncate">Obligatorio para asignar tu piloto</p>
+        </div>
+      </div>
+      <button type="button" id="expressShareLocationBtn"
+        class="bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs px-4 py-2 rounded-xl flex items-center gap-1.5 flex-shrink-0">
+        <span>📍</span><span>Activar</span>
+      </button>
+    </section>
+
+    <!-- WIZARD -->
+    <section id="expressForm" class="bg-white rounded-3xl shadow-xl border border-slate-200/80 overflow-hidden">
+      <div class="flex items-center justify-center gap-3 py-4 bg-slate-50 border-b border-slate-100">
+        <div data-wizard-dot="1" class="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center font-black text-xs">1</div>
+        <div class="w-8 h-1 rounded-full bg-slate-200"></div>
+        <div data-wizard-dot="2" class="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-black text-xs">2</div>
+        <div class="w-8 h-1 rounded-full bg-slate-200"></div>
+        <div data-wizard-dot="3" class="w-8 h-8 rounded-full bg-slate-200 text-slate-500 flex items-center justify-center font-black text-xs">3</div>
+      </div>
+
+      <!-- PASO 1 -->
+      <div id="expressStep1" class="express-step p-5 space-y-5">
+        <div>
+          <h2 class="text-lg font-black text-slate-900">📍 Origen y Destino</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Busca una dirección o toca el mapa para fijar el punto exacto.</p>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1.5">📍 Origen *</label>
+            <input type="text" id="expressOriginAddress" required
+              placeholder="Ej. Parque Central Xela"
+              class="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold bg-slate-50 outline-none focus:ring-2 focus:ring-teal-500" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1.5">🎯 Destino *</label>
+            <input type="text" id="expressDestAddress" required
+              placeholder="Ej. Pradera Xela"
+              class="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold bg-slate-50 outline-none focus:ring-2 focus:ring-teal-500" />
+          </div>
+        </div>
+
+        <div class="pt-3 border-t border-slate-100 space-y-3">
+          <div class="flex items-center justify-between flex-wrap gap-2">
+            <label class="text-[10px] font-black text-slate-500 uppercase">🗺️ Mapa interactivo</label>
+            <button type="button" id="expressUseMyLocationBtn"
+              class="text-[10px] font-black bg-teal-50 hover:bg-teal-100 text-teal-700 px-3 py-1.5 rounded-full border border-teal-200 transition">
+              📍 Usar mi ubicación
+            </button>
+          </div>
+
+          <div class="rounded-2xl overflow-hidden border-2 border-slate-200 shadow-inner relative">
+            <div id="expressGoogleMap"></div>
+            <div id="expressRouteInfo" class="hidden absolute top-3 left-3 bg-white/95 backdrop-blur px-3 py-1.5 rounded-full text-[11px] font-black text-teal-700 shadow-md"></div>
+          </div>
+
+          <div class="grid grid-cols-2 gap-2">
+            <button type="button" id="expressPickOriginBtn"
+              class="text-xs font-bold bg-teal-50 hover:bg-teal-100 text-teal-800 px-3 py-2.5 rounded-xl border border-teal-200 transition flex items-center justify-center gap-1.5">
+              📍 Marcar Origen
+            </button>
+            <button type="button" id="expressPickDestBtn"
+              class="text-xs font-bold bg-rose-50 hover:bg-rose-100 text-rose-800 px-3 py-2.5 rounded-xl border border-rose-200 transition flex items-center justify-center gap-1.5">
+              🎯 Marcar Destino
+            </button>
+          </div>
+          <p id="expressMapStatus" class="text-[10px] text-slate-400 text-center">
+            💡 Escribe una dirección (autocompletado) o haz clic en el mapa
+          </p>
+        </div>
+
+        <div id="expressRideBlock" class="hidden space-y-3 pt-3 border-t border-slate-100">
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Tipo de Vehículo</label>
+            <div class="grid grid-cols-3 gap-2">
+              <label class="cursor-pointer">
+                <input type="radio" name="expressVehicle" value="any" class="peer hidden" checked>
+                <div class="border-2 border-slate-200 peer-checked:border-teal-500 peer-checked:bg-teal-50 rounded-xl p-3 text-center transition">
+                  <div class="text-2xl">✨</div><div class="text-[11px] font-bold text-slate-700 mt-1">Cualquiera</div>
+                </div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="expressVehicle" value="moto" class="peer hidden">
+                <div class="border-2 border-slate-200 peer-checked:border-teal-500 peer-checked:bg-teal-50 rounded-xl p-3 text-center transition">
+                  <div class="text-2xl">🛵</div><div class="text-[11px] font-bold text-slate-700 mt-1">Moto</div>
+                </div>
+              </label>
+              <label class="cursor-pointer">
+                <input type="radio" name="expressVehicle" value="carro" class="peer hidden">
+                <div class="border-2 border-slate-200 peer-checked:border-teal-500 peer-checked:bg-teal-50 rounded-xl p-3 text-center transition">
+                  <div class="text-2xl">🚗</div><div class="text-[11px] font-bold text-slate-700 mt-1">Carro</div>
+                </div>
+              </label>
+            </div>
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Número de Pasajeros</label>
+            <div class="flex gap-2">
+              <button type="button" data-passengers="1" class="passenger-btn flex-1 py-2.5 rounded-xl border-2 border-teal-500 bg-teal-50 text-teal-700 font-black text-sm">1</button>
+              <button type="button" data-passengers="2" class="passenger-btn flex-1 py-2.5 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm">2</button>
+              <button type="button" data-passengers="3" class="passenger-btn flex-1 py-2.5 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm">3</button>
+              <button type="button" data-passengers="4" class="passenger-btn flex-1 py-2.5 rounded-xl border-2 border-slate-200 text-slate-600 font-bold text-sm">4</button>
+            </div>
+          </div>
+        </div>
+
+        <button type="button" id="expressStep1Next"
+          class="w-full bg-teal-600 hover:bg-teal-700 text-white font-extrabold py-3 rounded-2xl text-sm shadow-md">
+          Continuar → Detalle
+        </button>
+      </div>
+
+      <!-- PASO 2 -->
+      <div id="expressStep2" class="express-step hidden p-5 space-y-5">
+        <div>
+          <h2 class="text-lg font-black text-slate-900">📦 Detalle del Encargo</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Cuéntanos qué necesitas.</p>
+        </div>
+
+        <div id="expressAuthInfoBanner" class="hidden rounded-2xl bg-teal-50 border border-teal-200 p-3 flex items-center gap-3 text-xs">
+          <div class="w-8 h-8 rounded-full bg-teal-600 text-white flex items-center justify-center font-black flex-shrink-0" id="expressAuthInitial">U</div>
+          <div class="flex-1 min-w-0">
+            <p class="text-slate-700">Usando tu cuenta: <strong id="expressAuthEmail">—</strong></p>
+            <p class="text-[10px] text-teal-700">Puedes editar el teléfono si es para un tercero.</p>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Nombre de contacto *</label>
+            <input type="text" id="expressCustomerName" required placeholder="Ej. María López"
+              class="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold bg-slate-50 outline-none focus:ring-2 focus:ring-teal-500" />
+          </div>
+          <div>
+            <label class="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Teléfono WhatsApp *</label>
+            <input type="tel" id="expressCustomerPhone" required placeholder="50255551234"
+              class="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold bg-slate-50 outline-none focus:ring-2 focus:ring-teal-500" />
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1.5">¿Qué necesitas? *</label>
+          <textarea id="expressDesc" rows="3" required placeholder="Ej. Traer 2 lb de café..."
+            class="w-full border border-slate-200 p-3 rounded-xl text-sm font-medium bg-slate-50 outline-none focus:ring-2 focus:ring-teal-500 resize-none"></textarea>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Items o productos (opcional)</label>
+          <input type="text" id="expressItems" placeholder="Ej. 2 lb café, 1 pan dulce"
+            class="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold bg-slate-50 outline-none focus:ring-2 focus:ring-teal-500" />
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Notas adicionales (opcional)</label>
+          <input type="text" id="expressNotes" placeholder="Ej. Tocar el timbre 3 veces"
+            class="w-full border border-slate-200 p-3 rounded-xl text-sm font-semibold bg-slate-50 outline-none focus:ring-2 focus:ring-teal-500" />
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" id="expressStep2Back"
+            class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-2xl text-sm">← Atrás</button>
+          <button type="button" id="expressStep2Next"
+            class="bg-teal-600 hover:bg-teal-700 text-white font-extrabold py-3 rounded-2xl text-sm shadow-md">Continuar → Tarifa</button>
+        </div>
+      </div>
+
+      <!-- PASO 3 -->
+      <div id="expressStep3" class="express-step hidden p-5 space-y-5">
+        <div>
+          <h2 class="text-lg font-black text-slate-900">💰 Resumen y Tarifa</h2>
+          <p class="text-xs text-slate-500 mt-0.5">Confirma y publica tu solicitud.</p>
+        </div>
+
+        <div id="expressSummary" class="bg-slate-50 border border-slate-200 rounded-2xl p-4"></div>
+
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1.5">🎟️ Código de Cupón (opcional)</label>
+          <div class="flex gap-2">
+            <input type="text" id="expressCouponInput" placeholder="Ej. EXPRESS10" maxlength="24"
+              class="flex-1 border border-slate-200 p-3 rounded-xl text-sm font-black tracking-wider uppercase bg-slate-50 outline-none focus:ring-2 focus:ring-teal-500" />
+            <button type="button" id="expressCouponApplyBtn"
+              class="bg-slate-900 hover:bg-slate-800 text-white font-extrabold px-5 rounded-xl text-xs">Aplicar</button>
+          </div>
+          <p id="expressCouponFeedback" class="hidden text-[11px] mt-1.5 font-bold"></p>
+        </div>
+
+        <div>
+          <label class="block text-[10px] font-black text-slate-500 uppercase mb-1.5">Tu propuesta de tarifa (Q) *</label>
+          <input type="number" id="expressCustomFee" min="5" max="500" step="0.50" value="15.00" required
+            class="w-full border-2 border-teal-300 p-3 rounded-xl text-lg font-black bg-white text-teal-700 outline-none focus:ring-2 focus:ring-teal-500" />
+          <p class="text-[10px] text-slate-400 mt-1">💡 Los pilotos competirán por tu servicio.</p>
+        </div>
+
+        <div class="grid grid-cols-2 gap-2">
+          <button type="button" id="expressStep3Back"
+            class="bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold py-3 rounded-2xl text-sm">← Atrás</button>
+          <button type="button" id="expressPublishBtn"
+            class="bg-gradient-to-r from-teal-600 to-cyan-600 hover:from-teal-700 hover:to-cyan-700 text-white font-extrabold py-3 rounded-2xl text-sm shadow-md">
+            🚀 Publicar
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- INFO CARDS -->
+    <section class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+      <div class="bg-white rounded-2xl border border-slate-200/80 p-4 text-center shadow-sm">
+        <div class="text-3xl mb-1">⚡</div><p class="font-black text-xs">Rápido</p><p class="text-[10px] text-slate-500 mt-0.5">Subasta en minutos</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200/80 p-4 text-center shadow-sm">
+        <div class="text-3xl mb-1">🔒</div><p class="font-black text-xs">Seguro</p><p class="text-[10px] text-slate-500 mt-0.5">Doble PIN + rastreo GPS</p>
+      </div>
+      <div class="bg-white rounded-2xl border border-slate-200/80 p-4 text-center shadow-sm">
+        <div class="text-3xl mb-1">💰</div><p class="font-black text-xs">Justo</p><p class="text-[10px] text-slate-500 mt-0.5">Tú propones, pilotos compiten</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- MODAL AUTH -->
+  <div id="expressAuthModal" class="hidden fixed inset-0 z-[100] flex items-center justify-center p-4"
+       style="background: rgba(15, 23, 42, 0.65); backdrop-filter: blur(8px);">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-sm w-full p-6 space-y-4">
+      <div class="text-center space-y-2">
+        <div class="w-14 h-14 rounded-2xl bg-gradient-to-br from-teal-500 to-cyan-600 text-white flex items-center justify-center text-3xl mx-auto">🛵</div>
+        <h3 class="font-black text-slate-900 text-lg">Bienvenido a Pasaje Express</h3>
+        <p class="text-xs text-slate-500 leading-snug">Para solicitar tu piloto en Xela necesitas una cuenta. Tu borrador se guardará automáticamente.</p>
+      </div>
+      <div class="space-y-2 pt-2">
+        <a id="expressGoLoginBtn" href="../login.html?redirect=delivery/index.html"
+          class="w-full bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-sm px-4 py-3 rounded-2xl flex items-center justify-center gap-2">🔑 Iniciar Sesión</a>
+        <a id="expressGoRegisterBtn" href="../registro.html?redirect=delivery/index.html"
+          class="w-full bg-white hover:bg-slate-50 text-slate-800 font-bold text-sm px-4 py-2.5 rounded-2xl border border-slate-200 flex items-center justify-center gap-2">📝 Registrarme</a>
+        <button type="button" id="expressAuthModalClose"
+          class="w-full text-slate-500 hover:text-slate-700 text-xs font-bold py-2">Cancelar</button>
+      </div>
+    </div>
+  </div>
+
+  <div id="pasajeFooter"></div>
+</body>
+</html>

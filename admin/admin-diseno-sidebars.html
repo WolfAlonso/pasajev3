@@ -1,0 +1,767 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Diseño de Sidebars · Admin</title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="../js/theme-loader.js?v=8"></script>
+  <script src="../js/admin-utils.js?v=6"></script>
+  <script src="../js/admin-sidebar.js?v=3"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>
+    * { box-sizing: border-box; }
+    body { font-family: 'Inter', sans-serif; background: #f1f5f9; color: #1e293b; }
+
+    .sidebar-layout { display: grid; grid-template-columns: 1fr; gap: 20px; align-items: start; }
+    @media (min-width: 1100px) { .sidebar-layout { grid-template-columns: minmax(0,1fr) 460px; } }
+
+    .panel-card {
+      background: #fff; border: 1px solid #e2e8f0; border-radius: 14px;
+      margin-bottom: 14px; overflow: hidden; box-shadow: 0 2px 8px -4px rgba(15,23,42,.06);
+    }
+    .panel-card-header {
+      padding: 14px 18px; background: #f8fafc; border-bottom: 1px solid #e2e8f0;
+      display: flex; align-items: center; justify-content: space-between; gap: 10px; flex-wrap: wrap;
+    }
+    .panel-card-title { font-weight: 800; font-size: 14px; color: #1e293b; display: flex; align-items: center; gap: 8px; }
+    .panel-body { padding: 18px; }
+
+    .field-label { display: block; font-size: 11px; font-weight: 700; color: #475569; margin-bottom: 5px; text-transform: uppercase; }
+    .input-text { width: 100%; border: 1px solid #cbd5e1; border-radius: 8px; padding: 8px 10px; font-size: 13px; color: #1e293b; background: #fff; }
+    .input-mono { font-family: ui-monospace, monospace; font-size: 12px; text-transform: uppercase; }
+
+    .color-group { display: flex; align-items: center; gap: 8px; }
+    .color-group input[type="color"] { width: 48px; height: 38px; border: 1px solid #e2e8f0; border-radius: 8px; cursor: pointer; padding: 2px; background: #fff; }
+
+    input[type="range"] {
+      -webkit-appearance: none; appearance: none; width: 100%; height: 5px;
+      background: linear-gradient(to right,#10b981 0%,#10b981 var(--slider-pct,50%),#e2e8f0 var(--slider-pct,50%),#e2e8f0 100%);
+      border-radius: 999px; outline: none; margin: 8px 0;
+    }
+    input[type="range"]::-webkit-slider-thumb {
+      -webkit-appearance: none; width: 18px; height: 18px;
+      border-radius: 50%; background: #fff; border: 3px solid #10b981; cursor: pointer;
+    }
+
+    .range-row { display: flex; justify-content: space-between; align-items: baseline; font-size: 11px; font-weight: 600; color: #475569; }
+    .range-value { font-family: ui-monospace, monospace; color: #059669; background: #ecfdf5; padding: 1px 7px; border-radius: 5px; font-size: 11px; font-weight: 700; }
+
+    .carousel-track-container { position: relative; overflow: hidden; border-radius: 14px; padding: 4px 0; }
+    .carousel-track {
+      display: flex; gap: 12px; overflow-x: auto; scroll-behavior: smooth;
+      padding: 6px 2px; scroll-snap-type: x mandatory; -webkit-overflow-scrolling: touch;
+    }
+    .carousel-track::-webkit-scrollbar { height: 6px; }
+    .carousel-track::-webkit-scrollbar-thumb { background: #cbd5e1; border-radius: 999px; }
+
+    .preset-card {
+      flex: 0 0 230px; scroll-snap-align: start;
+      background: #fff; border: 2px solid #e2e8f0; border-radius: 12px; padding: 12px;
+      cursor: pointer; text-align: left; transition: all .2s cubic-bezier(.2,.7,.2,1);
+      position: relative; overflow: hidden;
+    }
+    .preset-card:hover { border-color: #10b981; transform: translateY(-2px); box-shadow: 0 6px 16px -4px rgba(15,23,42,.1); }
+    .preset-swatches { display: flex; height: 12px; border-radius: 5px; overflow: hidden; margin-top: 10px; border: 1px solid rgba(0,0,0,.08); }
+    .preset-swatch { flex: 1; height: 100%; }
+
+    .carousel-nav-btn {
+      position: absolute; top: 50%; transform: translateY(-50%); z-index: 10;
+      width: 32px; height: 32px; border-radius: 50%; background: #fff; border: 1px solid #cbd5e1;
+      display: flex; align-items: center; justify-content: center; font-weight: 800; color: #0f172a;
+      box-shadow: 0 4px 10px rgba(0,0,0,.1); cursor: pointer; transition: all .15s;
+    }
+    .carousel-nav-btn:hover { background: #10b981; color: #fff; border-color: #10b981; }
+    .carousel-nav-btn.prev { left: 4px; }
+    .carousel-nav-btn.next { right: 4px; }
+
+    .tab-btn {
+      padding: 8px 14px; font-size: 12px; font-weight: 700;
+      border-radius: 10px; transition: all .15s; cursor: pointer;
+      border: 1px solid #e2e8f0; background: #fff; color: #64748b;
+    }
+    .tab-btn.active { background: #0f172a; color: #fff; border-color: #0f172a; }
+
+    .category-tab-btn {
+      padding: 8px 16px; border-radius: 10px; font-weight: 700; font-size: 12px;
+      cursor: pointer; border: 1px solid #e2e8f0; background: #f8fafc; color: #64748b; transition: all .15s;
+    }
+    .category-tab-btn.active { background: #10b981; color: #fff; border-color: #10b981; }
+
+    .preview-sticky { position: sticky; top: 16px; max-height: calc(100vh - 32px); overflow-y: auto; }
+
+    .mock-canvas {
+      position: relative; border-radius: 16px; overflow: hidden; min-height: 460px;
+      background:
+        radial-gradient(circle at 15% 15%, #f59e0b 0%, transparent 45%),
+        radial-gradient(circle at 85% 25%, #ec4899 0%, transparent 50%),
+        radial-gradient(circle at 50% 90%, #06b6d4 0%, transparent 55%),
+        linear-gradient(135deg, #8b5cf6 0%, #3b82f6 100%);
+      display: flex; padding: 14px;
+    }
+    .mock-page { flex: 1; z-index: 10; }
+
+    .mock-sb {
+      width: 200px; flex-shrink: 0; z-index: 10;
+      border-radius: 14px; padding: 12px 10px;
+      display: flex; flex-direction: column; justify-content: space-between;
+      margin-right: 12px;
+      background-color: rgba(var(--m-tint-rgb, 255,255,255), var(--m-opacity, .85));
+      backdrop-filter: blur(var(--m-blur, 20px)) saturate(160%);
+      -webkit-backdrop-filter: blur(var(--m-blur, 20px)) saturate(160%);
+      border: 1px solid rgba(255,255,255,.35);
+      box-shadow: 0 8px 26px -12px rgba(15,23,42,.35);
+      color: var(--m-text, #1E293B);
+      transition: background-color .15s, color .15s;
+    }
+    .mock-sb .msb-head { display: flex; align-items: center; gap: 6px; padding-bottom: 8px; margin-bottom: 8px; border-bottom: 1px solid rgba(148,163,184,.28); }
+    .mock-sb .msb-logo { width: 26px; height: 26px; border-radius: 8px; background: var(--m-active, #10B981); color: #fff; display: flex; align-items: center; justify-content: center; font-size: 13px; font-weight: 800; flex-shrink: 0; }
+    .mock-sb .msb-title { font-weight: 800; font-size: 12px; color: var(--m-text, #1E293B); }
+    .mock-sb .msb-sub { font-size: 10px; opacity: .75; color: var(--m-text, #1E293B); }
+    .mock-sb .msb-item { display: flex; align-items: center; gap: 7px; padding: 6px 8px; border-radius: 8px; font-size: 11px; font-weight: 600; margin-bottom: 3px; color: var(--m-text, #1E293B); }
+    .mock-sb .msb-item.active { background: rgba(var(--m-active-rgb, 16,185,129), .18); color: var(--m-active, #10B981); border-left: 3px solid var(--m-active, #10B981); padding-left: 5px; font-weight: 800; }
+    .mock-sb .msb-foot { font-size: 10px; opacity: .7; text-align: center; padding-top: 8px; border-top: 1px solid rgba(148,163,184,.28); color: var(--m-text, #1E293B); }
+
+    .save-bar { position: sticky; bottom: 0; z-index: 20; padding-top: 12px; background: linear-gradient(to top, #f1f5f9 60%, transparent); margin-top: 10px; }
+    .save-bar-inner { background: #fff; border: 1px solid #e2e8f0; border-radius: 14px; padding: 12px 16px; display: flex; align-items: center; gap: 12px; flex-wrap: wrap; box-shadow: 0 10px 30px -14px rgba(15,23,42,.2); }
+    .btn { padding: 9px 16px; border-radius: 9px; font-weight: 700; font-size: 13px; cursor: pointer; border: none; }
+    .btn-ghost { background: #f1f5f9; color: #475569; }
+    .btn-primary { background: #10b981; color: #fff; }
+
+    .grid-2 { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; }
+  </style>
+</head>
+<body class="min-h-screen pb-12">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-[1400px] mx-auto p-4">
+    <div id="adminTabs"></div>
+
+    <div id="loadingState" class="bg-white rounded-xl shadow-sm border p-8 text-center text-sm text-gray-500">
+      Cargando configuración de sidebars...
+    </div>
+
+    <section id="content" class="hidden">
+
+      <div class="mb-4 flex flex-wrap items-center justify-between gap-3 bg-white p-4 rounded-xl border border-slate-200">
+        <div>
+          <h1 class="text-xl font-extrabold text-slate-900 flex items-center gap-2">
+            🪟 Personalización Total de Sidebars
+          </h1>
+          <p class="text-xs text-slate-500 mt-0.5">
+            Configura el color de texto, tinte de cristal, desenfoque y tonos de acento de las 3 barras laterales de la plataforma.
+          </p>
+        </div>
+        <div class="flex gap-2" id="sidebarTabs">
+          <button type="button" class="tab-btn active" data-tab="public">🌐 Pública</button>
+          <button type="button" class="tab-btn" data-tab="dash">🏪 Dashboard</button>
+          <button type="button" class="tab-btn" data-tab="admin">🛡️ Admin</button>
+        </div>
+      </div>
+
+      <div class="sidebar-layout">
+
+        <!-- COLUMNA CONFIGURACIONES -->
+        <div>
+
+          <!-- CARRUSEL 20 PRESETS EN 2 PESTAÑAS -->
+          <div class="panel-card">
+            <div class="panel-card-header">
+              <span class="panel-card-title">👓 Presets de Confort y Festividades (20 Diseños)</span>
+            </div>
+            <div class="panel-body">
+
+              <!-- PESTAÑAS DE CATEGORÍAS -->
+              <div class="flex items-center gap-2 mb-4">
+                <button type="button" class="category-tab-btn active" id="tabConfort" onclick="filterCategory('confort')">👓 Confort Visual (10)</button>
+                <button type="button" class="category-tab-btn" id="tabFestivos" onclick="filterCategory('festivos')">🇬🇹 Ferias y Festividades (10)</button>
+              </div>
+
+              <div class="carousel-track-container">
+                <button type="button" class="carousel-nav-btn prev" onclick="scrollCarousel(-250)">‹</button>
+                <button type="button" class="carousel-nav-btn next" onclick="scrollCarousel(250)">›</button>
+
+                <div class="carousel-track" id="presetsSbTrack">
+
+                  <!-- CATEGORÍA 1: CONFORT VISUAL (1-10) -->
+                  <div class="preset-card confort-item" onclick="applySbPreset(1)"><span class="text-[10px] font-bold text-amber-800 bg-amber-100 px-2 py-0.5 rounded-full">1. Sepia Papel</span><div class="font-bold text-xs text-slate-800 mt-1">Cero Luz Azul</div><div class="preset-swatches"><div class="preset-swatch" style="background:#FDF6E2"></div><div class="preset-swatch" style="background:#78350F"></div><div class="preset-swatch" style="background:#D97706"></div></div></div>
+                  <div class="preset-card confort-item" onclick="applySbPreset(2)"><span class="text-[10px] font-bold text-teal-800 bg-teal-100 px-2 py-0.5 rounded-full">2. Slate Dark</span><div class="font-bold text-xs text-slate-800 mt-1">Pizarra Noche</div><div class="preset-swatches"><div class="preset-swatch" style="background:#1E293B"></div><div class="preset-swatch" style="background:#E2E8F0"></div><div class="preset-swatch" style="background:#14B8A6"></div></div></div>
+                  <div class="preset-card confort-item" onclick="applySbPreset(3)"><span class="text-[10px] font-bold text-emerald-800 bg-emerald-100 px-2 py-0.5 rounded-full">3. Sabina Focus</span><div class="font-bold text-xs text-slate-800 mt-1">Menta & Bosque</div><div class="preset-swatches"><div class="preset-swatch" style="background:#065F46"></div><div class="preset-swatch" style="background:#D1FAE5"></div><div class="preset-swatch" style="background:#10B981"></div></div></div>
+                  <div class="preset-card confort-item" onclick="applySbPreset(4)"><span class="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">4. Niebla Nórdica</span><div class="font-bold text-xs text-slate-800 mt-1">Claro Antideslumbrante</div><div class="preset-swatches"><div class="preset-swatch" style="background:#FFFFFF"></div><div class="preset-swatch" style="background:#1E293B"></div><div class="preset-swatch" style="background:#2563EB"></div></div></div>
+                  <div class="preset-card confort-item" onclick="applySbPreset(5)"><span class="text-[10px] font-bold text-stone-800 bg-stone-200 px-2 py-0.5 rounded-full">5. Café Mocha</span><div class="font-bold text-xs text-slate-800 mt-1">Cálido Tostado</div><div class="preset-swatches"><div class="preset-swatch" style="background:#292524"></div><div class="preset-swatch" style="background:#E7E5E4"></div><div class="preset-swatch" style="background:#D97706"></div></div></div>
+                  <div class="preset-card confort-item" onclick="applySbPreset(6)"><span class="text-[10px] font-bold text-orange-800 bg-orange-100 px-2 py-0.5 rounded-full">6. Pergamino</span><div class="font-bold text-xs text-slate-800 mt-1">Libro Impreso</div><div class="preset-swatches"><div class="preset-swatch" style="background:#EAE0D5"></div><div class="preset-swatch" style="background:#2B2B2B"></div><div class="preset-swatch" style="background:#C85A32"></div></div></div>
+                  <div class="preset-card confort-item" onclick="applySbPreset(7)"><span class="text-[10px] font-bold text-slate-200 bg-black px-2 py-0.5 rounded-full">7. OLED Noche</span><div class="font-bold text-xs text-slate-800 mt-1">Negro Puro</div><div class="preset-swatches"><div class="preset-swatch" style="background:#111111"></div><div class="preset-swatch" style="background:#E5E7EB"></div><div class="preset-swatch" style="background:#10B981"></div></div></div>
+                  <div class="preset-card confort-item" onclick="applySbPreset(8)"><span class="text-[10px] font-bold text-cyan-800 bg-cyan-100 px-2 py-0.5 rounded-full">8. Océano Abisal</span><div class="font-bold text-xs text-slate-800 mt-1">Azul Relax Ocular</div><div class="preset-swatches"><div class="preset-swatch" style="background:#112240"></div><div class="preset-swatch" style="background:#CCD6F6"></div><div class="preset-swatch" style="background:#64FFDA"></div></div></div>
+                  <div class="preset-card confort-item" onclick="applySbPreset(9)"><span class="text-[10px] font-bold text-purple-800 bg-purple-100 px-2 py-0.5 rounded-full">9. Ciruela Suave</span><div class="font-bold text-xs text-slate-800 mt-1">Oscuro Rosado</div><div class="preset-swatches"><div class="preset-swatch" style="background:#2D2438"></div><div class="preset-swatch" style="background:#F3E8EE"></div><div class="preset-swatch" style="background:#EC4899"></div></div></div>
+                  <div class="preset-card confort-item" onclick="applySbPreset(10)"><span class="text-[10px] font-bold text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded-full">10. Hueso Mate</span><div class="font-bold text-xs text-slate-800 mt-1">Grafito Antideslumbrante</div><div class="preset-swatches"><div class="preset-swatch" style="background:#FFFFFF"></div><div class="preset-swatch" style="background:#334155"></div><div class="preset-swatch" style="background:#16A34A"></div></div></div>
+
+                  <!-- CATEGORÍA 2: FERIAS Y FESTIVIDADES (11-20) -->
+                  <div class="preset-card festivo-item hidden" onclick="applySbPreset(11)"><span class="text-[10px] font-bold text-blue-800 bg-blue-100 px-2 py-0.5 rounded-full">11. Independencia</span><div class="font-bold text-xs text-slate-800 mt-1">15 de Septiembre</div><div class="preset-swatches"><div class="preset-swatch" style="background:#002B66"></div><div class="preset-swatch" style="background:#FFFFFF"></div><div class="preset-swatch" style="background:#60A5FA"></div></div></div>
+                  <div class="preset-card festivo-item hidden" onclick="applySbPreset(12)"><span class="text-[10px] font-bold text-indigo-800 bg-indigo-100 px-2 py-0.5 rounded-full">12. Feria de Xelajú</span><div class="font-bold text-xs text-slate-800 mt-1">Xelafer Altense</div><div class="preset-swatches"><div class="preset-swatch" style="background:#1E1B4B"></div><div class="preset-swatch" style="background:#E0E7FF"></div><div class="preset-swatch" style="background:#EF4444"></div></div></div>
+                  <div class="preset-card festivo-item hidden" onclick="applySbPreset(13)"><span class="text-[10px] font-bold text-purple-900 bg-purple-100 px-2 py-0.5 rounded-full">13. Semana Santa</span><div class="font-bold text-xs text-slate-800 mt-1">Tradición Procesional</div><div class="preset-swatches"><div class="preset-swatch" style="background:#2E1065"></div><div class="preset-swatch" style="background:#F3E8FF"></div><div class="preset-swatch" style="background:#FBBF24"></div></div></div>
+                  <div class="preset-card festivo-item hidden" onclick="applySbPreset(14)"><span class="text-[10px] font-bold text-fuchsia-900 bg-fuchsia-100 px-2 py-0.5 rounded-full">14. Fiambre Chapín</span><div class="font-bold text-xs text-slate-800 mt-1">1 de Noviembre</div><div class="preset-swatches"><div class="preset-swatch" style="background:#3B0764"></div><div class="preset-swatch" style="background:#FAE8FF"></div><div class="preset-swatch" style="background:#FACC15"></div></div></div>
+                  <div class="preset-card festivo-item hidden" onclick="applySbPreset(15)"><span class="text-[10px] font-bold text-orange-900 bg-orange-100 px-2 py-0.5 rounded-full">15. Barriletes Gigantes</span><div class="font-bold text-xs text-slate-800 mt-1">Sumpango Neón</div><div class="preset-swatches"><div class="preset-swatch" style="background:#0F172A"></div><div class="preset-swatch" style="background:#F8FAFC"></div><div class="preset-swatch" style="background:#F97316"></div></div></div>
+                  <div class="preset-card festivo-item hidden" onclick="applySbPreset(16)"><span class="text-[10px] font-bold text-red-900 bg-red-100 px-2 py-0.5 rounded-full">16. Navidad Chapina</span><div class="font-bold text-xs text-slate-800 mt-1">Nochebuena & Pinabete</div><div class="preset-swatches"><div class="preset-swatch" style="background:#052E16"></div><div class="preset-swatch" style="background:#FEF2F2"></div><div class="preset-swatch" style="background:#DC2626"></div></div></div>
+                  <div class="preset-card festivo-item hidden" onclick="applySbPreset(17)"><span class="text-[10px] font-bold text-yellow-900 bg-yellow-100 px-2 py-0.5 rounded-full">17. Año Nuevo</span><div class="font-bold text-xs text-slate-800 mt-1">Dorado Gala</div><div class="preset-swatches"><div class="preset-swatch" style="background:#09090B"></div><div class="preset-swatch" style="background:#FEF3C7"></div><div class="preset-swatch" style="background:#F59E0B"></div></div></div>
+                  <div class="preset-card festivo-item hidden" onclick="applySbPreset(18)"><span class="text-[10px] font-bold text-purple-100 bg-purple-900 px-2 py-0.5 rounded-full">18. Halloween</span><div class="font-bold text-xs text-slate-800 mt-1">Naranja & Morado</div><div class="preset-swatches"><div class="preset-swatch" style="background:#180228"></div><div class="preset-swatch" style="background:#FAF5FF"></div><div class="preset-swatch" style="background:#EA580C"></div></div></div>
+                  <div class="preset-card festivo-item hidden" onclick="applySbPreset(19)"><span class="text-[10px] font-bold text-teal-900 bg-teal-100 px-2 py-0.5 rounded-full">19. Rabín Ajaw</span><div class="font-bold text-xs text-slate-800 mt-1">Cobán & Quetzal</div><div class="preset-swatches"><div class="preset-swatch" style="background:#064E3B"></div><div class="preset-swatch" style="background:#ECFDF5"></div><div class="preset-swatch" style="background:#F43F5E"></div></div></div>
+                  <div class="preset-card festivo-item hidden" onclick="applySbPreset(20)"><span class="text-[10px] font-bold text-red-100 bg-red-900 px-2 py-0.5 rounded-full">20. Quema del Diablo</span><div class="font-bold text-xs text-slate-800 mt-1">7 de Diciembre</div><div class="preset-swatches"><div class="preset-swatch" style="background:#1C1917"></div><div class="preset-swatch" style="background:#FEF2F2"></div><div class="preset-swatch" style="background:#EF4444"></div></div></div>
+
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 1. SIDEBAR PÚBLICO -->
+          <div id="cfg-public" class="cfg-group">
+            <div class="panel-card">
+              <div class="panel-card-header">
+                <span class="panel-card-title">🌐 Sidebar Público (Index y Tienda)</span>
+                <span class="text-xs bg-blue-100 text-blue-800 font-bold px-2 py-0.5 rounded-full">public-sidebar.js</span>
+              </div>
+              <div class="panel-body space-y-4">
+                <div class="grid-2">
+                  <div>
+                    <label class="field-label">Tinte de cristal (Fondo)</label>
+                    <div class="color-group">
+                      <input type="color" id="pubTint" value="#FFFFFF">
+                      <input type="text" id="pubTintHex" value="#FFFFFF" maxlength="7" class="input-text input-mono">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="field-label">Modo predeterminado</label>
+                    <select id="pubColorMode" class="input-text">
+                      <option value="auto">🌗 Automático (Sistema)</option>
+                      <option value="light">☀️ Siempre claro</option>
+                      <option value="dark">🌙 Siempre oscuro</option>
+                    </select>
+                  </div>
+                </div>
+
+                <div class="grid-2">
+                  <div>
+                    <div class="range-row"><span>Desenfoque (Blur)</span><span class="range-value" id="pubBlurLabel">20px</span></div>
+                    <input type="range" id="pubBlur" min="0" max="32" step="1" value="20">
+                  </div>
+                  <div>
+                    <div class="range-row"><span>Opacidad del cristal</span><span class="range-value" id="pubOpacityLabel">85%</span></div>
+                    <input type="range" id="pubOpacity" min="20" max="100" step="1" value="85">
+                  </div>
+                </div>
+
+                <div class="grid-2">
+                  <div>
+                    <label class="field-label">Color de las letras (Texto)</label>
+                    <div class="color-group">
+                      <input type="color" id="pubTextColor" value="#1E293B">
+                      <input type="text" id="pubTextHex" value="#1E293B" maxlength="7" class="input-text input-mono">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="field-label">Color de enlace activo / Acento</label>
+                    <div class="color-group">
+                      <input type="color" id="pubActiveColor" value="#10B981">
+                      <input type="text" id="pubActiveHex" value="#10B981" maxlength="7" class="input-text input-mono">
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 2. SIDEBAR DASHBOARD -->
+          <div id="cfg-dash" class="cfg-group hidden">
+            <div class="panel-card">
+              <div class="panel-card-header">
+                <span class="panel-card-title">🏪 Sidebar Dashboard (Panel Vendedor)</span>
+                <span class="text-xs bg-emerald-100 text-emerald-800 font-bold px-2 py-0.5 rounded-full">dashboard-sidebar.js</span>
+              </div>
+              <div class="panel-body space-y-4">
+                <div class="grid-2">
+                  <div>
+                    <label class="field-label">Tinte de cristal (Fondo)</label>
+                    <div class="color-group">
+                      <input type="color" id="dashTint" value="#FFFFFF">
+                      <input type="text" id="dashTintHex" value="#FFFFFF" maxlength="7" class="input-text input-mono">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="field-label">Color de las letras (Texto)</label>
+                    <div class="color-group">
+                      <input type="color" id="dashTextColor" value="#1E293B">
+                      <input type="text" id="dashTextHex" value="#1E293B" maxlength="7" class="input-text input-mono">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid-2">
+                  <div>
+                    <label class="field-label">Color del resalte activo</label>
+                    <div class="color-group">
+                      <input type="color" id="dashActiveColor" value="#10B981">
+                      <input type="text" id="dashActiveHex" value="#10B981" maxlength="7" class="input-text input-mono">
+                    </div>
+                  </div>
+                  <div></div>
+                </div>
+
+                <div class="grid-2">
+                  <div>
+                    <div class="range-row"><span>Desenfoque (Blur)</span><span class="range-value" id="dashBlurLabel">20px</span></div>
+                    <input type="range" id="dashBlur" min="0" max="32" step="1" value="20">
+                  </div>
+                  <div>
+                    <div class="range-row"><span>Opacidad del cristal</span><span class="range-value" id="dashOpacityLabel">85%</span></div>
+                    <input type="range" id="dashOpacity" min="20" max="100" step="1" value="85">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 3. SIDEBAR ADMIN -->
+          <div id="cfg-admin" class="cfg-group hidden">
+            <div class="panel-card">
+              <div class="panel-card-header">
+                <span class="panel-card-title">🛡️ Sidebar Administrativa</span>
+                <span class="text-xs bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">admin-sidebar.js</span>
+              </div>
+              <div class="panel-body space-y-4">
+                <div class="grid-2">
+                  <div>
+                    <label class="field-label">Tinte oscuro (Fondo)</label>
+                    <div class="color-group">
+                      <input type="color" id="admTint" value="#0F172A">
+                      <input type="text" id="admTintHex" value="#0F172A" maxlength="7" class="input-text input-mono">
+                    </div>
+                  </div>
+                  <div>
+                    <label class="field-label">Color de las letras (Texto)</label>
+                    <div class="color-group">
+                      <input type="color" id="admTextColor" value="#E2E8F0">
+                      <input type="text" id="admTextHex" value="#E2E8F0" maxlength="7" class="input-text input-mono">
+                    </div>
+                  </div>
+                </div>
+
+                <div class="grid-2">
+                  <div>
+                    <label class="field-label">Color de acento activo</label>
+                    <div class="color-group">
+                      <input type="color" id="admActiveColor" value="#F59E0B">
+                      <input type="text" id="admActiveHex" value="#F59E0B" maxlength="7" class="input-text input-mono">
+                    </div>
+                  </div>
+                  <div></div>
+                </div>
+
+                <div class="grid-2">
+                  <div>
+                    <div class="range-row"><span>Desenfoque (Blur)</span><span class="range-value" id="admBlurLabel">20px</span></div>
+                    <input type="range" id="admBlur" min="0" max="32" step="1" value="20">
+                  </div>
+                  <div>
+                    <div class="range-row"><span>Opacidad del cristal</span><span class="range-value" id="admOpacityLabel">85%</span></div>
+                    <input type="range" id="admOpacity" min="20" max="100" step="1" value="85">
+                  </div>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- BARRA DE GUARDADO -->
+          <div class="save-bar">
+            <div class="save-bar-inner">
+              <div class="flex-1 min-w-[160px]">
+                <p class="text-sm font-bold text-slate-800">¿Guardar personalización?</p>
+                <p class="text-[11px] text-slate-500">Se aplicará inmediatamente a todos los usuarios.</p>
+              </div>
+              <button type="button" id="resetBtn" class="btn btn-ghost">↩️ Restaurar</button>
+              <button type="button" id="saveBtn" class="btn btn-primary">💾 Guardar cambios</button>
+            </div>
+          </div>
+
+        </div>
+
+        <!-- VISTA PREVIA CON PATRÓN DE ALTO CONTRASTE AL FONDO -->
+        <div class="preview-sticky">
+          <div class="bg-white rounded-2xl border border-slate-200 p-4 shadow-sm">
+            <div class="flex items-center justify-between mb-3">
+              <h3 class="font-extrabold text-sm text-slate-800 flex items-center gap-1.5">
+                👁️ Previsualizador en tiempo real
+              </h3>
+              <span id="previewTag" class="text-[10px] bg-slate-100 font-bold px-2 py-0.5 rounded-full text-slate-600">
+                🌐 Pública
+              </span>
+            </div>
+
+            <div class="mock-canvas">
+              <!-- Elementos visuales detrás del sidebar para verificar el desenfoque -->
+              <div class="absolute inset-0 pointer-events-none overflow-hidden flex flex-col justify-between p-4 opacity-90">
+                <div class="flex gap-4 items-center">
+                  <div class="w-16 h-16 rounded-full bg-amber-400 shadow-xl border-2 border-white"></div>
+                  <div class="w-28 h-8 rounded-lg bg-white/60 border border-white font-black text-[10px] flex items-center justify-center text-slate-900">EFECTO VIDRIO</div>
+                </div>
+                <div class="text-white/90 font-black text-xl tracking-widest uppercase rotate-[-15deg] select-none leading-none drop-shadow-md">
+                  PASAJE DE LOS ALTOS<br>PRUEBA DE DESENFOQUE
+                </div>
+                <div class="flex justify-end gap-3 items-center">
+                  <div class="w-16 h-16 rounded-2xl bg-cyan-300 border-2 border-white shadow-lg"></div>
+                  <div class="w-10 h-10 rounded-full bg-rose-500 border-2 border-white shadow-lg"></div>
+                </div>
+              </div>
+
+              <div class="mock-sb" id="mockSidebar">
+                <div>
+                  <div class="msb-head">
+                    <div class="msb-logo">🏔️</div>
+                    <div style="min-width:0;">
+                      <p class="msb-title truncate">Pasaje de los Altos</p>
+                      <p class="msb-sub truncate" id="msbSubtitle">Vista de ejemplo</p>
+                    </div>
+                  </div>
+                  <div>
+                    <div class="msb-item active">🏠 <span>Inicio</span></div>
+                    <div class="msb-item">🛒 <span>Carrito</span></div>
+                    <div class="msb-item">❤️ <span>Favoritos</span></div>
+                    <div class="msb-item">🏪 <span>Mis Tiendas</span></div>
+                    <div class="msb-item">⚙️ <span>Ajustes</span></div>
+                  </div>
+                </div>
+                <div class="msb-foot">© 2026 Pasaje de los Altos</div>
+              </div>
+
+              <div class="mock-page">
+                <div class="bg-white/75 backdrop-blur rounded-xl p-3 text-xs text-slate-700 leading-relaxed h-full shadow-sm border border-white/40">
+                  <p class="font-extrabold text-slate-900 mb-1">Área de contenido</p>
+                  <p>Mueve el control de Desenfoque para observar cómo los círculos y letras de fondo se suavizan o se ven nítidos al instante.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+
+      </div>
+    </section>
+  </main>
+
+  <div id="toast" class="hidden fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] bg-emerald-600 text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-2xl transition-opacity duration-300"></div>
+
+  <script>
+    let activeTab = 'public';
+    let currentSettings = null;
+
+    const SIDEBAR_PRESETS = {
+      // Confort Visual (1-10)
+      1:  { tint: '#FDF6E2', blur: 16, opacity: 90, active: '#D97706', text: '#78350F' },
+      2:  { tint: '#1E293B', blur: 22, opacity: 85, active: '#14B8A6', text: '#E2E8F0' },
+      3:  { tint: '#065F46', blur: 20, opacity: 85, active: '#10B981', text: '#D1FAE5' },
+      4:  { tint: '#FFFFFF', blur: 18, opacity: 92, active: '#2563EB', text: '#1E293B' },
+      5:  { tint: '#292524', blur: 20, opacity: 85, active: '#D97706', text: '#E7E5E4' },
+      6:  { tint: '#EAE0D5', blur: 16, opacity: 90, active: '#C85A32', text: '#2B2B2B' },
+      7:  { tint: '#111111', blur: 24, opacity: 95, active: '#10B981', text: '#E5E7EB' },
+      8:  { tint: '#112240', blur: 20, opacity: 88, active: '#64FFDA', text: '#CCD6F6' },
+      9:  { tint: '#2D2438', blur: 20, opacity: 85, active: '#EC4899', text: '#F3E8EE' },
+      10: { tint: '#FFFFFF', blur: 16, opacity: 94, active: '#16A34A', text: '#334155' },
+
+      // Ferias y Festividades (11-20)
+      11: { tint: '#002B66', blur: 20, opacity: 88, active: '#60A5FA', text: '#FFFFFF' },
+      12: { tint: '#1E1B4B', blur: 20, opacity: 88, active: '#EF4444', text: '#E0E7FF' },
+      13: { tint: '#2E1065', blur: 20, opacity: 88, active: '#FBBF24', text: '#F3E8FF' },
+      14: { tint: '#3B0764', blur: 20, opacity: 88, active: '#FACC15', text: '#FAE8FF' },
+      15: { tint: '#0F172A', blur: 20, opacity: 88, active: '#F97316', text: '#F8FAFC' },
+      16: { tint: '#052E16', blur: 20, opacity: 88, active: '#DC2626', text: '#FEF2F2' },
+      17: { tint: '#09090B', blur: 22, opacity: 90, active: '#F59E0B', text: '#FEF3C7' },
+      18: { tint: '#180228', blur: 20, opacity: 88, active: '#EA580C', text: '#FAF5FF' },
+      19: { tint: '#064E3B', blur: 20, opacity: 88, active: '#F43F5E', text: '#ECFDF5' },
+      20: { tint: '#1C1917', blur: 20, opacity: 88, active: '#EF4444', text: '#FEF2F2' }
+    };
+
+    const DEFAULTS = {
+      public: { tint:'#FFFFFF', blur:20, opacity:85, textColor:'#1E293B', activeColor:'#10B981', colorMode:'auto' },
+      dash:   { tint:'#FFFFFF', blur:20, opacity:85, textColor:'#1E293B', activeColor:'#10B981' },
+      admin:  { tint:'#0F172A', blur:20, opacity:85, textColor:'#E2E8F0', activeColor:'#F59E0B' }
+    };
+
+    (async () => {
+      const session = await adminGuardPage();
+      if (!session) return;
+      await initAdminNav({ user: session.user });
+
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+
+      bindTabs();
+      bindColorPairs();
+      bindRanges();
+      bindActions();
+      initSliderPcts();
+
+      await loadSettings();
+      updateLivePreview();
+    })();
+
+    function filterCategory(cat) {
+      document.getElementById('tabConfort').classList.toggle('active', cat === 'confort');
+      document.getElementById('tabFestivos').classList.toggle('active', cat === 'festivos');
+
+      document.querySelectorAll('.confort-item').forEach(el => el.classList.toggle('hidden', cat !== 'confort'));
+      document.querySelectorAll('.festivo-item').forEach(el => el.classList.toggle('hidden', cat !== 'festivos'));
+
+      document.getElementById('presetsSbTrack').scrollLeft = 0;
+    }
+
+    function scrollCarousel(amount) {
+      document.getElementById('presetsSbTrack').scrollBy({ left: amount, behavior: 'smooth' });
+    }
+
+    function applySbPreset(id) {
+      const p = SIDEBAR_PRESETS[id];
+      if (!p) return;
+
+      if (activeTab === 'public') {
+        setColorPair('pubTint', p.tint); setVal('pubBlur', p.blur); setVal('pubOpacity', p.opacity);
+        setColorPair('pubActiveColor', p.active); setColorPair('pubTextColor', p.text);
+      } else if (activeTab === 'dash') {
+        setColorPair('dashTint', p.tint); setVal('dashBlur', p.blur); setVal('dashOpacity', p.opacity);
+        setColorPair('dashActiveColor', p.active); setColorPair('dashTextColor', p.text);
+      } else {
+        setColorPair('admTint', p.tint); setVal('admBlur', p.blur); setVal('admOpacity', p.opacity);
+        setColorPair('admActiveColor', p.active); setColorPair('admTextColor', p.text);
+      }
+
+      ['pub','dash','adm'].forEach(prefix => {
+        const b = document.getElementById(prefix+'Blur');
+        const o = document.getElementById(prefix+'Opacity');
+        if (b) document.getElementById(prefix+'BlurLabel').textContent = b.value + 'px';
+        if (o) document.getElementById(prefix+'OpacityLabel').textContent = o.value + '%';
+      });
+
+      document.querySelectorAll('input[type="range"]').forEach(updateSliderPct);
+      updateLivePreview();
+      showToast(`🪟 Preset #${id} aplicado al sidebar ${activeTab.toUpperCase()}`);
+    }
+
+    function bindTabs() {
+      document.querySelectorAll('#sidebarTabs button').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#sidebarTabs button').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          activeTab = btn.dataset.tab;
+
+          document.querySelectorAll('.cfg-group').forEach(g => g.classList.add('hidden'));
+          document.getElementById(`cfg-${activeTab}`).classList.remove('hidden');
+
+          document.getElementById('previewTag').textContent =
+            activeTab === 'public' ? '🌐 Pública' :
+            activeTab === 'dash'   ? '🏪 Dashboard' : '🛡️ Admin';
+          document.getElementById('msbSubtitle').textContent =
+            activeTab === 'public' ? 'Vista de ejemplo' :
+            activeTab === 'dash'   ? 'Panel emprendedor' : 'Consola de control';
+
+          updateLivePreview();
+        });
+      });
+    }
+
+    function bindColorPairs() {
+      const pairs = [
+        ['pubTint','pubTintHex'], ['pubTextColor','pubTextHex'], ['pubActiveColor','pubActiveHex'],
+        ['dashTint','dashTintHex'], ['dashTextColor','dashTextHex'], ['dashActiveColor','dashActiveHex'],
+        ['admTint','admTintHex'], ['admTextColor','admTextHex'], ['admActiveColor','admActiveHex']
+      ];
+      pairs.forEach(([pickerId, hexId]) => {
+        const picker = document.getElementById(pickerId);
+        const hex = document.getElementById(hexId);
+        if (!picker || !hex) return;
+        picker.addEventListener('input', () => { hex.value = picker.value.toUpperCase(); updateLivePreview(); });
+        hex.addEventListener('input', () => {
+          const val = hex.value.trim().toUpperCase();
+          if (/^#[0-9A-F]{6}$/.test(val)) { picker.value = val; updateLivePreview(); }
+        });
+      });
+    }
+
+    function bindRanges() {
+      ['pubBlur','pubOpacity','dashBlur','dashOpacity','admBlur','admOpacity'].forEach(id => {
+        const el = document.getElementById(id);
+        const lbl = document.getElementById(id + 'Label');
+        if (!el || !lbl) return;
+        const updateHandler = () => {
+          lbl.textContent = id.includes('Blur') ? `${el.value}px` : `${el.value}%`;
+          updateSliderPct(el);
+          updateLivePreview();
+        };
+        el.addEventListener('input', updateHandler);
+        el.addEventListener('change', updateHandler);
+      });
+    }
+
+    function initSliderPcts() { document.querySelectorAll('input[type="range"]').forEach(updateSliderPct); }
+
+    function updateSliderPct(el) {
+      const min = parseFloat(el.min) || 0;
+      const max = parseFloat(el.max) || 100;
+      const v   = parseFloat(el.value) || 0;
+      const pct = ((v - min) / (max - min)) * 100;
+      el.style.setProperty('--slider-pct', pct + '%');
+    }
+
+    function hexToRgbStr(hex) {
+      const c = String(hex || '').replace('#','').trim();
+      if (c.length !== 6) return '255,255,255';
+      return `${parseInt(c.slice(0,2),16)},${parseInt(c.slice(2,4),16)},${parseInt(c.slice(4,6),16)}`;
+    }
+
+    function updateLivePreview() {
+      const mock = document.getElementById('mockSidebar');
+      if (!mock) return;
+
+      let tint, opacity, blur, active, text;
+
+      if (activeTab === 'public') {
+        tint     = document.getElementById('pubTint').value;
+        opacity  = document.getElementById('pubOpacity').value / 100;
+        blur     = document.getElementById('pubBlur').value;
+        active   = document.getElementById('pubActiveColor').value;
+        text     = document.getElementById('pubTextColor').value;
+      } else if (activeTab === 'dash') {
+        tint     = document.getElementById('dashTint').value;
+        opacity  = document.getElementById('dashOpacity').value / 100;
+        blur     = document.getElementById('dashBlur').value;
+        active   = document.getElementById('dashActiveColor').value;
+        text     = document.getElementById('dashTextColor').value;
+      } else {
+        tint     = document.getElementById('admTint').value;
+        opacity  = document.getElementById('admOpacity').value / 100;
+        blur     = document.getElementById('admBlur').value;
+        active   = document.getElementById('admActiveColor').value;
+        text     = document.getElementById('admTextColor').value;
+      }
+
+      const blurVal = parseInt(blur, 10) || 0;
+
+      // Asignación de variables CSS
+      mock.style.setProperty('--m-tint-rgb',   hexToRgbStr(tint));
+      mock.style.setProperty('--m-opacity',    opacity.toFixed(2));
+      mock.style.setProperty('--m-blur',       blurVal + 'px');
+      mock.style.setProperty('--m-active',     active);
+      mock.style.setProperty('--m-active-rgb', hexToRgbStr(active));
+      mock.style.setProperty('--m-text',       text);
+
+      // FORZADO DE ESTILO INLINE PARA RESPUESTA INSTANTÁNEA
+      mock.style.backdropFilter = `blur(${blurVal}px) saturate(160%)`;
+      mock.style.webkitBackdropFilter = `blur(${blurVal}px) saturate(160%)`;
+    }
+
+    async function loadSettings() {
+      try {
+        const { data, error } = await _supabase.from('site_settings').select('*').eq('id','global').maybeSingle();
+        if (error) throw error;
+        currentSettings = data || {};
+
+        const pub  = { ...DEFAULTS.public, ...(currentSettings.sidebar_public_config || {}) };
+        const dash = { ...DEFAULTS.dash,   ...(currentSettings.sidebar_dash_config   || {}) };
+        const adm  = { ...DEFAULTS.admin,  ...(currentSettings.sidebar_admin_config  || {}) };
+
+        setColorPair('pubTint', pub.tint); setVal('pubBlur', pub.blur); setVal('pubOpacity', pub.opacity);
+        setColorPair('pubTextColor', pub.textColor); setColorPair('pubActiveColor', pub.activeColor); setVal('pubColorMode', pub.colorMode || 'auto');
+
+        setColorPair('dashTint', dash.tint); setVal('dashBlur', dash.blur); setVal('dashOpacity', dash.opacity);
+        setColorPair('dashTextColor', dash.textColor); setColorPair('dashActiveColor', dash.activeColor);
+
+        setColorPair('admTint', adm.tint); setVal('admBlur', adm.blur); setVal('admOpacity', adm.opacity);
+        setColorPair('admTextColor', adm.textColor); setColorPair('admActiveColor', adm.activeColor);
+
+        ['pub','dash','adm'].forEach(p => {
+          document.getElementById(p+'BlurLabel').textContent    = document.getElementById(p+'Blur').value + 'px';
+          document.getElementById(p+'OpacityLabel').textContent = document.getElementById(p+'Opacity').value + '%';
+        });
+        document.querySelectorAll('input[type="range"]').forEach(updateSliderPct);
+        updateLivePreview();
+      } catch (e) {
+        console.warn('[Sidebars] load:', e);
+        showToast('Error al cargar configuración', 'err');
+      }
+    }
+
+    function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
+    function setColorPair(id, hex) {
+      const picker = document.getElementById(id); const hexEl  = document.getElementById(id + 'Hex');
+      const v = (hex || '').toUpperCase();
+      if (picker) picker.value = v; if (hexEl)  hexEl.value  = v;
+    }
+
+    function bindActions() {
+      document.getElementById('saveBtn').addEventListener('click', saveAll);
+      document.getElementById('resetBtn').addEventListener('click', async () => {
+        await loadSettings();
+        showToast('Configuración recargada', 'ok');
+      });
+    }
+
+    async function saveAll() {
+      const btn = document.getElementById('saveBtn');
+      btn.disabled = true;
+
+      const payload = {
+        sidebar_public_config: {
+          tint:        document.getElementById('pubTint').value,
+          blur:        parseInt(document.getElementById('pubBlur').value, 10),
+          opacity:     parseInt(document.getElementById('pubOpacity').value, 10),
+          textColor:   document.getElementById('pubTextColor').value,
+          activeColor: document.getElementById('pubActiveColor').value,
+          colorMode:   document.getElementById('pubColorMode').value
+        },
+        sidebar_dash_config: {
+          tint:        document.getElementById('dashTint').value,
+          blur:        parseInt(document.getElementById('dashBlur').value, 10),
+          opacity:     parseInt(document.getElementById('dashOpacity').value, 10),
+          textColor:   document.getElementById('dashTextColor').value,
+          activeColor: document.getElementById('dashActiveColor').value
+        },
+        sidebar_admin_config: {
+          tint:        document.getElementById('admTint').value,
+          blur:        parseInt(document.getElementById('admBlur').value, 10),
+          opacity:     parseInt(document.getElementById('admOpacity').value, 10),
+          textColor:   document.getElementById('admTextColor').value,
+          activeColor: document.getElementById('admActiveColor').value
+        }
+      };
+
+      try {
+        const { error } = await _supabase.from('site_settings').update(payload).eq('id','global');
+        if (error) throw error;
+        showToast('✅ Preferencias guardadas y publicadas', 'ok');
+      } catch (e) {
+        showToast('Error al guardar: ' + (e.message || ''), 'err');
+      } finally {
+        btn.disabled = false;
+      }
+    }
+
+    let toastTimer = null;
+    function showToast(msg, type) {
+      const t = document.getElementById('toast');
+      t.textContent = msg;
+      t.classList.remove('bg-emerald-600','bg-red-600','hidden');
+      t.classList.add(type === 'err' ? 'bg-red-600' : 'bg-emerald-600');
+      t.style.opacity = '1';
+      clearTimeout(toastTimer);
+      toastTimer = setTimeout(() => {
+        t.style.opacity = '0';
+        setTimeout(() => t.classList.add('hidden'), 300);
+      }, 2600);
+    }
+  </script>
+</body>
+</html>

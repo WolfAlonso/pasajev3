@@ -1,0 +1,405 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <title>Mis Tiendas · Pasaje de los Altos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="../js/theme-loader.js?v=3"></script>
+  <script src="../js/dashboard-utils.js"></script>
+  <script src="../js/dashboard-sidebar.js?v=5"></script>
+  <script src="../js/liquid-glass.js?v=1"></script>
+  <script src="../js/services/products-service.js?v=4"></script>
+  <script src="../js/ui/product-card.js?v=3"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <div id="dashboardHeader"></div>
+
+  <main class="max-w-6xl mx-auto p-4">
+    <div id="dashboardTabs"></div>
+
+    <div id="loadingState" class="bg-white rounded-xl shadow-sm border p-8 text-center text-sm text-gray-500">
+      Cargando tus tiendas...
+    </div>
+
+    <section id="content" class="hidden space-y-5">
+      <div class="flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 class="text-2xl font-extrabold text-gray-800">🏪 Mis Tiendas</h1>
+          <p class="text-sm text-gray-500 mt-1">Configura la zona de tu comercio, dirección, tipo de local y estado de tu plan.</p>
+        </div>
+
+        <!-- Botón para Crear Nueva Tienda -->
+        <button id="openCreateStoreBtn"
+          class="bg-emerald-600 hover:bg-emerald-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition shadow flex items-center gap-1.5">
+          <span>+</span>
+          <span>Crear Nueva Tienda</span>
+        </button>
+      </div>
+
+      <div id="storesGrid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4"></div>
+    </section>
+  </main>
+
+  <!-- Modal Crear Nueva Tienda -->
+  <div id="createStoreModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-4 border-b pb-3">
+        <h3 class="text-lg font-extrabold text-slate-900">🏪 Crear Nueva Tienda</h3>
+        <button id="closeCreateStoreBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 w-8 h-8 rounded-full font-bold">✕</button>
+      </div>
+
+      <form id="createStoreForm" class="space-y-4">
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre Comercial *</label>
+          <input type="text" id="csName" required placeholder="Ej. Panadería San Rafael"
+            class="w-full border border-slate-300 p-2.5 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">WhatsApp de Pedidos *</label>
+          <input type="tel" id="csWhatsapp" required placeholder="50212345678"
+            class="w-full border border-slate-300 p-2.5 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Zona de Xela *</label>
+            <select id="csZone" required class="w-full border border-slate-300 p-2.5 rounded-xl text-xs font-bold bg-white outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="Zona 1">Zona 1</option>
+              <option value="Zona 2">Zona 2</option>
+              <option value="Zona 3">Zona 3</option>
+              <option value="Zona 4">Zona 4</option>
+              <option value="Zona 5">Zona 5</option>
+              <option value="Zona 6">Zona 6</option>
+              <option value="Zona 7">Zona 7</option>
+              <option value="Zona 8">Zona 8</option>
+              <option value="Zona 9">Zona 9</option>
+              <option value="Zona 10">Zona 10</option>
+              <option value="Zona 11">Zona 11</option>
+              <option value="Interurbano">Interurbano / Alrededores</option>
+            </select>
+          </div>
+
+          <div class="flex items-center pt-5">
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="csHasPhysicalStore" checked class="w-4 h-4 accent-emerald-600 rounded">
+              <span class="text-xs font-bold text-slate-800">📍 Cuento con local físico</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Dirección / Referencia Comercial</label>
+          <input type="text" id="csAddressDetails" placeholder="Ej. 14 Avenida 4-12, Zona 1"
+            class="w-full border border-slate-300 p-2.5 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Descripción corta</label>
+          <textarea id="csDescription" rows="2" placeholder="Resumen de tus productos o especialidades..."
+            class="w-full border border-slate-300 p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+        </div>
+
+        <div class="flex gap-2 pt-2 border-t">
+          <button type="button" id="cancelCreateStoreBtn" class="flex-1 bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs">Cancelar</button>
+          <button type="submit" id="saveNewStoreBtn" class="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs">Crear Tienda</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Configuración / Editar Tienda Existente -->
+  <div id="editMyStoreModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[92vh] overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-4 border-b pb-3">
+        <h3 class="text-lg font-extrabold text-slate-900">✏️ Configuración de Tienda</h3>
+        <button id="closeEditMyStoreBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 w-8 h-8 rounded-full font-bold">✕</button>
+      </div>
+
+      <form id="editMyStoreForm" class="space-y-4">
+        <input type="hidden" id="emsStoreId">
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Nombre Comercial *</label>
+          <input type="text" id="emsName" required class="w-full border border-slate-300 p-2.5 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">WhatsApp de Pedidos *</label>
+          <input type="tel" id="emsWhatsapp" required class="w-full border border-slate-300 p-2.5 rounded-xl text-xs font-semibold outline-none focus:ring-2 focus:ring-emerald-500">
+        </div>
+
+        <div class="grid grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Zona de Xela *</label>
+            <select id="emsZone" required class="w-full border border-slate-300 p-2.5 rounded-xl text-xs font-bold bg-white outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="Zona 1">Zona 1</option>
+              <option value="Zona 2">Zona 2</option>
+              <option value="Zona 3">Zona 3</option>
+              <option value="Zona 4">Zona 4</option>
+              <option value="Zona 5">Zona 5</option>
+              <option value="Zona 6">Zona 6</option>
+              <option value="Zona 7">Zona 7</option>
+              <option value="Zona 8">Zona 8</option>
+              <option value="Zona 9">Zona 9</option>
+              <option value="Zona 10">Zona 10</option>
+              <option value="Zona 11">Zona 11</option>
+              <option value="Interurbano">Interurbano / Alrededores</option>
+            </select>
+          </div>
+
+          <div class="flex items-center pt-5">
+            <label class="inline-flex items-center gap-2 cursor-pointer">
+              <input type="checkbox" id="emsHasPhysicalStore" class="w-4 h-4 accent-emerald-600 rounded">
+              <span class="text-xs font-bold text-slate-800">📍 Cuento con local físico</span>
+            </label>
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Dirección / Referencia Comercial</label>
+          <input type="text" id="emsAddressDetails" placeholder="Ej. 3ra calle 12-45 entre 12 y 13 avenida" class="w-full border border-slate-300 p-2.5 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold text-slate-700 uppercase mb-1">Descripción corta</label>
+          <textarea id="emsDescription" rows="2" class="w-full border border-slate-300 p-2 rounded-xl text-xs outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+        </div>
+
+        <div class="flex gap-2 pt-2 border-t">
+          <button type="button" id="cancelEditMyStoreBtn" class="flex-1 bg-slate-200 text-slate-700 font-bold py-2.5 rounded-xl text-xs">Cancelar</button>
+          <button type="submit" id="saveMyStoreBtn" class="flex-1 bg-emerald-600 text-white font-bold py-2.5 rounded-xl text-xs">Guardar Cambios</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <!-- Modal Reseñas -->
+  <div id="storeReviewsModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto p-6">
+      <div class="flex items-center justify-between mb-4 border-b pb-3">
+        <h3 class="text-lg font-extrabold text-slate-900">⭐ Reseñas Recibidas</h3>
+        <button id="closeReviewsModalBtn" class="bg-slate-100 hover:bg-slate-200 text-slate-700 w-8 h-8 rounded-full font-bold">✕</button>
+      </div>
+      <div id="storeReviewsModalContent" class="space-y-3">
+        <p class="text-xs text-slate-500">Cargando opiniones...</p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    let currentUser = null;
+    let allStores = [];
+    let activeStore = null;
+
+    (async () => {
+      const session = await requireAuth();
+      if (!session) return;
+      currentUser = session.user;
+
+      const { stores, store } = await getActiveStore();
+      allStores = stores;
+      activeStore = store;
+
+      await initDashboardNav({ user: currentUser, stores, store });
+
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+
+      renderStores();
+
+      // Eventos para Crear Nueva Tienda
+      document.getElementById('openCreateStoreBtn').onclick = () => {
+        document.getElementById('createStoreModal').classList.remove('hidden');
+      };
+      document.getElementById('closeCreateStoreBtn').onclick = closeCreateModal;
+      document.getElementById('cancelCreateStoreBtn').onclick = closeCreateModal;
+      document.getElementById('createStoreForm').onsubmit = handleCreateStore;
+
+      // Eventos para Editar Tienda
+      document.getElementById('closeEditMyStoreBtn').onclick = closeEditModal;
+      document.getElementById('cancelEditMyStoreBtn').onclick = closeEditModal;
+      document.getElementById('editMyStoreForm').onsubmit = handleSaveStore;
+    })();
+
+    function renderStores() {
+      const grid = document.getElementById('storesGrid');
+      const e = dashEscapeHtml;
+
+      grid.innerHTML = allStores.map(s => {
+        const logo = s.logo_url || PLACEHOLDER_IMG;
+        const isVerified = !!s.is_verified;
+        const isPhysical = s.has_physical_store !== false;
+
+        const planName = (s.plan_type || 'free').toUpperCase();
+        let planBadgeColor = 'bg-slate-100 text-slate-800 border-slate-300';
+        if (s.plan_type === 'pro') planBadgeColor = 'bg-indigo-100 text-indigo-800 border-indigo-300';
+        if (s.plan_type === 'advanced') planBadgeColor = 'bg-amber-100 text-amber-900 border-amber-300 font-black';
+
+        const badge = isPhysical
+          ? `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">📍 Local Físico - ${e(s.zone || 'Zona 1')}</span>`
+          : `<span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">🛵 Venta en Línea (${e(s.zone || 'Xela')})</span>`;
+
+        return `
+          <div class="bg-white rounded-xl shadow-sm border p-4 space-y-3">
+            <div class="flex items-center gap-3">
+              <img src="${logo}" alt="${e(s.name)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" class="w-14 h-14 rounded-full object-cover bg-gray-100 border flex-shrink-0">
+              <div class="min-w-0 flex-1">
+                <div class="flex items-center gap-1.5 flex-wrap">
+                  <h3 class="font-bold text-gray-800 truncate">${e(s.name)}</h3>
+                  ${isVerified ? '<span class="text-[10px] bg-blue-100 text-blue-700 font-extrabold px-1.5 py-0.5 rounded-full">✓ Verificada</span>' : ''}
+                </div>
+                <div class="mt-1 flex items-center gap-1 flex-wrap">
+                  ${badge}
+                  <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${planBadgeColor}">Plan ${planName}</span>
+                </div>
+                <p class="text-xs text-gray-500 mt-1 truncate">🏢 ${e(s.address_details || s.address || 'Quetzaltenango')}</p>
+              </div>
+            </div>
+
+            <div class="pt-2 border-t flex gap-1.5 flex-wrap">
+              <button data-store-edit-config="${s.id}" class="flex-1 text-center text-xs bg-slate-100 hover:bg-slate-200 text-slate-800 font-bold py-2 rounded-lg transition">⚙️ Configurar</button>
+              <a href="dashboard-productos.html" class="flex-1 text-center text-xs bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-2 rounded-lg transition">Productos</a>
+              <button data-store-reviews="${s.id}" class="text-xs bg-amber-50 text-amber-700 font-bold px-3 py-2 rounded-lg">⭐ Reseñas</button>
+            </div>
+          </div>`;
+      }).join('');
+
+      grid.querySelectorAll('[data-store-reviews]').forEach(btn => {
+        btn.addEventListener('click', () => openReviewsModal(btn.dataset.storeReviews));
+      });
+
+      grid.querySelectorAll('[data-store-edit-config]').forEach(btn => {
+        btn.addEventListener('click', () => openEditModal(btn.dataset.storeEditConfig));
+      });
+    }
+
+    function closeCreateModal() {
+      document.getElementById('createStoreModal').classList.add('hidden');
+      document.getElementById('createStoreForm').reset();
+    }
+
+    async function handleCreateStore(e) {
+      e.preventDefault();
+      const btn = document.getElementById('saveNewStoreBtn');
+      btn.disabled = true; btn.textContent = 'Creando tienda...';
+
+      try {
+        const name = document.getElementById('csName').value.trim();
+        const slug = name.toLowerCase()
+          .replace(/[^\w\s-]/g, '')
+          .replace(/[\s_-]+/g, '-')
+          .replace(/^-+|-+$/g, '') + '-' + Math.floor(Math.random() * 1000);
+
+        const payload = {
+          user_id: currentUser.id,
+          name,
+          slug,
+          whatsapp: document.getElementById('csWhatsapp').value.trim(),
+          zone: document.getElementById('csZone').value,
+          has_physical_store: document.getElementById('csHasPhysicalStore').checked,
+          address_details: document.getElementById('csAddressDetails').value.trim() || null,
+          description: document.getElementById('csDescription').value.trim() || null,
+          plan_type: 'free',
+          is_active: true
+        };
+
+        const { data, error } = await _supabase.from('stores').insert([payload]).select().single();
+        if (error) throw error;
+
+        alert('🎉 ¡Tienda creada con éxito!');
+        setActiveStore(data.id);
+        closeCreateModal();
+        location.reload();
+      } catch (err) {
+        alert('Error al crear tienda: ' + err.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Crear Tienda';
+      }
+    }
+
+    function openEditModal(storeId) {
+      const s = allStores.find(x => String(x.id) === String(storeId));
+      if (!s) return;
+
+      document.getElementById('emsStoreId').value = s.id;
+      document.getElementById('emsName').value = s.name || '';
+      document.getElementById('emsWhatsapp').value = s.whatsapp || '';
+      document.getElementById('emsZone').value = s.zone || 'Zona 1';
+      document.getElementById('emsHasPhysicalStore').checked = s.has_physical_store !== false;
+      document.getElementById('emsAddressDetails').value = s.address_details || s.address || '';
+      document.getElementById('emsDescription').value = s.description || '';
+
+      document.getElementById('editMyStoreModal').classList.remove('hidden');
+    }
+
+    function closeEditModal() {
+      document.getElementById('editMyStoreModal').classList.add('hidden');
+    }
+
+    async function handleSaveStore(e) {
+      e.preventDefault();
+      const id = document.getElementById('emsStoreId').value;
+      const btn = document.getElementById('saveMyStoreBtn');
+      btn.disabled = true; btn.textContent = 'Guardando...';
+
+      try {
+        const payload = {
+          name: document.getElementById('emsName').value.trim(),
+          whatsapp: document.getElementById('emsWhatsapp').value.trim(),
+          zone: document.getElementById('emsZone').value,
+          has_physical_store: document.getElementById('emsHasPhysicalStore').checked,
+          address_details: document.getElementById('emsAddressDetails').value.trim(),
+          description: document.getElementById('emsDescription').value.trim()
+        };
+
+        const { error } = await _supabase.from('stores').update(payload).eq('id', id);
+        if (error) throw error;
+
+        alert('✅ Datos de la tienda actualizados correctamente.');
+        closeEditModal();
+        location.reload();
+      } catch (err) {
+        alert('Error al guardar: ' + err.message);
+      } finally {
+        btn.disabled = false; btn.textContent = 'Guardar Cambios';
+      }
+    }
+
+    async function openReviewsModal(storeId) {
+      const modal = document.getElementById('storeReviewsModal');
+      const container = document.getElementById('storeReviewsModalContent');
+      modal.classList.remove('hidden');
+
+      document.getElementById('closeReviewsModalBtn').onclick = () => modal.classList.add('hidden');
+
+      const reviews = await ProductsService.fetchStoreReviews(storeId);
+      if (reviews.length === 0) {
+        container.innerHTML = '<p class="text-xs text-slate-500 italic">No has recibido reseñas aún en esta tienda.</p>';
+        return;
+      }
+
+      container.innerHTML = reviews.map(r => `
+        <div class="bg-slate-50 p-3 rounded-xl border border-slate-100 text-xs space-y-1">
+          <div class="flex items-center justify-between">
+            <span class="font-bold text-slate-800">${dashEscapeHtml(r.customer_name)}</span>
+            ${ProductCardUI.renderStars(r.rating)}
+          </div>
+          <p class="text-[11px] text-emerald-600 font-semibold">Producto: ${dashEscapeHtml(r.products?.title || 'General')}</p>
+          ${r.comment ? `<p class="text-slate-600">${dashEscapeHtml(r.comment)}</p>` : ''}
+        </div>
+      `).join('');
+    }
+  </script>
+</body>
+</html>

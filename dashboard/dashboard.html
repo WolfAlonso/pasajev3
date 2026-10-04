@@ -1,0 +1,302 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <title>Mi Panel · Pasaje de los Altos</title>
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=5"></script>
+  <script src="../js/theme-loader.js?v=5"></script>
+  <script src="../js/dashboard-utils.js?v=5"></script>
+  <script src="../js/dashboard-sidebar.js?v=6"></script>
+  <script src="../js/liquid-glass.js?v=5"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+
+  <style>
+    body {
+      font-family: 'Inter', sans-serif;
+      background-color: var(--color-secondary, #f8fafc);
+      color: var(--color-text, #1e293b);
+      background-image: var(--bg-image, none);
+      background-size: cover;
+      background-attachment: fixed;
+      background-position: center;
+      min-height: 100vh;
+    }
+
+    /* Tarjeta adaptable al sistema de diseño dinámico */
+    .pasaje-card {
+      background-color: rgba(var(--color-secondary-rgb, 255, 255, 255), var(--glass-opacity, 0.85));
+      backdrop-filter: blur(var(--glass-blur, 16px));
+      -webkit-backdrop-filter: blur(var(--glass-blur, 16px));
+      border: 1px solid rgba(226, 232, 240, var(--glass-border-opacity, 0.8));
+      border-radius: var(--theme-radius, 1rem);
+      color: var(--color-text, #1e293b);
+    }
+
+    h1, h2, h3, h4 { color: var(--color-heading, #0f172a); }
+
+    .dash-menu-card { transition: transform .18s ease, box-shadow .18s ease; }
+    .dash-menu-card:hover {
+      transform: translateY(-3px);
+      box-shadow: 0 12px 24px -8px rgba(15, 23, 42, 0.12);
+    }
+
+    .badge-live {
+      display: inline-flex; align-items: center; justify-content: center;
+      min-width: 22px; height: 22px; padding: 0 6px; border-radius: 999px;
+      font-size: 11px; font-weight: 800; line-height: 1;
+    }
+    .badge-red    { background: #ef4444; color: #ffffff; }
+    .badge-amber  { background: #f59e0b; color: #ffffff; }
+    .badge-slate  { background: #e2e8f0; color: #334155; }
+  </style>
+</head>
+<body class="min-h-screen text-slate-800">
+
+  <div id="dashboardHeader"></div>
+
+  <main class="min-h-screen text-slate-800 max-w-4xl mx-auto p-4 mt-4">
+
+    <div id="loadingState" class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-10 text-center text-sm opacity-70 shadow-sm">
+      Cargando tu panel...
+    </div>
+
+    <!-- VISTA SETUP (CREACIÓN DE TIENDA SI NO TIENE) -->
+    <section id="setupView" class="hidden">
+      <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-6 sm:p-8 shadow-sm">
+        <div class="text-center mb-6">
+          <div class="text-4xl mb-2">🏪</div>
+          <h2 class="text-2xl font-extrabold text-slate-900">Configura tu primera tienda</h2>
+          <p class="text-sm text-slate-500 mt-1">Podrás crear más tiendas después desde tu panel.</p>
+        </div>
+
+        <form id="storeForm" class="space-y-4">
+          <div>
+            <label class="block text-sm font-medium text-slate-700">Nombre comercial *</label>
+            <input type="text" id="storeName" required placeholder="Ej. Gelatinas El Alto"
+              class="w-full border border-slate-200 p-2.5 rounded-xl mt-1 outline-none text-slate-900 bg-white/90 focus:ring-2 focus:ring-emerald-500">
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-700">WhatsApp de ventas *</label>
+            <div class="flex mt-1">
+              <select id="storeWhatsappPrefix"
+                class="border border-slate-200 border-r-0 rounded-l-xl px-3 py-2.5 bg-slate-100 text-slate-900 text-sm outline-none">
+                <option value="502">+502 GT</option>
+                <option value="503">+503 SV</option>
+                <option value="504">+504 HN</option>
+                <option value="505">+505 NI</option>
+                <option value="506">+506 CR</option>
+                <option value="507">+507 PA</option>
+                <option value="52">+52 MX</option>
+                <option value="1">+1 US</option>
+              </select>
+              <input type="tel" id="storeWhatsapp" required placeholder="5555 1234"
+                class="flex-1 border border-slate-200 rounded-r-xl p-2.5 outline-none text-slate-900 bg-white/90 focus:ring-2 focus:ring-emerald-500">
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-700">Categoría principal *</label>
+            <select id="storeMainCategory" required
+              class="w-full border border-slate-200 p-2.5 rounded-xl mt-1 text-slate-900 bg-white outline-none focus:ring-2 focus:ring-emerald-500">
+              <option value="">Cargando categorías...</option>
+            </select>
+          </div>
+
+          <div>
+            <label class="block text-sm font-medium text-slate-700">Descripción corta (opcional)</label>
+            <textarea id="storeDescription" rows="3" placeholder="Ej. Repostería artesanal hecha en casa."
+              class="w-full border border-slate-200 p-2.5 rounded-xl mt-1 outline-none text-slate-900 bg-white/90 focus:ring-2 focus:ring-emerald-500"></textarea>
+          </div>
+
+          <button type="submit" id="storeSaveBtn"
+            class="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold py-3 rounded-xl transition shadow-sm disabled:opacity-60">
+            Crear mi tienda
+          </button>
+        </form>
+      </div>
+    </section>
+
+    <!-- VISTA MENU PRINCIPAL -->
+    <div id="menuWrapper" class="hidden">
+      <div id="dashboardTabs"></div>
+
+      <section id="menuView" class="space-y-4">
+
+        <div class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 rounded-2xl p-5 shadow-sm">
+          <div class="flex items-start gap-3">
+            <div class="text-3xl">👋</div>
+            <div class="min-w-0 flex-1">
+              <h2 class="text-lg font-extrabold text-slate-900">Tu panel de emprendedor</h2>
+              <p class="text-sm text-slate-500 mt-0.5">
+                Administra productos, ventas, clientes y más desde un solo lugar.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+
+          <a href="dashboard-productos.html" class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 dash-menu-card rounded-2xl p-5 group shadow-sm">
+            <div class="text-3xl mb-2">📦</div>
+            <h3 class="font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">Productos</h3>
+            <p class="text-xs text-slate-500 mt-1">Publica, edita y gestiona tu inventario.</p>
+          </a>
+
+          <a href="dashboard-pedidos.html" class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 dash-menu-card rounded-2xl p-5 group shadow-sm">
+            <div class="text-3xl mb-2">🛒</div>
+            <h3 class="font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">Pedidos & Tickets</h3>
+            <p class="text-xs text-slate-500 mt-1">Gestiona pedidos, tickets e impresiones.</p>
+          </a>
+
+          <a href="dashboard-metricas.html" class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 dash-menu-card rounded-2xl p-5 group shadow-sm">
+            <div class="text-3xl mb-2">📊</div>
+            <h3 class="font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">Métricas y Ventas</h3>
+            <p class="text-xs text-slate-500 mt-1">Ciclo contable, registro de ventas e historial.</p>
+          </a>
+
+          <a href="dashboard-clientes.html" class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 dash-menu-card rounded-2xl p-5 group shadow-sm">
+            <div class="text-3xl mb-2">👥</div>
+            <h3 class="font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">Clientes</h3>
+            <p class="text-xs text-slate-500 mt-1">Mini-CRM con notas y etiquetas privadas.</p>
+          </a>
+
+          <a href="dashboard-soporte.html" class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 dash-menu-card rounded-2xl p-5 group relative shadow-sm" id="supportCard">
+            <div class="text-3xl mb-2">🎧</div>
+            <h3 class="font-bold text-slate-900 group-hover:text-emerald-600 transition-colors flex items-center gap-2">
+              Soporte y Casos
+              <span id="supportBadge" class="badge-live badge-slate hidden">0</span>
+            </h3>
+            <p class="text-xs text-slate-500 mt-1">Revisa y responde reportes sobre tu tienda.</p>
+          </a>
+
+          <a href="dashboard-zonas.html" class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 dash-menu-card rounded-2xl p-5 group shadow-sm">
+            <div class="text-3xl mb-2">🗺️</div>
+            <h3 class="font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">Zonas</h3>
+            <p class="text-xs text-slate-500 mt-1">Agrupa clientes por dirección y visualiza el mapa.</p>
+          </a>
+
+          <a href="dashboard-calculadora.html" class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 dash-menu-card rounded-2xl p-5 group shadow-sm">
+            <div class="text-3xl mb-2">🧮</div>
+            <h3 class="font-bold text-slate-900 group-hover:text-emerald-600 transition-colors">Calculadora</h3>
+            <p class="text-xs text-slate-500 mt-1">Calcula precios sugeridos según tus costos.</p>
+          </a>
+
+          <a href="dashboard-tiendas.html" class="pasaje-card bg-white/80 backdrop-blur-md border border-slate-200/80 dash-menu-card rounded-2xl p-5 group shadow-sm">
+            <div class="text-3xl mb-2">🏪</div>
+            <h3 class="font-bold text-slate-900 group-hover:text-emerald-600 transition-colors flex items-center gap-2">
+              Mis tiendas
+              <span class="text-[10px] bg-emerald-500/20 text-emerald-600 font-bold px-2 py-0.5 rounded-full">Multi</span>
+            </h3>
+            <p class="text-xs text-slate-500 mt-1">Administra todas tus tiendas y crea nuevas.</p>
+          </a>
+
+        </div>
+
+      </section>
+    </div>
+
+  </main>
+
+  <script>
+    let currentUser = null;
+    let currentStore = null;
+    let allStores = [];
+
+    (async () => {
+      const session = await requireAuth();
+      if (!session) return;
+      currentUser = session.user;
+
+      await loadCategories();
+
+      const { stores, store } = await getActiveStore();
+      allStores = stores || [];
+      currentStore = store;
+
+      document.getElementById('loadingState').classList.add('hidden');
+
+      if (allStores.length === 0) {
+        await initDashboardNav({ user: currentUser, stores: [], store: null });
+        document.getElementById('setupView').classList.remove('hidden');
+      } else {
+        await initDashboardNav({ user: currentUser, stores: allStores, store: currentStore });
+        document.getElementById('menuWrapper').classList.remove('hidden');
+        if (currentStore && currentStore.id) {
+          loadSupportBadge(currentStore.id);
+        }
+      }
+    })();
+
+    async function loadCategories() {
+      try {
+        const client = window._supabase || initSupabaseClient();
+        if (!client) return;
+        const { data } = await client.from('categories').select('*').order('sort_order');
+        const options = (data || []).map(c => `<option value="${c.id}">${c.icon || ''} ${c.name}</option>`).join('');
+        const select = document.getElementById('storeMainCategory');
+        if (select) select.innerHTML = '<option value="">Selecciona una categoría...</option>' + options;
+      } catch (e) {}
+    }
+
+    async function loadSupportBadge(storeId) {
+      const badge = document.getElementById('supportBadge');
+      if (!badge) return;
+      try {
+        const client = window._supabase || initSupabaseClient();
+        const { count } = await client.from('reports').select('id', { count: 'exact', head: true }).eq('store_id', storeId);
+        if (count > 0) {
+          badge.textContent = count > 99 ? '99+' : String(count);
+          badge.classList.remove('hidden');
+          badge.classList.add(count >= 3 ? 'badge-red' : 'badge-amber');
+        }
+      } catch (e) {}
+    }
+
+    document.getElementById('storeForm')?.addEventListener('submit', async (e) => {
+      e.preventDefault();
+      const saveBtn = document.getElementById('storeSaveBtn');
+      saveBtn.disabled = true;
+      saveBtn.textContent = 'Guardando tienda...';
+
+      try {
+        const client = window._supabase || initSupabaseClient();
+        const name = document.getElementById('storeName').value.trim();
+        const prefix = document.getElementById('storeWhatsappPrefix').value;
+        const phone = document.getElementById('storeWhatsapp').value.trim();
+        const category_id = document.getElementById('storeMainCategory').value;
+        const description = document.getElementById('storeDescription').value.trim();
+
+        const fullWhatsapp = dashCombinePhone(prefix, phone);
+
+        const { data, error } = await client.from('stores').insert([{
+          user_id: currentUser.id,
+          name,
+          whatsapp: fullWhatsapp,
+          category_id,
+          description: description || null
+        }]).select().single();
+
+        if (error) throw error;
+
+        localStorage.setItem('activeStoreId', String(data.id));
+        window.location.reload();
+      } catch (err) {
+        alert('Error al crear la tienda: ' + (err.message || err));
+        saveBtn.disabled = false;
+        saveBtn.textContent = 'Crear mi tienda';
+      }
+    });
+  </script>
+</body>
+</html>

@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Configuración de Módulos · Admin</title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=8"></script>
+  <script src="../js/theme-loader.js?v=9"></script>
+  <script src="../js/admin-utils.js?v=8"></script>
+  <script src="../js/admin-sidebar.js?v=3"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .glass-container {
+      background: rgba(255, 255, 255, 0.75);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+    .cfg-tab { transition: all .15s; }
+    .switch { position: relative; width: 46px; height: 26px; flex-shrink: 0; }
+    .switch input { opacity: 0; width: 0; height: 0; }
+    .switch .slider {
+      position: absolute; inset: 0; background: #cbd5e1;
+      border-radius: 999px; cursor: pointer; transition: background .2s;
+    }
+    .switch .slider::before {
+      content: ''; position: absolute;
+      width: 20px; height: 20px; left: 3px; top: 3px;
+      background: #fff; border-radius: 50%; transition: transform .2s;
+      box-shadow: 0 1px 3px rgba(0,0,0,.2);
+    }
+    .switch input:checked + .slider { background: #10b981; }
+    .switch input:checked + .slider::before { transform: translateX(20px); }
+    .zone-toggle-row {
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 8px 12px; background: #f8fafc; border: 1px solid #e2e8f0;
+      border-radius: 10px; margin-bottom: 6px;
+    }
+    .input-text {
+      width: 100%; border: 1px solid #cbd5e1; border-radius: 10px;
+      padding: 10px 12px; font-size: 13px; background: #fff; color: #1e293b;
+      transition: border-color .15s, box-shadow .15s;
+    }
+    .input-text:focus { outline: none; border-color: #10b981; box-shadow: 0 0 0 3px rgba(16,185,129,.12); }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-5xl mx-auto p-4 pb-16">
+    <div id="adminTabs"></div>
+
+    <div id="loadingState" class="glass-container rounded-2xl p-8 text-center text-sm text-slate-500 shadow-sm">
+      Cargando configuración de módulos...
+    </div>
+
+    <section id="content" class="hidden space-y-5">
+
+      <!-- HEADER -->
+      <div class="glass-container rounded-2xl p-5 shadow-sm border border-slate-200/80">
+        <h1 class="text-xl font-black text-slate-900 flex items-center gap-2">⚙️ Configuración de Módulos</h1>
+        <p class="text-xs text-slate-500 mt-1">
+          Ajusta tarifas, límites y zonas activas sin tocar código. Los cambios se aplican al instante en el sitio público.
+        </p>
+      </div>
+
+      <!-- TABS -->
+      <div class="bg-white p-1.5 rounded-2xl border shadow-sm grid grid-cols-3 gap-2 text-xs font-bold">
+        <button type="button" class="cfg-tab py-2.5 rounded-xl bg-slate-900 text-white shadow-sm" data-tab="delivery">🛵 Delivery</button>
+        <button type="button" class="cfg-tab py-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200" data-tab="real_estate">🏠 Inmuebles</button>
+        <button type="button" class="cfg-tab py-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200" data-tab="marketplace">🏪 Marketplace</button>
+      </div>
+
+      <!-- TAB DELIVERY -->
+      <div id="tab-delivery" class="cfg-panel space-y-4">
+        <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+          <h2 class="font-black text-sm text-slate-900 flex items-center gap-2">🛵 Configuración Delivery / Pasaje Express</h2>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Tarifa base (Q)</label>
+              <input type="number" id="cfgBaseFee" step="0.50" min="0" class="input-text">
+              <p class="text-[10px] text-slate-400 mt-1">Precio mínimo sugerido para un mandadito.</p>
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Tiempo de gracia cancelación (seg)</label>
+              <input type="number" id="cfgGraceSec" step="10" min="0" class="input-text">
+              <p class="text-[10px] text-slate-400 mt-1">Minutos sin sanción para cancelar.</p>
+            </div>
+          </div>
+
+          <div class="rounded-2xl bg-blue-50/60 border border-blue-200 p-4 space-y-3">
+            <div class="flex items-center justify-between gap-3">
+              <div>
+                <p class="text-xs font-black text-blue-900 uppercase">🌧️ Modo Lluvia</p>
+                <p class="text-[11px] text-blue-700">Activa un recargo automático en todas las tarifas mientras llueve.</p>
+              </div>
+              <label class="switch">
+                <input type="checkbox" id="cfgRainEnabled">
+                <span class="slider"></span>
+              </label>
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-blue-800 uppercase mb-1">Recargo por lluvia (Q)</label>
+              <input type="number" id="cfgRainSurcharge" step="0.50" min="0" class="input-text">
+            </div>
+          </div>
+
+          <div>
+            <p class="text-[10px] font-black text-slate-500 uppercase mb-2">Zonas activas de Xela</p>
+            <div id="cfgZonesList" class="space-y-1.5"></div>
+            <button type="button" id="cfgAddZone"
+              class="mt-2 text-xs font-bold text-emerald-700 bg-emerald-50 hover:bg-emerald-100 px-3 py-2 rounded-xl border border-emerald-200 transition">
+              ➕ Agregar zona
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB INMUEBLES -->
+      <div id="tab-real_estate" class="cfg-panel hidden space-y-4">
+        <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+          <h2 class="font-black text-sm text-slate-900 flex items-center gap-2">🏠 Configuración Inmuebles</h2>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Máximo de imágenes por publicación</label>
+              <input type="number" id="cfgReMaxImages" min="1" max="30" class="input-text">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Días de vigencia</label>
+              <input type="number" id="cfgReActiveDays" min="1" max="365" class="input-text">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Precio destacado (Q)</label>
+              <input type="number" id="cfgReFeaturedPrice" step="0.50" min="0" class="input-text">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-2">Requiere aprobación admin</label>
+              <label class="switch">
+                <input type="checkbox" id="cfgReApproval">
+                <span class="slider"></span>
+              </label>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- TAB MARKETPLACE -->
+      <div id="tab-marketplace" class="cfg-panel hidden space-y-4">
+        <div class="bg-white rounded-2xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+          <h2 class="font-black text-sm text-slate-900 flex items-center gap-2">🏪 Configuración Marketplace</h2>
+
+          <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Plan Gratis · Máx productos</label>
+              <input type="number" id="cfgMkFreeProducts" min="0" class="input-text">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Plan Pro · Máx productos</label>
+              <input type="number" id="cfgMkProProducts" min="0" class="input-text">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Plan Gratis · Máx imágenes/producto</label>
+              <input type="number" id="cfgMkFreeImages" min="1" class="input-text">
+            </div>
+            <div>
+              <label class="block text-[10px] font-black text-slate-500 uppercase mb-1">Plan Pro · Máx imágenes/producto</label>
+              <input type="number" id="cfgMkProImages" min="1" class="input-text">
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- SAVE BAR -->
+      <div class="sticky bottom-4 z-20">
+        <div class="glass-container rounded-2xl p-4 shadow-xl border border-slate-200 flex items-center justify-between flex-wrap gap-3">
+          <div>
+            <p class="font-black text-sm text-slate-900">¿Listo para publicar?</p>
+            <p class="text-[11px] text-slate-500">Los cambios aplican al instante en todos los usuarios.</p>
+          </div>
+          <div class="flex gap-2">
+            <button type="button" id="cfgReset" class="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-4 py-2.5 rounded-xl">↩️ Restaurar</button>
+            <button type="button" id="cfgSave" class="text-xs font-bold bg-emerald-600 hover:bg-emerald-700 text-white px-5 py-2.5 rounded-xl shadow-sm">💾 Guardar</button>
+          </div>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <script>
+    let currentSettings = null;
+
+    (async () => {
+      const session = await adminGuardPage();
+      if (!session) return;
+      await initAdminNav({ user: session.user });
+
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+
+      bindTabs();
+      bindZoneActions();
+      bindActions();
+      await loadSettings();
+    })();
+
+    function bindTabs() {
+      document.querySelectorAll('.cfg-tab').forEach(btn => {
+        btn.onclick = () => {
+          document.querySelectorAll('.cfg-tab').forEach(b => {
+            b.className = 'cfg-tab py-2.5 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200';
+          });
+          btn.className = 'cfg-tab py-2.5 rounded-xl bg-slate-900 text-white shadow-sm';
+          document.querySelectorAll('.cfg-panel').forEach(p => p.classList.add('hidden'));
+          document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+        };
+      });
+    }
+
+    function renderZones(zones) {
+      const list = document.getElementById('cfgZonesList');
+      list.innerHTML = (zones || []).map((z, i) => `
+        <div class="zone-toggle-row">
+          <input type="text" value="${escapeAttr(z.name)}" data-zone-name="${i}"
+            class="flex-1 border-0 bg-transparent text-xs font-semibold text-slate-800 outline-none" />
+          <label class="switch" style="transform: scale(.85);">
+            <input type="checkbox" data-zone-active="${i}" ${z.active ? 'checked' : ''}>
+            <span class="slider"></span>
+          </label>
+          <button type="button" data-zone-delete="${i}"
+            class="text-xs font-bold text-rose-500 hover:text-rose-700 ml-2">🗑️</button>
+        </div>
+      `).join('');
+
+      list.querySelectorAll('[data-zone-delete]').forEach(btn => {
+        btn.onclick = () => {
+          const idx = parseInt(btn.dataset.zoneDelete, 10);
+          const zones = collectZones();
+          zones.splice(idx, 1);
+          renderZones(zones);
+        };
+      });
+    }
+
+    function collectZones() {
+      const list = document.getElementById('cfgZonesList');
+      const zones = [];
+      list.querySelectorAll('.zone-toggle-row').forEach(row => {
+        const name = row.querySelector('[data-zone-name]').value.trim();
+        const active = row.querySelector('[data-zone-active]').checked;
+        if (name) zones.push({ name, active });
+      });
+      return zones;
+    }
+
+    function bindZoneActions() {
+      document.getElementById('cfgAddZone').onclick = () => {
+        const zones = collectZones();
+        zones.push({ name: 'Nueva Zona', active: true });
+        renderZones(zones);
+      };
+    }
+
+    function escapeAttr(str) {
+      return String(str ?? '').replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+    }
+
+    async function loadSettings() {
+      const { data, error } = await _supabase.from('site_settings')
+        .select('*').eq('id', 'global').maybeSingle();
+      if (error) { alert('Error al cargar: ' + error.message); return; }
+      currentSettings = data || {};
+
+      const dc = currentSettings.delivery_config || {};
+      const re = currentSettings.real_estate_config || {};
+      const mk = currentSettings.marketplace_config || {};
+
+      setVal('cfgBaseFee', dc.base_fee ?? 15);
+      setVal('cfgRainSurcharge', dc.rain_surcharge ?? 5);
+      setVal('cfgGraceSec', dc.cancellation_grace_seconds ?? 120);
+      setCheck('cfgRainEnabled', !!dc.rain_mode_enabled);
+      renderZones(dc.zones || []);
+
+      setVal('cfgReMaxImages', re.max_images ?? 12);
+      setVal('cfgReActiveDays', re.active_days ?? 30);
+      setVal('cfgReFeaturedPrice', re.featured_price ?? 50);
+      setCheck('cfgReApproval', !!re.require_approval);
+
+      setVal('cfgMkFreeProducts', mk.free_plan_max_products ?? 20);
+      setVal('cfgMkProProducts', mk.pro_plan_max_products ?? 500);
+      setVal('cfgMkFreeImages', mk.free_plan_max_images_per_product ?? 3);
+      setVal('cfgMkProImages', mk.pro_plan_max_images_per_product ?? 8);
+    }
+
+    function setVal(id, v) { const el = document.getElementById(id); if (el) el.value = v; }
+    function setCheck(id, v) { const el = document.getElementById(id); if (el) el.checked = !!v; }
+
+    function bindActions() {
+      document.getElementById('cfgReset').onclick = async () => {
+        if (!confirm('¿Descartar cambios y recargar del servidor?')) return;
+        await loadSettings();
+      };
+
+      document.getElementById('cfgSave').onclick = async () => {
+        const btn = document.getElementById('cfgSave');
+        btn.disabled = true; btn.textContent = 'Guardando...';
+
+        const payload = {
+          delivery_config: {
+            base_fee: parseFloat(document.getElementById('cfgBaseFee').value) || 0,
+            rain_surcharge: parseFloat(document.getElementById('cfgRainSurcharge').value) || 0,
+            rain_mode_enabled: document.getElementById('cfgRainEnabled').checked,
+            cancellation_grace_seconds: parseInt(document.getElementById('cfgGraceSec').value, 10) || 0,
+            zones: collectZones()
+          },
+          real_estate_config: {
+            max_images: parseInt(document.getElementById('cfgReMaxImages').value, 10) || 12,
+            active_days: parseInt(document.getElementById('cfgReActiveDays').value, 10) || 30,
+            featured_price: parseFloat(document.getElementById('cfgReFeaturedPrice').value) || 0,
+            require_approval: document.getElementById('cfgReApproval').checked
+          },
+          marketplace_config: {
+            free_plan_max_products: parseInt(document.getElementById('cfgMkFreeProducts').value, 10) || 0,
+            pro_plan_max_products: parseInt(document.getElementById('cfgMkProProducts').value, 10) || 0,
+            free_plan_max_images_per_product: parseInt(document.getElementById('cfgMkFreeImages').value, 10) || 1,
+            pro_plan_max_images_per_product: parseInt(document.getElementById('cfgMkProImages').value, 10) || 1
+          }
+        };
+
+        try {
+          const { error } = await _supabase.from('site_settings')
+            .update(payload).eq('id', 'global');
+          if (error) throw error;
+          alert('✅ Configuración guardada y publicada.');
+        } catch (err) {
+          alert('Error: ' + (err.message || err));
+        } finally {
+          btn.disabled = false; btn.textContent = '💾 Guardar';
+        }
+      };
+    }
+  </script>
+</body>
+</html>

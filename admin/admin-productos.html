@@ -1,0 +1,643 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Productos · Admin</title>
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js"></script>
+
+  <script>
+    (function () {
+      if (typeof window.PLACEHOLDER_IMG === 'undefined') {
+        window.PLACEHOLDER_IMG = 'data:image/svg+xml;utf8,' + encodeURIComponent(
+          '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="400"><rect width="400" height="400" fill="#f1f5f9"/><text x="50%" y="50%" text-anchor="middle" dy=".35em" fill="#94a3b8" font-family="sans-serif" font-size="20">Sin imagen</text></svg>'
+        );
+      }
+      if (typeof window.adminEscapeHtml === 'undefined') {
+        window.adminEscapeHtml = function (str) {
+          return String(str ?? '')
+            .replace(/&/g, '&amp;')
+            .replace(/</g, '&lt;')
+            .replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;')
+            .replace(/'/g, '&#039;');
+        };
+      }
+    })();
+  </script>
+
+  <script src="../js/theme-loader.js?v=2"></script>
+  <script src="../js/admin-utils.js"></script>
+  <script src="../js/admin-sidebar.js?v=1"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-7xl mx-auto p-4">
+    <div id="adminTabs"></div>
+
+    <div id="loadingState" class="bg-white rounded-xl shadow-sm border p-8 text-center text-sm text-gray-500">Cargando productos...</div>
+
+    <section id="content" class="hidden space-y-4">
+
+      <div class="grid grid-cols-2 lg:grid-cols-5 gap-3">
+        <div class="bg-white rounded-xl shadow-sm border p-4">
+          <p class="text-xs font-semibold text-gray-500 uppercase tracking-wider">Total</p>
+          <p id="statTotal" class="text-2xl font-extrabold text-gray-800 mt-1">—</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border p-4">
+          <p class="text-xs font-semibold text-emerald-700 uppercase tracking-wider">✅ Activos</p>
+          <p id="statActive" class="text-2xl font-extrabold text-emerald-600 mt-1">—</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border p-4">
+          <p class="text-xs font-semibold text-gray-700 uppercase tracking-wider">⛔ Inactivos</p>
+          <p id="statInactive" class="text-2xl font-extrabold text-gray-600 mt-1">—</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border p-4">
+          <p class="text-xs font-semibold text-amber-700 uppercase tracking-wider">⭐ Destacados</p>
+          <p id="statFeatured" class="text-2xl font-extrabold text-amber-600 mt-1">—</p>
+        </div>
+        <div class="bg-white rounded-xl shadow-sm border p-4">
+          <p class="text-xs font-semibold text-red-700 uppercase tracking-wider">📉 Agotados</p>
+          <p id="statOut" class="text-2xl font-extrabold text-red-600 mt-1">—</p>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-xl shadow-sm border p-4 space-y-3">
+        <div class="flex flex-col sm:flex-row items-stretch sm:items-center gap-2">
+          <input id="prodSearch" type="text" placeholder="Buscar por título, tienda o categoría..."
+            class="flex-1 border border-gray-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white">
+          <select id="prodFilter"
+            class="border border-gray-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none">
+            <option value="all">Todos</option>
+            <option value="featured">⭐ Destacados</option>
+            <option value="active">✅ Activos</option>
+            <option value="inactive">⛔ Inactivos</option>
+            <option value="out">📉 Agotados</option>
+            <option value="no-image">🖼️ Sin imagen</option>
+          </select>
+          <select id="prodStoreFilter"
+            class="border border-gray-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none">
+            <option value="">Todas las tiendas</option>
+          </select>
+          <select id="prodSort"
+            class="border border-gray-300 p-2.5 rounded-lg text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none">
+            <option value="recent">🕒 Más recientes</option>
+            <option value="oldest">🕰️ Más antiguos</option>
+            <option value="price-desc">💰 Mayor precio</option>
+            <option value="price-asc">💲 Menor precio</option>
+            <option value="title">🔤 Título (A-Z)</option>
+            <option value="stock-asc">📉 Menor stock</option>
+            <option value="favorites">❤️ Más favoritos</option>
+          </select>
+        </div>
+        <p class="text-xs text-gray-500">Mostrando <span id="countShown">0</span> de <span id="countTotal">0</span> productos</p>
+      </div>
+
+      <div id="productsList" class="bg-white rounded-xl shadow-sm border overflow-hidden divide-y">
+        <p class="p-8 text-center text-sm text-gray-500">Cargando productos...</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal: Editar producto (Admin) -->
+  <div id="editModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto">
+      <div id="editModalContent" class="p-6"></div>
+    </div>
+  </div>
+
+  <script>
+    let currentAdmin = null;
+    let allProducts = [];
+    let allStores = [];
+    let allCategories = [];
+
+    (async () => {
+      try {
+        const session = await adminGuardPage();
+        if (!session) return;
+        currentAdmin = session.user;
+
+        if (typeof initAdminNav === 'function') {
+          await initAdminNav({ user: session.user });
+        }
+
+        const loadingEl = document.getElementById('loadingState');
+        const contentEl = document.getElementById('content');
+        if (loadingEl) loadingEl.classList.add('hidden');
+        if (contentEl) contentEl.classList.remove('hidden');
+
+        await Promise.all([loadCategories(), loadStores()]);
+        await loadProducts();
+
+        document.getElementById('prodSearch')?.addEventListener('input', renderProducts);
+        document.getElementById('prodFilter')?.addEventListener('change', renderProducts);
+        document.getElementById('prodStoreFilter')?.addEventListener('change', renderProducts);
+        document.getElementById('prodSort')?.addEventListener('change', renderProducts);
+      } catch (err) {
+        console.error('[Admin Productos] Error de inicialización:', err);
+        const loadingEl = document.getElementById('loadingState');
+        if (loadingEl) {
+          loadingEl.innerHTML = '<p class="text-red-500 font-bold text-sm">Error al cargar el módulo de productos.</p>';
+        }
+      }
+    })();
+
+    async function loadCategories() {
+      const { data } = await _supabase.from('categories').select('*').order('sort_order');
+      allCategories = data || [];
+    }
+
+    async function loadStores() {
+      const { data } = await _supabase.from('stores').select('id, name, slug').order('name');
+      allStores = data || [];
+      const sel = document.getElementById('prodStoreFilter');
+      if (sel) {
+        const e = window.adminEscapeHtml || (s => s);
+        sel.innerHTML = '<option value="">Todas las tiendas</option>' +
+          allStores.map(s => `<option value="${s.id}">${e(s.name)}</option>`).join('');
+      }
+    }
+
+    async function loadProducts() {
+      const container = document.getElementById('productsList');
+      if (container) {
+        container.innerHTML = '<p class="p-8 text-center text-sm text-gray-500">Cargando productos...</p>';
+      }
+
+      const { data, error } = await _supabase
+        .from('products')
+        .select(`
+          id, title, description, price, image_url, is_active, is_featured,
+          stock_quantity, min_order_qty, badge_tag, prep_time, favorites_count, created_at,
+          category_id, store_id,
+          stores ( id, name, slug ),
+          categories ( id, name, icon ),
+          product_images ( id, image_url, sort_order ),
+          product_variants ( id, variant_group, name, price_adjustment, stock_quantity )
+        `)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        if (container) {
+          container.innerHTML = '<p class="p-8 text-center text-sm text-red-500">Error al cargar productos.</p>';
+        }
+        console.error(error);
+        return;
+      }
+
+      allProducts = data || [];
+      updateStats();
+      renderProducts();
+    }
+
+    function updateStats() {
+      const total    = allProducts.length;
+      const active   = allProducts.filter(p => p.is_active !== false).length;
+      const inactive = total - active;
+      const featured = allProducts.filter(p => p.is_featured).length;
+      const out      = allProducts.filter(p => p.stock_quantity === 0).length;
+
+      const setTxt = (id, val) => {
+        const el = document.getElementById(id);
+        if (el) el.textContent = val;
+      };
+
+      setTxt('statTotal', total);
+      setTxt('statActive', active);
+      setTxt('statInactive', inactive);
+      setTxt('statFeatured', featured);
+      setTxt('statOut', out);
+    }
+
+    function renderProducts() {
+      const container = document.getElementById('productsList');
+      if (!container) return;
+
+      const e = window.adminEscapeHtml || (s => String(s || ''));
+      const placeholder = window.PLACEHOLDER_IMG || 'img/placeholder.png';
+      const term = (document.getElementById('prodSearch')?.value || '').toLowerCase().trim();
+      const filter = document.getElementById('prodFilter')?.value || 'all';
+      const storeFilter = document.getElementById('prodStoreFilter')?.value || '';
+      const sort = document.getElementById('prodSort')?.value || 'recent';
+
+      let list = allProducts.filter(p => {
+        const byTerm = !term ||
+          (p.title || '').toLowerCase().includes(term) ||
+          (p.stores?.name || '').toLowerCase().includes(term) ||
+          (p.categories?.name || '').toLowerCase().includes(term);
+
+        const byFilter =
+          filter === 'all' ||
+          (filter === 'featured' && p.is_featured) ||
+          (filter === 'active' && p.is_active !== false) ||
+          (filter === 'inactive' && p.is_active === false) ||
+          (filter === 'out' && p.stock_quantity === 0) ||
+          (filter === 'no-image' && !p.image_url);
+
+        const byStore = !storeFilter || p.store_id === storeFilter;
+
+        return byTerm && byFilter && byStore;
+      });
+
+      list = [...list].sort((a, b) => {
+        if (sort === 'recent')    return new Date(b.created_at || 0) - new Date(a.created_at || 0);
+        if (sort === 'oldest')    return new Date(a.created_at || 0) - new Date(b.created_at || 0);
+        if (sort === 'price-desc')return parseFloat(b.price || 0) - parseFloat(a.price || 0);
+        if (sort === 'price-asc') return parseFloat(a.price || 0) - parseFloat(b.price || 0);
+        if (sort === 'title')     return (a.title || '').localeCompare(b.title || '');
+        if (sort === 'stock-asc') {
+          const av = (a.stock_quantity === null || a.stock_quantity === undefined) ? 999999 : a.stock_quantity;
+          const bv = (b.stock_quantity === null || b.stock_quantity === undefined) ? 999999 : b.stock_quantity;
+          return av - bv;
+        }
+        if (sort === 'favorites') return (b.favorites_count || 0) - (a.favorites_count || 0);
+        return 0;
+      });
+
+      const shownEl = document.getElementById('countShown');
+      const totalEl = document.getElementById('countTotal');
+      if (shownEl) shownEl.textContent = list.length;
+      if (totalEl) totalEl.textContent = allProducts.length;
+
+      if (list.length === 0) {
+        container.innerHTML = '<p class="p-8 text-center text-sm text-gray-500">Sin resultados.</p>';
+        return;
+      }
+
+      container.innerHTML = list.map(p => {
+        const img = p.image_url || placeholder;
+        const active = p.is_active !== false;
+        const featured = !!p.is_featured;
+        const stock = p.stock_quantity;
+        const hasStock = stock !== null && stock !== undefined;
+        const isOut = hasStock && stock <= 0;
+        const catName = p.categories ? ((p.categories.icon || '') + ' ' + (p.categories.name || '')) : 'Sin categoría';
+        const imgCount = (p.product_images || []).length + (p.image_url ? 1 : 0);
+        const varCount = (p.product_variants || []).length;
+
+        const badges = [];
+        if (featured) badges.push('<span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">⭐ Destacado</span>');
+        if (!active) badges.push('<span class="text-[10px] bg-gray-200 text-gray-700 font-bold px-2 py-0.5 rounded-full">⛔ Inactivo</span>');
+        if (isOut) badges.push('<span class="text-[10px] bg-red-100 text-red-700 font-bold px-2 py-0.5 rounded-full">📉 Agotado</span>');
+        else if (hasStock && stock <= 5) badges.push('<span class="text-[10px] bg-amber-100 text-amber-800 font-bold px-2 py-0.5 rounded-full">⚠️ Últimas ' + stock + '</span>');
+        else if (hasStock) badges.push('<span class="text-[10px] bg-emerald-100 text-emerald-700 font-bold px-2 py-0.5 rounded-full">📦 ' + stock + '</span>');
+        else badges.push('<span class="text-[10px] bg-blue-50 text-blue-700 font-bold px-2 py-0.5 rounded-full">♾️ Ilimitado</span>');
+        if (p.badge_tag) badges.push('<span class="text-[10px] bg-purple-100 text-purple-700 font-bold px-2 py-0.5 rounded-full">' + e(p.badge_tag) + '</span>');
+        if (imgCount > 1) badges.push('<span class="text-[10px] bg-gray-800 text-white font-bold px-2 py-0.5 rounded-full">📷 ' + imgCount + ' fotos</span>');
+        if (varCount > 0) badges.push('<span class="text-[10px] bg-indigo-100 text-indigo-800 font-bold px-2 py-0.5 rounded-full">🎨 ' + varCount + ' variantes</span>');
+
+        return `
+          <div class="p-3 hover:bg-gray-50 transition ${!active ? 'opacity-70' : ''}">
+            <div class="flex items-start gap-3 flex-wrap">
+              <img src="${img}" alt="${e(p.title)}"
+                   onerror="this.onerror=null;this.src='${placeholder}'"
+                   class="w-16 h-16 rounded-lg object-cover bg-gray-100 flex-shrink-0 border">
+
+              <div class="flex-1 min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h3 class="font-bold text-gray-800 truncate">${e(p.title)}</h3>
+                </div>
+                <p class="text-xs text-gray-500 mt-0.5 truncate">
+                  🏪 ${e(p.stores?.name || '—')} · ${e(catName)} · <strong class="text-emerald-700">Q ${parseFloat(p.price || 0).toFixed(2)}</strong>
+                  ${(p.favorites_count || 0) > 0 ? ` · <span class="text-red-500">❤️ ${p.favorites_count}</span>` : ''}
+                </p>
+                <div class="flex flex-wrap gap-1 mt-1.5">${badges.join('')}</div>
+              </div>
+
+              <div class="flex flex-wrap gap-1 flex-shrink-0">
+                <a href="../index.html?product=${p.id}" target="_blank"
+                   class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-2.5 py-1.5 rounded-lg"
+                   title="Ver en el catálogo">👁️</a>
+
+                <button data-action="edit" data-id="${p.id}"
+                  class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-2.5 py-1.5 rounded-lg"
+                  title="Editar producto">✏️</button>
+
+                <button data-action="feature" data-id="${p.id}"
+                  class="text-xs font-semibold px-2.5 py-1.5 rounded-lg transition ${featured
+                    ? 'bg-amber-500 text-white'
+                    : 'bg-amber-50 hover:bg-amber-100 text-amber-700'}"
+                  title="${featured ? 'Quitar de destacados' : 'Destacar en portada'}">⭐</button>
+
+                <button data-action="toggle" data-id="${p.id}"
+                  class="text-xs font-semibold px-2.5 py-1.5 rounded-lg transition ${active
+                    ? 'bg-emerald-50 hover:bg-emerald-100 text-emerald-700'
+                    : 'bg-gray-100 hover:bg-gray-200 text-gray-600'}"
+                  title="${active ? 'Ocultar del catálogo' : 'Mostrar en el catálogo'}">
+                  ${active ? '✅' : '⛔'}
+                </button>
+
+                <button data-action="delete" data-id="${p.id}"
+                  class="text-xs bg-red-50 hover:bg-red-100 text-red-600 font-semibold px-2.5 py-1.5 rounded-lg"
+                  title="Eliminar producto">🗑️</button>
+              </div>
+            </div>
+          </div>`;
+      }).join('');
+
+      container.querySelectorAll('button[data-action]').forEach(btn => {
+        btn.addEventListener('click', () => handleProductAction(btn));
+      });
+    }
+
+    async function handleProductAction(btn) {
+      const id = btn.dataset.id;
+      const action = btn.dataset.action;
+      const product = allProducts.find(x => String(x.id) === String(id));
+      if (!product) return;
+
+      btn.disabled = true;
+
+      try {
+        if (action === 'edit') {
+          openEditModal(product);
+          btn.disabled = false;
+          return;
+        }
+
+        if (action === 'feature') {
+          const { error } = await _supabase.from('products')
+            .update({ is_featured: !product.is_featured }).eq('id', id);
+          if (error) throw error;
+          product.is_featured = !product.is_featured;
+          updateStats();
+          renderProducts();
+        }
+
+        if (action === 'toggle') {
+          const newVal = product.is_active === false;
+          const { error } = await _supabase.from('products')
+            .update({ is_active: newVal }).eq('id', id);
+          if (error) throw error;
+          product.is_active = newVal;
+          updateStats();
+          renderProducts();
+        }
+
+        if (action === 'delete') {
+          if (!confirm(`¿Eliminar "${product.title}"? Esta acción no se puede deshacer.`)) {
+            btn.disabled = false;
+            return;
+          }
+          const { error } = await _supabase.from('products').delete().eq('id', id);
+          if (error) throw error;
+          if (product.image_url) await deleteImageByUrl(product.image_url, 'products');
+          allProducts = allProducts.filter(x => String(x.id) !== String(id));
+          updateStats();
+          renderProducts();
+        }
+      } catch (err) {
+        console.error(err);
+        alert('Error: ' + (err.message || 'desconocido'));
+        btn.disabled = false;
+      }
+    }
+
+    function openEditModal(product) {
+      const e = window.adminEscapeHtml || (s => String(s || ''));
+      const placeholder = window.PLACEHOLDER_IMG || 'img/placeholder.png';
+      const modal = document.getElementById('editModal');
+      const box = document.getElementById('editModalContent');
+
+      const storeOptions = allStores.map(s =>
+        '<option value="' + s.id + '" ' + (s.id === product.store_id ? 'selected' : '') + '>' + e(s.name) + '</option>'
+      ).join('');
+
+      const catOptions = allCategories.map(c =>
+        '<option value="' + c.id + '" ' + (c.id === product.category_id ? 'selected' : '') + '>' + (c.icon || '') + ' ' + e(c.name) + '</option>'
+      ).join('');
+
+      const badgeOptions = ['', '✨ Nuevo', '🔥 Lo más vendido', '⚡ Oferta', '🎂 Por encargo', '⭐ Recomendado', '🌱 Artesanal', '💎 Premium'];
+      const badgeSelectOptions = badgeOptions.map(b => {
+        const isSel = b === (product.badge_tag || '');
+        const label = b || '— Sin etiqueta —';
+        return '<option value="' + e(b) + '" ' + (isSel ? 'selected' : '') + '>' + e(label) + '</option>';
+      }).join('');
+
+      box.innerHTML = `
+        <div class="flex items-start justify-between mb-4">
+          <div class="min-w-0">
+            <h3 class="text-lg font-extrabold text-gray-800">Editar producto (Admin)</h3>
+            <p class="text-xs text-gray-500 mt-0.5">ID: <span class="font-mono">${e(product.id)}</span></p>
+          </div>
+          <button id="closeEditModalBtn" type="button"
+            class="bg-gray-100 hover:bg-gray-200 text-gray-700 w-9 h-9 rounded-lg flex items-center justify-center transition flex-shrink-0">✕</button>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
+          <div class="sm:col-span-1">
+            <img id="editImgPreview" src="${product.image_url || placeholder}"
+                 onerror="this.onerror=null;this.src='${placeholder}'"
+                 class="w-full aspect-square rounded-xl object-cover bg-gray-100 border">
+          </div>
+          <div class="sm:col-span-2 space-y-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-700">Título *</label>
+              <input type="text" id="editTitle" value="${e(product.title)}" required
+                class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+            </div>
+            <div>
+              <label class="block text-xs font-medium text-gray-700">Descripción</label>
+              <textarea id="editDescription" rows="2"
+                class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm focus:ring-2 focus:ring-amber-500 outline-none">${e(product.description || '')}</textarea>
+            </div>
+            <div class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-xs font-medium text-gray-700">Precio Base (Q) *</label>
+                <input type="number" step="0.01" min="0" id="editPrice" value="${product.price || 0}" required
+                  class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+              </div>
+              <div>
+                <label class="block text-xs font-medium text-gray-700">Stock (vacío = ilimitado)</label>
+                <input type="number" min="0" id="editStock" value="${product.stock_quantity === null || product.stock_quantity === undefined ? '' : product.stock_quantity}"
+                  class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 mb-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-700">Tienda *</label>
+            <select id="editStore" required
+              class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none">
+              ${storeOptions}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700">Categoría</label>
+            <select id="editCategory"
+              class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none">
+              <option value="">Sin categoría</option>
+              ${catOptions}
+            </select>
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3 mb-4">
+          <div>
+            <label class="block text-xs font-medium text-gray-700">Etiqueta especial</label>
+            <select id="editBadge"
+              class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm bg-white focus:ring-2 focus:ring-amber-500 outline-none">
+              ${badgeSelectOptions}
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700">Tiempo de preparación</label>
+            <input type="text" id="editPrepTime" value="${e(product.prep_time || '')}" placeholder="Ej. Encargar 24h"
+              class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+          </div>
+          <div>
+            <label class="block text-xs font-medium text-gray-700">Pedido mínimo</label>
+            <input type="number" min="1" id="editMinOrder" value="${product.min_order_qty || 1}"
+              class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+          </div>
+        </div>
+
+        <div class="mb-4">
+          <label class="block text-xs font-medium text-gray-700 mb-1">URL de imagen principal</label>
+          <input type="url" id="editImageUrl" value="${e(product.image_url || '')}" placeholder="https://..."
+            class="w-full border border-gray-300 p-2 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none">
+        </div>
+
+        <div class="flex flex-wrap gap-4 p-3 bg-gray-50 rounded-lg mb-4">
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="editActive" ${product.is_active !== false ? 'checked' : ''}
+              class="w-4 h-4 accent-emerald-600">
+            <span class="text-sm font-medium text-gray-700">✅ Activo en el catálogo</span>
+          </label>
+          <label class="inline-flex items-center gap-2 cursor-pointer">
+            <input type="checkbox" id="editFeatured" ${product.is_featured ? 'checked' : ''}
+              class="w-4 h-4 accent-amber-500">
+            <span class="text-sm font-medium text-gray-700">⭐ Destacado en portada</span>
+          </label>
+        </div>
+
+        <div class="flex flex-col sm:flex-row gap-2 pt-2 border-t">
+          <button id="deleteFromModalBtn" type="button"
+            class="flex-1 sm:flex-none bg-red-50 hover:bg-red-100 text-red-600 font-bold text-sm px-4 py-2.5 rounded-lg transition">
+            🗑️ Eliminar producto
+          </button>
+          <div class="flex-1"></div>
+          <button id="cancelEditBtn" type="button"
+            class="flex-1 sm:flex-none bg-gray-200 hover:bg-gray-300 text-gray-700 font-semibold text-sm px-5 py-2.5 rounded-lg transition">
+            Cancelar
+          </button>
+          <button id="saveEditBtn" type="button"
+            class="flex-1 sm:flex-none bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-sm px-6 py-2.5 rounded-lg transition disabled:opacity-60">
+            Guardar cambios
+          </button>
+        </div>
+      `;
+
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+
+      const closeFn = () => {
+        modal.classList.add('hidden');
+        document.body.style.overflow = '';
+        box.innerHTML = '';
+      };
+
+      document.getElementById('closeEditModalBtn')?.addEventListener('click', closeFn);
+      document.getElementById('cancelEditBtn')?.addEventListener('click', closeFn);
+
+      document.getElementById('editImageUrl')?.addEventListener('input', (ev) => {
+        const url = ev.target.value.trim();
+        const imgEl = document.getElementById('editImgPreview');
+        if (imgEl) imgEl.src = url || placeholder;
+      });
+
+      document.getElementById('saveEditBtn')?.addEventListener('click', async () => {
+        const btn = document.getElementById('saveEditBtn');
+        btn.disabled = true; btn.textContent = 'Guardando...';
+
+        try {
+          const title = document.getElementById('editTitle').value.trim();
+          const description = document.getElementById('editDescription').value.trim() || null;
+          const price = parseFloat(document.getElementById('editPrice').value);
+          const stockRaw = document.getElementById('editStock').value.trim();
+          const stock_quantity = stockRaw === '' ? null : Math.max(0, parseInt(stockRaw, 10));
+          const store_id = document.getElementById('editStore').value;
+          const category_id = document.getElementById('editCategory').value || null;
+          const badge_tag = document.getElementById('editBadge').value || null;
+          const prep_time = document.getElementById('editPrepTime').value.trim() || null;
+          const min_order_qty = parseInt(document.getElementById('editMinOrder').value, 10) || 1;
+          const image_url = document.getElementById('editImageUrl').value.trim() || null;
+          const is_active = document.getElementById('editActive').checked;
+          const is_featured = document.getElementById('editFeatured').checked;
+
+          if (!title) throw new Error('El título es obligatorio.');
+          if (!store_id) throw new Error('La tienda es obligatoria.');
+          if (isNaN(price) || price < 0) throw new Error('Precio inválido.');
+
+          const { error } = await _supabase.from('products').update({
+            title,
+            description,
+            price,
+            stock_quantity,
+            store_id,
+            category_id,
+            badge_tag,
+            prep_time,
+            min_order_qty,
+            image_url,
+            is_active,
+            is_featured,
+          }).eq('id', product.id);
+          if (error) throw error;
+
+          btn.textContent = '✅ Guardado';
+          setTimeout(() => {
+            closeFn();
+            loadProducts();
+          }, 500);
+        } catch (err) {
+          console.error(err);
+          alert('Error al guardar: ' + (err.message || 'desconocido'));
+          btn.disabled = false; btn.textContent = 'Guardar cambios';
+        }
+      });
+
+      document.getElementById('deleteFromModalBtn')?.addEventListener('click', async () => {
+        if (!confirm(`¿Eliminar "${product.title}"? Esta acción no se puede deshacer.`)) return;
+        const btn = document.getElementById('deleteFromModalBtn');
+        btn.disabled = true; btn.textContent = 'Eliminando...';
+
+        try {
+          const { error } = await _supabase.from('products').delete().eq('id', product.id);
+          if (error) throw error;
+          if (product.image_url) await deleteImageByUrl(product.image_url, 'products');
+
+          closeFn();
+          allProducts = allProducts.filter(x => String(x.id) !== String(product.id));
+          updateStats();
+          renderProducts();
+        } catch (err) {
+          console.error(err);
+          alert('Error: ' + (err.message || 'desconocido'));
+          btn.disabled = false; btn.textContent = '🗑️ Eliminar producto';
+        }
+      });
+    }
+
+    document.addEventListener('keydown', (ev) => {
+      if (ev.key === 'Escape' && !document.getElementById('editModal')?.classList.contains('hidden')) {
+        document.getElementById('editModal').classList.add('hidden');
+        document.body.style.overflow = '';
+        document.getElementById('editModalContent').innerHTML = '';
+      }
+    });
+  </script>
+</body>
+</html>

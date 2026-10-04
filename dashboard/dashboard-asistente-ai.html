@@ -1,0 +1,507 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <title>Asistente de Ventas AI · Pasaje de los Altos</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=4"></script>
+  <script src="../js/theme-loader.js?v=4"></script>
+  <script src="../js/dashboard-utils.js?v=4"></script>
+  <script src="../js/dashboard-sidebar.js?v=6"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    .cat-chip {
+      transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+      cursor: pointer;
+    }
+    .cat-chip.active {
+      background-color: #0f172a;
+      color: #ffffff;
+      border-color: #0f172a;
+      box-shadow: 0 10px 15px -3px rgba(15, 23, 42, 0.2);
+      transform: translateY(-2px);
+    }
+    .chat-bubble {
+      background-color: #dcf8c6;
+      border-radius: 18px;
+      border-top-right-radius: 4px;
+      box-shadow: 0 2px 5px rgba(0,0,0,0.06);
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+  <div id="dashboardHeader"></div>
+
+  <main class="max-w-6xl mx-auto p-4 pb-16">
+    <div id="dashboardTabs"></div>
+
+    <div id="loadingState" class="bg-white/80 backdrop-blur rounded-2xl border border-slate-200/80 p-8 text-center text-sm text-slate-500 shadow-sm">
+      Cargando Asistente de Ventas AI...
+    </div>
+
+    <section id="content" class="hidden space-y-6">
+
+      <!-- BANNER SUPERIOR DE ENCABEZADO -->
+      <div class="bg-gradient-to-r from-slate-900 via-indigo-950 to-slate-900 rounded-3xl p-6 sm:p-8 text-white shadow-xl relative overflow-hidden">
+        <div class="absolute -right-10 -bottom-10 text-white/5 text-9xl font-black pointer-events-none">🪄</div>
+        <div class="relative z-10 max-w-2xl space-y-2">
+          <div class="inline-flex items-center gap-2 bg-emerald-500/20 text-emerald-300 text-xs font-black px-3 py-1 rounded-full border border-emerald-500/30">
+            <span>✨ Asistente Generativo de WhatsApp</span>
+          </div>
+          <h1 class="text-2xl sm:text-3xl font-black tracking-tight">Copiar y Pegar en 1-Clic</h1>
+          <p class="text-xs sm:text-sm text-slate-300 leading-relaxed font-medium">
+            Genera respuestas profesionales y efectivas estructuradas para WhatsApp. Cierra ventas, envía cotizaciones claras y resuelve objeciones en segundos.
+          </p>
+        </div>
+      </div>
+
+      <!-- SELECTOR DE CATEGORÍA DE MENSAJE -->
+      <div class="bg-white/80 backdrop-blur rounded-3xl border border-slate-200/80 p-4 sm:p-5 shadow-sm space-y-3">
+        <label class="block text-xs font-black uppercase tracking-wider text-slate-500">1. Selecciona el Tipo de Respuesta:</label>
+        
+        <div class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5" id="categoryGrid">
+          
+          <button type="button" data-category="welcome" class="cat-chip active p-3 rounded-2xl border border-slate-200 bg-white text-left flex flex-col justify-between space-y-2">
+            <span class="text-xl">👋</span>
+            <div>
+              <p class="text-xs font-black">Bienvenida</p>
+              <p class="text-[10px] opacity-70">Saludo e info inicial</p>
+            </div>
+          </button>
+
+          <button type="button" data-category="quote" class="cat-chip p-3 rounded-2xl border border-slate-200 bg-white text-left flex flex-col justify-between space-y-2">
+            <span class="text-xl">💳</span>
+            <div>
+              <p class="text-xs font-black">Cotización</p>
+              <p class="text-[10px] opacity-70">Precios y datos bancarios</p>
+            </div>
+          </button>
+
+          <button type="button" data-category="tracking" class="cat-chip p-3 rounded-2xl border border-slate-200 bg-white text-left flex flex-col justify-between space-y-2">
+            <span class="text-xl">📍</span>
+            <div>
+              <p class="text-xs font-black">Confirmación</p>
+              <p class="text-[10px] opacity-70">Pago y link de rastreo</p>
+            </div>
+          </button>
+
+          <button type="button" data-category="delay" class="cat-chip p-3 rounded-2xl border border-slate-200 bg-white text-left flex flex-col justify-between space-y-2">
+            <span class="text-xl">⏱️</span>
+            <div>
+              <p class="text-xs font-black">Retrasos</p>
+              <p class="text-[10px] opacity-70">Manejo de demoras</p>
+            </div>
+          </button>
+
+          <button type="button" data-category="close" class="cat-chip p-3 rounded-2xl border border-slate-200 bg-white text-left flex flex-col justify-between space-y-2">
+            <span class="text-xl">🔥</span>
+            <div>
+              <p class="text-xs font-black">Reenganche</p>
+              <p class="text-[10px] opacity-70">Oferta y cierre de venta</p>
+            </div>
+          </button>
+
+        </div>
+      </div>
+
+      <!-- GRID PRINCIPAL: CONTROLES DE PERSONALIZACIÓN Y VISTA PREVIA -->
+      <div class="grid lg:grid-cols-12 gap-6 items-start">
+
+        <!-- COLUMNA IZQUIERDA: FORMULARIO DINÁMICO (5 COLS) -->
+        <div class="lg:col-span-5 bg-white/80 backdrop-blur rounded-3xl border border-slate-200/80 p-5 shadow-sm space-y-4">
+          <div class="flex items-center justify-between border-b border-slate-100 pb-3">
+            <h2 class="text-sm font-black text-slate-900">2. Personaliza los Datos</h2>
+            <span id="toneBadge" class="text-[10px] bg-slate-100 font-bold px-2.5 py-0.5 rounded-full text-slate-600">Tone: Amigable</span>
+          </div>
+
+          <form id="aiForm" class="space-y-3">
+            
+            <!-- CAMPO: Teléfono del Cliente para envío directo -->
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">WhatsApp del Cliente (opcional)</label>
+              <input type="tel" id="inputClientPhone" placeholder="Ej. 50255554444"
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-slate-50 text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+            </div>
+
+            <!-- CAMPO: Nombre del Cliente -->
+            <div>
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Nombre del Cliente *</label>
+              <input type="text" id="inputClientName" value="Cliente" placeholder="Ej. María López" required
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 font-bold">
+            </div>
+
+            <!-- DYNAMIC FIELD: Producto -->
+            <div id="fieldProduct">
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Producto / Servicio *</label>
+              <input type="text" id="inputProduct" placeholder="Ej. Pastel de Chocolate Familiar"
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+            </div>
+
+            <!-- DYNAMIC FIELD: Precio y Envío -->
+            <div id="fieldPrices" class="grid grid-cols-2 gap-2">
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Precio (Q)</label>
+                <input type="number" step="0.01" min="0" id="inputPrice" placeholder="150.00"
+                  class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 font-extrabold">
+              </div>
+              <div>
+                <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Envío (Q)</label>
+                <input type="number" step="0.01" min="0" id="inputShipping" placeholder="20.00"
+                  class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 font-extrabold">
+              </div>
+            </div>
+
+            <!-- DYNAMIC FIELD: Datos Bancarios -->
+            <div id="fieldBank">
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Datos Bancarios / DPB</label>
+              <textarea id="inputBank" rows="2" placeholder="Ej. Banrural Monetaria No. 3000123456 a nombre de Mi Tienda"
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 font-mono"></textarea>
+            </div>
+
+            <!-- DYNAMIC FIELD: ID de Pedido -->
+            <div id="fieldOrderId" class="hidden">
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">ID / UUID del Pedido</label>
+              <input type="text" id="inputOrderId" placeholder="Ej. d27e0aa6-3d18-4736-97e8-05aec4fe8217"
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 font-mono">
+            </div>
+
+            <!-- DYNAMIC FIELD: Tiempo de Retraso -->
+            <div id="fieldDelay" class="hidden">
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Tiempo Estimado / Motivo</label>
+              <input type="text" id="inputDelayText" placeholder="Ej. 30 minutos extra por alta demanda"
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+            </div>
+
+            <!-- DYNAMIC FIELD: Descuento / Promo -->
+            <div id="fieldPromo" class="hidden">
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1">Oferta / Regalo Especial</label>
+              <input type="text" id="inputPromoText" placeholder="Ej. Envío GRATIS si confirmas hoy"
+                class="w-full border border-slate-200 p-2.5 rounded-xl text-xs bg-white text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 font-medium">
+            </div>
+
+            <!-- SELECTOR DE TONO AI -->
+            <div class="pt-2 border-t border-slate-100">
+              <label class="block text-[11px] font-bold text-slate-700 uppercase mb-1.5">Tono de la Respuesta:</label>
+              <div class="grid grid-cols-3 gap-1.5">
+                <button type="button" data-tone="friendly" class="tone-btn text-[11px] font-bold py-2 rounded-xl border border-emerald-600 bg-emerald-50 text-emerald-900 text-center">😀 Amigable</button>
+                <button type="button" data-tone="formal" class="tone-btn text-[11px] font-bold py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-center">💼 Formal</button>
+                <button type="button" data-tone="eager" class="tone-btn text-[11px] font-bold py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-center">🔥 Comercial</button>
+              </div>
+            </div>
+
+          </form>
+        </div>
+
+        <!-- COLUMNA DERECHA: VISTA PREVIA FORMATO WHATSAPP Y ACCIONES (7 COLS) -->
+        <div class="lg:col-span-7 space-y-4">
+          
+          <div class="bg-slate-900 rounded-3xl p-5 text-white shadow-xl space-y-4">
+            <div class="flex items-center justify-between border-b border-white/10 pb-3">
+              <div class="flex items-center gap-2">
+                <span class="w-2.5 h-2.5 rounded-full bg-emerald-400 animate-pulse"></span>
+                <h3 class="text-xs font-black uppercase tracking-wider text-slate-300">Vista Previa para WhatsApp</h3>
+              </div>
+              <span class="text-[10px] font-mono text-slate-400">Formato interactivo</span>
+            </div>
+
+            <!-- SIMULADOR BUBBLE DE WHATSAPP -->
+            <div class="bg-[#efeae2] rounded-2xl p-4 sm:p-5 border border-black/10 min-h-[220px] flex flex-col justify-between">
+              <div class="chat-bubble p-4 text-slate-900 text-xs sm:text-sm font-normal leading-relaxed whitespace-pre-wrap break-words max-w-full font-sans" id="whatsappPreview">
+                Cargando respuesta...
+              </div>
+              <div class="text-[10px] text-slate-400 text-right mt-2 font-mono">Formateado con emojis y negritas *texto*</div>
+            </div>
+
+            <!-- ÁREA TEXTO REUTILIZABLE O EDITABLE -->
+            <div>
+              <label class="block text-[10px] font-bold text-slate-400 uppercase mb-1">Texto generado (puedes ajustarlo manualmente):</label>
+              <textarea id="rawTextarea" rows="4"
+                class="w-full bg-slate-950 border border-slate-800 rounded-2xl p-3 text-xs text-emerald-400 font-mono outline-none focus:ring-2 focus:ring-emerald-500"></textarea>
+            </div>
+
+            <!-- BOTONES DESTACADOS DE ACCIÓN -->
+            <div class="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-2">
+              <button type="button" id="copyBtn"
+                class="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-extrabold py-3.5 px-4 rounded-2xl text-xs sm:text-sm transition shadow-lg flex items-center justify-center gap-2">
+                <span>📋 Copiar al Portapapeles</span>
+              </button>
+
+              <button type="button" id="openWaBtn"
+                class="w-full bg-[#25D366] hover:bg-[#128C7E] text-white font-extrabold py-3.5 px-4 rounded-2xl text-xs sm:text-sm transition shadow-lg flex items-center justify-center gap-2">
+                <span>📱 Abrir en WhatsApp</span>
+              </button>
+            </div>
+
+            <div id="feedbackToast" class="hidden p-2.5 bg-emerald-500/20 border border-emerald-500/40 rounded-xl text-center text-emerald-300 text-xs font-bold animate-bounce">
+              ¡Texto copiado con éxito al portapapeles! 🚀
+            </div>
+
+          </div>
+
+        </div>
+
+      </div>
+
+    </section>
+  </main>
+
+  <script>
+    let currentStore = null;
+    let selectedCategory = 'welcome';
+    let selectedTone = 'friendly';
+
+    const inputClientName = document.getElementById('inputClientName');
+    const inputClientPhone = document.getElementById('inputClientPhone');
+    const inputProduct = document.getElementById('inputProduct');
+    const inputPrice = document.getElementById('inputPrice');
+    const inputShipping = document.getElementById('inputShipping');
+    const inputBank = document.getElementById('inputBank');
+    const inputOrderId = document.getElementById('inputOrderId');
+    const inputDelayText = document.getElementById('inputDelayText');
+    const inputPromoText = document.getElementById('inputPromoText');
+    const rawTextarea = document.getElementById('rawTextarea');
+    const whatsappPreview = document.getElementById('whatsappPreview');
+    const copyBtn = document.getElementById('copyBtn');
+    const openWaBtn = document.getElementById('openWaBtn');
+    const feedbackToast = document.getElementById('feedbackToast');
+
+    (async () => {
+      try {
+        const guardRes = await guardDashboardPage();
+        if (!guardRes || !guardRes.session || !guardRes.store) return;
+
+        currentStore = guardRes.store;
+        await initDashboardNav({ store: currentStore, user: guardRes.session.user });
+
+        document.getElementById('loadingState').classList.add('hidden');
+        document.getElementById('content').classList.remove('hidden');
+
+        setupEvents();
+        updateCategoryFields();
+        generateMessage();
+      } catch (err) {
+        console.error('[AsistenteAI] Error:', err);
+      }
+    })();
+
+    function setupEvents() {
+      // Selector de Categoría
+      document.querySelectorAll('#categoryGrid .cat-chip').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('#categoryGrid .cat-chip').forEach(b => b.classList.remove('active'));
+          btn.classList.add('active');
+          selectedCategory = btn.dataset.category;
+          updateCategoryFields();
+          generateMessage();
+        });
+      });
+
+      // Selector de Tono
+      document.querySelectorAll('.tone-btn').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('.tone-btn').forEach(b => {
+            b.className = 'tone-btn text-[11px] font-bold py-2 rounded-xl border border-slate-200 bg-white text-slate-700 text-center';
+          });
+          btn.className = 'tone-btn text-[11px] font-bold py-2 rounded-xl border border-emerald-600 bg-emerald-50 text-emerald-900 text-center';
+          selectedTone = btn.dataset.tone;
+          document.getElementById('toneBadge').textContent = `Tone: ${btn.textContent.trim()}`;
+          generateMessage();
+        });
+      });
+
+      // Inputs reactivos
+      const inputs = [inputClientName, inputClientPhone, inputProduct, inputPrice, inputShipping, inputBank, inputOrderId, inputDelayText, inputPromoText];
+      inputs.forEach(inp => inp?.addEventListener('input', generateMessage));
+
+      // Edición manual en textarea
+      rawTextarea?.addEventListener('input', () => {
+        renderFormattedPreview(rawTextarea.value);
+      });
+
+      // Botón Copiar
+      copyBtn?.addEventListener('click', () => {
+        const textToCopy = rawTextarea.value;
+        if (!textToCopy) return;
+
+        navigator.clipboard.writeText(textToCopy).then(() => {
+          showFeedback('¡Copiado al portapapeles! 🚀');
+        }).catch(() => {
+          rawTextarea.select();
+          document.execCommand('copy');
+          showFeedback('¡Copiado al portapapeles! 🚀');
+        });
+      });
+
+      // Botón Abrir en WhatsApp
+      openWaBtn?.addEventListener('click', () => {
+        const cleanPhone = window.cleanPhone || (raw => String(raw || '').replace(/\D/g, ''));
+        const phone = cleanPhone(inputClientPhone.value);
+        const text = encodeURIComponent(rawTextarea.value);
+
+        if (phone) {
+          window.open(`https://wa.me/${phone}?text=${text}`, '_blank');
+        } else {
+          window.open(`https://wa.me/?text=${text}`, '_blank');
+        }
+      });
+    }
+
+    function showFeedback(msg) {
+      feedbackToast.textContent = msg;
+      feedbackToast.classList.remove('hidden');
+      setTimeout(() => feedbackToast.classList.add('hidden'), 2500);
+    }
+
+    function updateCategoryFields() {
+      const fieldProduct = document.getElementById('fieldProduct');
+      const fieldPrices = document.getElementById('fieldPrices');
+      const fieldBank = document.getElementById('fieldBank');
+      const fieldOrderId = document.getElementById('fieldOrderId');
+      const fieldDelay = document.getElementById('fieldDelay');
+      const fieldPromo = document.getElementById('fieldPromo');
+
+      // Ocultar todos por defecto
+      [fieldProduct, fieldPrices, fieldBank, fieldOrderId, fieldDelay, fieldPromo].forEach(el => el?.classList.add('hidden'));
+
+      if (selectedCategory === 'welcome') {
+        fieldProduct?.classList.remove('hidden');
+      } else if (selectedCategory === 'quote') {
+        fieldProduct?.classList.remove('hidden');
+        fieldPrices?.classList.remove('hidden');
+        fieldBank?.classList.remove('hidden');
+      } else if (selectedCategory === 'tracking') {
+        fieldProduct?.classList.remove('hidden');
+        fieldOrderId?.classList.remove('hidden');
+      } else if (selectedCategory === 'delay') {
+        fieldProduct?.classList.remove('hidden');
+        fieldOrderId?.classList.remove('hidden');
+        fieldDelay?.classList.remove('hidden');
+      } else if (selectedCategory === 'close') {
+        fieldProduct?.classList.remove('hidden');
+        fieldPrices?.classList.remove('hidden');
+        fieldPromo?.classList.remove('hidden');
+      }
+    }
+
+    function generateMessage() {
+      const storeName = currentStore?.name || 'nuestra tienda';
+      const client = inputClientName.value.trim() || 'Cliente';
+      const product = inputProduct.value.trim() || 'tu producto';
+      const priceVal = parseFloat(inputPrice.value) || 0;
+      const shippingVal = parseFloat(inputShipping.value) || 0;
+      const totalVal = (priceVal + shippingVal).toFixed(2);
+      const bank = inputBank.value.trim() || 'Consultar datos bancarios con el vendedor';
+      const orderId = inputOrderId.value.trim() || '[ID_PEDIDO]';
+      const delayReason = inputDelayText.value.trim() || 'alta demanda de entregas';
+      const promoText = inputPromoText.value.trim() || 'un descuento especial en tu orden';
+
+      const origin = window.location.origin.includes('http') ? window.location.origin : 'https://pasajedelosaltos.com';
+      const trackingUrl = `${origin}/rastreo.html?id=${orderId}`;
+
+      let msg = '';
+
+      if (selectedCategory === 'welcome') {
+        if (selectedTone === 'friendly') {
+          msg = `¡Hola *${client}*! 👋 Bienvenid@ a *${storeName}*. Me alegra mucho saludarte. ¿En qué producto o servicio te podemos asesorar hoy? Quedo a tu disposición.`;
+        } else if (selectedTone === 'formal') {
+          msg = `Estimado/a *${client}*, le damos la bienvenida a *${storeName}*. Agradecemos su interés en nuestras opciones. ¿En qué podemos colaborar con usted hoy?`;
+        } else {
+          msg = `¡Hola *${client}*! 🔥 Gracias por escribir a *${storeName}*. Tenemos excelentes opciones disponibles hoy. ¿Qué producto te gustaría conocer más?`;
+        }
+      } else if (selectedCategory === 'quote') {
+        if (selectedTone === 'friendly') {
+          msg = `¡Excelente elección, *${client}*! Aquí tienes la cotización para tu pedido en *${storeName}*:\n\n` +
+                `📦 *Producto:* ${product}\n` +
+                `💰 *Precio:* Q ${priceVal.toFixed(2)}\n` +
+                `🛵 *Envío:* Q ${shippingVal.toFixed(2)}\n` +
+                `💳 *TOTAL A PAGAR:* *Q ${totalVal}*\n\n` +
+                `📌 *DATOS PARA DEPÓSITO O TRANSFERENCIA:*\n${bank}\n\n` +
+                `Por favor envíanos tu comprobante cuando realices el pago para preparar tu envío. ¡Gracias por preferirnos!`;
+        } else if (selectedTone === 'formal') {
+          msg = `Estimado/a *${client}*, adjuntamos el detalle de su cotización con *${storeName}*:\n\n` +
+                `• *Detalle:* ${product}\n` +
+                `• *Monto:* Q ${priceVal.toFixed(2)}\n` +
+                `• *Servicio de Entrega:* Q ${shippingVal.toFixed(2)}\n` +
+                `• *TOTAL FINAL:* *Q ${totalVal}*\n\n` +
+                `📌 *INFORMACIÓN BANCARIA:*\n${bank}\n\n` +
+                `Agradecemos enviar la constancia de pago correspondiente para proceder con su solicitud.`;
+        } else {
+          msg = `¡Hola *${client}*! 🔥 Te tenemos listo tu pedido en *${storeName}* por solo *Q ${totalVal}* (Incluye envío Q${shippingVal.toFixed(2)}).\n\n` +
+                `📌 *PAGA FÁCIL Y RÁPIDO AQUÍ:*\n${bank}\n\n` +
+                `¡Envíanos tu boleta hoy mismo y aseguramos la entrega de tu *${product}*!`;
+        }
+      } else if (selectedCategory === 'tracking') {
+        if (selectedTone === 'friendly') {
+          msg = `¡Pago confirmado, *${client}*! 🎉 Muchas gracias por tu compra en *${storeName}*.\n\n` +
+                `Tu pedido de *${product}* ha sido registrado e ingresado a preparación.\n\n` +
+                `📍 *SIGUE EL ESTADO EN VIVO DE TU PEDIDO AQUÍ:*\n${trackingUrl}\n\n` +
+                `Te notificaremos en cuanto vaya en camino. ¡Que tengas un excelente día!`;
+        } else if (selectedTone === 'formal') {
+          msg = `Estimado/a *${client}*, confirmamos la recepción satisfactoria de su pago en *${storeName}*.\n\n` +
+                `Su solicitud se encuentra en estado de preparación.\n\n` +
+                `📍 *Consulte el rastreo en tiempo real a través del siguiente enlace:*\n${trackingUrl}\n\n` +
+                `Quedamos a su disposición.`;
+        } else {
+          msg = `¡Listo *${client}*! 🔥 Tu pago está verificado y tu *${product}* ya está en marcha.\n\n` +
+                `📍 *Rastrea tu envío en 1 clic aquí:*\n${trackingUrl}\n\n` +
+                `¡Gracias por comprar en *${storeName}*!`;
+        }
+      } else if (selectedCategory === 'delay') {
+        if (selectedTone === 'friendly') {
+          msg = `Hola *${client}*, te saludamos de *${storeName}*. Queremos informarte que tu pedido *${product}* presenta un ligero retraso debido a *${delayReason}*.\n\n` +
+                `Te pedimos una sincera disculpa por el inconveniente. Estamos trabajando para entregártelo lo antes posible.\n\n` +
+                `📍 Puedes revisar la actualización del pedido aquí:\n${trackingUrl}`;
+        } else if (selectedTone === 'formal') {
+          msg = `Estimado/a *${client}*, nos comunicamos de *${storeName}* para notificarle un ajuste en el tiempo de entrega de su orden por motivo de *${delayReason}*.\n\n` +
+                `Presentamos nuestras disculpas por el retraso ocasionado y mantenemos el compromiso de completar su entrega a la brevedad posible.`;
+        } else {
+          msg = `¡Hola *${client}*! Queremos que tengas tu *${product}* en perfectas condiciones. Debido a *${delayReason}*, nuestro repartidor se demorará unos minutos más.\n\n` +
+                `¡Agradecemos mucho tu paciencia y comprensión!`;
+        }
+      } else if (selectedCategory === 'close') {
+        if (selectedTone === 'friendly') {
+          msg = `¡Hola de nuevo, *${client}*! 🔥 Notamos que te interesó *${product}* en *${storeName}*.\n\n` +
+                `Tenemos una oportunidad especial para ti: *${promoText}*.\n\n` +
+                `💰 Llévatelo hoy por solo *Q ${priceVal > 0 ? priceVal.toFixed(2) : 'Especial'}*.\n` +
+                `¿Te gustaría que te lo reservemos para envío hoy mismo? Quedan muy pocas unidades disponibles.`;
+        } else if (selectedTone === 'formal') {
+          msg = `Estimado/a *${client}*, le saludamos de *${storeName}*. Le informamos que disponemos de una promoción activa para *${product}*: *${promoText}*.\n\n` +
+                `Quedamos atentos si desea aprovechar esta oportunidad antes del cierre de inventario.`;
+        } else {
+          msg = `¡*${client}*, no te quedes sin el tuyo! ⚡ En *${storeName}* tenemos una super oferta exclusiva en *${product}*: *${promoText}*.\n\n` +
+                `Reserva ahora mismo antes de que se agote el stock. ¿Te lo enviamos hoy?`;
+        }
+      }
+
+      rawTextarea.value = msg;
+      renderFormattedPreview(msg);
+    }
+
+    function renderFormattedPreview(text) {
+      if (!text) {
+        whatsappPreview.innerHTML = '<span class="text-slate-400 font-italic">Sin contenido...</span>';
+        return;
+      }
+
+      // Convertir formato WhatsApp (*negrita*) a HTML (<strong>negrita</strong>)
+      let formatted = escapeHtml(text)
+        .replace(/\*(.*?)\*/g, '<strong>$1</strong>')
+        .replace(/_(.*?)_/g, '<em>$1</em>');
+
+      whatsappPreview.innerHTML = formatted;
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>

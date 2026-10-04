@@ -1,0 +1,336 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Tiendas · Admin</title>
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js"></script>
+  <script src="../js/theme-loader.js?v=3"></script>
+  <script src="../js/admin-utils.js?v=6"></script>
+  <script src="../js/admin-sidebar.js?v=1"></script>
+  <script src="../js/liquid-glass.js?v=1"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Inter', sans-serif; }</style>
+</head>
+<body class="bg-gray-100 min-h-screen">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-7xl mx-auto p-4">
+    <div id="adminTabs"></div>
+
+    <div id="loadingState" class="bg-white rounded-xl shadow-sm border p-8 text-center text-sm text-gray-500">Cargando tiendas...</div>
+
+    <section id="content" class="hidden space-y-4">
+
+      <!-- Solicitudes de eliminación pendientes -->
+      <div id="deletionRequestsSection" class="hidden bg-amber-50 border-2 border-amber-200 rounded-xl p-4">
+        <div class="flex items-start gap-3 mb-3">
+          <div class="text-3xl">🗑️</div>
+          <div>
+            <h2 class="text-lg font-extrabold text-amber-900">Solicitudes de eliminación pendientes</h2>
+            <p class="text-xs text-amber-800">Aprueba para eliminar la tienda y todos sus datos, o rechaza para mantenerla.</p>
+          </div>
+        </div>
+        <div id="deletionRequestsList" class="space-y-3"></div>
+      </div>
+
+      <!-- Buscador -->
+      <div class="bg-white rounded-xl shadow-sm border p-4">
+        <input id="storeSearch" type="text" placeholder="Buscar tienda por nombre, plan, zona o propietario..."
+          class="w-full border border-gray-300 p-2.5 rounded-lg text-sm focus:ring-2 focus:ring-amber-500 outline-none bg-white">
+      </div>
+
+      <div id="storesList" class="bg-white rounded-xl shadow-sm border overflow-hidden divide-y">
+        <p class="p-8 text-center text-sm text-gray-500">Cargando tiendas...</p>
+      </div>
+    </section>
+  </main>
+
+  <!-- Modal editar tienda -->
+  <div id="editStoreModal" class="hidden fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+    <div class="bg-white rounded-2xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto">
+      <div id="editStoreModalContent" class="p-6"></div>
+    </div>
+  </div>
+
+  <script>
+    let allStores = [];
+    let allCategories = [];
+    const modal = document.getElementById('editStoreModal');
+
+    (async () => {
+      const session = await adminGuardPage();
+      if (!session) return;
+      await initAdminNav({ user: session.user });
+
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+
+      await loadCategories();
+      await loadStores();
+      document.getElementById('storeSearch').addEventListener('input', renderStores);
+    })();
+
+    async function loadCategories() {
+      const { data } = await _supabase.from('categories').select('*').order('sort_order');
+      allCategories = data || [];
+    }
+
+    async function loadStores() {
+      const container = document.getElementById('storesList');
+      container.innerHTML = '<p class="p-8 text-center text-sm text-gray-500">Cargando tiendas...</p>';
+
+      const { data, error } = await _supabase
+        .from('stores')
+        .select(`*, products(count)`)
+        .order('created_at', { ascending: false });
+
+      if (error) {
+        container.innerHTML = '<p class="p-8 text-center text-sm text-red-500">Error al cargar tiendas.</p>';
+        return;
+      }
+      allStores = data || [];
+      renderDeletionRequests();
+      renderStores();
+    }
+
+    function renderDeletionRequests() {
+      const section = document.getElementById('deletionRequestsSection');
+      const list = document.getElementById('deletionRequestsList');
+      const e = adminEscapeHtml;
+
+      const pending = allStores.filter(s => s.deletion_requested === true);
+
+      if (pending.length === 0) {
+        section.classList.add('hidden');
+        list.innerHTML = '';
+        return;
+      }
+
+      section.classList.remove('hidden');
+      list.innerHTML = pending.map(s => {
+        const logo = s.logo_url || PLACEHOLDER_IMG;
+        const dateStr = s.deletion_requested_at ? adminFormatDate(s.deletion_requested_at) : '—';
+
+        return `
+          <div class="bg-white rounded-lg border border-amber-200 p-3">
+            <div class="flex items-start gap-3 flex-wrap">
+              <img src="${logo}" alt="${e(s.name)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" class="w-14 h-14 rounded-full object-cover bg-gray-100 flex-shrink-0 border">
+              <div class="flex-1 min-w-0">
+                <h3 class="font-bold text-gray-800 truncate">${e(s.name)}</h3>
+                <p class="text-[11px] text-gray-500">Solicitada el ${dateStr}</p>
+                ${s.deletion_reason ? `<p class="text-xs text-gray-700 mt-2 bg-amber-50 border border-amber-100 rounded p-2 italic">"${e(s.deletion_reason)}"</p>` : ''}
+              </div>
+            </div>
+            <div class="flex gap-2 mt-3 pt-3 border-t flex-wrap">
+              <button data-del-reject="${s.id}" class="text-xs bg-emerald-50 hover:bg-emerald-100 text-emerald-700 font-bold px-3 py-1.5 rounded-lg transition">✅ Rechazar solicitud</button>
+              <button data-del-approve="${s.id}" class="text-xs bg-red-600 hover:bg-red-700 text-white font-bold px-3 py-1.5 rounded-lg transition">🗑️ Aprobar y eliminar</button>
+            </div>
+          </div>`;
+      }).join('');
+
+      list.querySelectorAll('[data-del-reject]').forEach(btn => {
+        btn.addEventListener('click', () => rejectDeletion(btn.dataset.delReject));
+      });
+      list.querySelectorAll('[data-del-approve]').forEach(btn => {
+        btn.addEventListener('click', () => approveDeletion(btn.dataset.delApprove));
+      });
+    }
+
+    async function rejectDeletion(storeId) {
+      const { error } = await _supabase.from('stores').update({ deletion_requested: false, deletion_reason: null }).eq('id', storeId);
+      if (error) alert('Error: ' + error.message);
+      else await loadStores();
+    }
+
+    async function approveDeletion(storeId) {
+      if (!confirm('¿Aprobar la eliminación definitiva de esta tienda?')) return;
+      const { error } = await _supabase.from('stores').delete().eq('id', storeId);
+      if (error) alert('Error: ' + error.message);
+      else await loadStores();
+    }
+
+    function renderStores() {
+      const container = document.getElementById('storesList');
+      const e = adminEscapeHtml;
+      const term = document.getElementById('storeSearch').value.toLowerCase().trim();
+
+      const list = allStores.filter(s => {
+        if (!term) return true;
+        return (s.name || '').toLowerCase().includes(term) || 
+               (s.owner_full_name || '').toLowerCase().includes(term) ||
+               (s.plan_type || '').toLowerCase().includes(term) ||
+               (s.zone || '').toLowerCase().includes(term);
+      });
+
+      if (list.length === 0) {
+        container.innerHTML = '<p class="p-8 text-center text-sm text-gray-500">Sin resultados.</p>';
+        return;
+      }
+
+      container.innerHTML = list.map(s => {
+        const logo = s.logo_url || PLACEHOLDER_IMG;
+        const nProd = s.products?.[0]?.count ?? 0;
+        const isVerified = !!s.is_verified;
+        const isPhysical = s.has_physical_store !== false;
+
+        const planName = (s.plan_type || 'free').toUpperCase();
+        let planColor = 'bg-slate-100 text-slate-700 border-slate-300';
+        if (s.plan_type === 'pro') planColor = 'bg-indigo-100 text-indigo-800 border-indigo-300';
+        if (s.plan_type === 'advanced') planColor = 'bg-amber-100 text-amber-900 border-amber-300 font-black';
+
+        const badge = isPhysical
+          ? `<span class="bg-emerald-100 text-emerald-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">📍 Local Físico - ${e(s.zone || 'Zona 1')}</span>`
+          : `<span class="bg-amber-100 text-amber-800 text-[10px] font-extrabold px-2 py-0.5 rounded-full">🛵 Venta en Línea (${e(s.zone || 'Xela')})</span>`;
+
+        return `
+          <div class="p-4 flex items-start gap-3 flex-wrap">
+            <img src="${logo}" alt="${e(s.name)}" onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'" class="w-14 h-14 rounded-full object-cover bg-gray-100 flex-shrink-0 border">
+            <div class="flex-1 min-w-0">
+              <div class="flex items-center gap-2 flex-wrap">
+                <h3 class="font-bold text-gray-800 truncate">${e(s.name)}</h3>
+                ${isVerified ? '<span class="text-[10px] bg-blue-100 text-blue-800 font-extrabold px-2 py-0.5 rounded-full">✓ Verificada</span>' : ''}
+                <span class="text-[10px] font-extrabold px-2 py-0.5 rounded-full border ${planColor}">Plan ${planName}</span>
+              </div>
+              <div class="mt-1">${badge}</div>
+              <p class="text-xs text-gray-500 mt-1">👤 ${e(s.owner_full_name || 'Sin propietario')} · 📱 +${e(s.whatsapp || '—')} · 📦 ${nProd} productos</p>
+              <p class="text-xs text-gray-400 mt-0.5 truncate">🏢 ${e(s.address_details || s.address || 'Sin dirección')}</p>
+            </div>
+            <div class="flex gap-1.5 flex-wrap flex-shrink-0">
+              <button data-store-verify="${s.id}" class="text-xs font-bold px-3 py-1.5 rounded-lg transition ${isVerified ? 'bg-blue-600 text-white' : 'bg-slate-100 text-slate-700 hover:bg-slate-200'}">
+                ${isVerified ? '✓ Verificada' : 'Verificar Tienda'}
+              </button>
+              <button data-store-edit="${s.id}" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-semibold px-3 py-1.5 rounded-lg transition">✏️ Editar Plan</button>
+              <a href="../tienda.html?slug=${encodeURIComponent(s.slug)}" target="_blank" class="text-xs bg-gray-100 hover:bg-gray-200 text-gray-700 font-semibold px-3 py-1.5 rounded-lg transition">👁️ Ver</a>
+            </div>
+          </div>`;
+      }).join('');
+
+      container.querySelectorAll('[data-store-verify]').forEach(btn => {
+        btn.addEventListener('click', async () => {
+          const store = allStores.find(x => x.id === btn.dataset.storeVerify);
+          if (!store) return;
+          const { error } = await _supabase.from('stores').update({ is_verified: !store.is_verified }).eq('id', store.id);
+          if (error) alert(error.message);
+          else await loadStores();
+        });
+      });
+
+      container.querySelectorAll('[data-store-edit]').forEach(btn => {
+        btn.addEventListener('click', () => openEditStoreModal(btn.dataset.storeEdit));
+      });
+    }
+
+    function openEditStoreModal(storeId) {
+      const s = allStores.find(x => x.id === storeId);
+      if (!s) return;
+      const e = adminEscapeHtml;
+
+      const zones = ['Zona 1','Zona 2','Zona 3','Zona 4','Zona 5','Zona 6','Zona 7','Zona 8','Zona 9','Zona 10','Zona 11','Interurbano'];
+      const zoneOpts = zones.map(z => `<option value="${z}" ${s.zone === z ? 'selected' : ''}>${z}</option>`).join('');
+
+      const planVal = s.plan_type || 'free';
+      const expireVal = s.plan_expires_at ? s.plan_expires_at.substring(0, 10) : '';
+
+      document.getElementById('editStoreModalContent').innerHTML = `
+        <div class="flex items-start justify-between mb-4">
+          <h3 class="text-lg font-extrabold text-gray-800">Editar Tienda y Plan (Admin)</h3>
+          <button id="closeEditStoreModalBtn" class="bg-gray-100 hover:bg-gray-200 text-gray-700 w-9 h-9 rounded-lg">✕</button>
+        </div>
+
+        <div class="space-y-4">
+          <!-- CONFIGURACIÓN DE SUSCRIPCIÓN Y PLAN -->
+          <div class="p-3.5 bg-gradient-to-r from-amber-50 to-orange-50 border border-amber-200 rounded-xl space-y-3">
+            <h4 class="text-xs font-black uppercase text-amber-900 tracking-wider">💎 Asignación de Plan de Suscripción</h4>
+            <div class="grid grid-cols-2 gap-3">
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Plan de la tienda *</label>
+                <select id="editStorePlanType" class="w-full border border-gray-300 p-2 rounded-lg text-xs font-bold bg-white outline-none focus:ring-2 focus:ring-amber-500">
+                  <option value="free" ${planVal === 'free' ? 'selected' : ''}>Gratis (Máx 10 prods)</option>
+                  <option value="pro" ${planVal === 'pro' ? 'selected' : ''}>Pro (Máx 50 prods)</option>
+                  <option value="advanced" ${planVal === 'advanced' ? 'selected' : ''}>Advanced (Ilimitado)</option>
+                </select>
+              </div>
+
+              <div>
+                <label class="block text-xs font-bold text-gray-700 mb-1">Fecha Vencimiento Plan</label>
+                <input type="date" id="editStorePlanExpiresAt" value="${expireVal}" class="w-full border border-gray-300 p-2 rounded-lg text-xs font-semibold bg-white outline-none">
+              </div>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-700">Nombre comercial *</label>
+            <input type="text" id="editStoreName" value="${e(s.name)}" required class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm outline-none">
+          </div>
+          
+          <div>
+            <label class="block text-xs font-medium text-gray-700">WhatsApp de ventas *</label>
+            <input type="tel" id="editStoreWhatsapp" value="${e(s.whatsapp || '')}" required class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm outline-none">
+          </div>
+
+          <div class="grid grid-cols-2 gap-3">
+            <div>
+              <label class="block text-xs font-medium text-gray-700">Zona de Xela *</label>
+              <select id="editStoreZone" class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm bg-white outline-none">
+                ${zoneOpts}
+              </select>
+            </div>
+
+            <div class="flex items-center pt-5">
+              <label class="inline-flex items-center gap-2 cursor-pointer">
+                <input type="checkbox" id="editStoreHasPhysical" ${s.has_physical_store !== false ? 'checked' : ''} class="w-4 h-4 accent-emerald-600 cursor-pointer">
+                <span class="text-xs font-bold text-gray-800">Local Físico</span>
+              </label>
+            </div>
+          </div>
+
+          <div>
+            <label class="block text-xs font-medium text-gray-700">Dirección comercial / Referencia</label>
+            <input type="text" id="editStoreAddressDetails" value="${e(s.address_details || s.address || '')}" class="w-full border border-gray-300 p-2 rounded-lg mt-1 text-sm outline-none">
+          </div>
+
+          <div class="p-3 bg-blue-50 rounded-lg flex items-center gap-2">
+            <input type="checkbox" id="editStoreVerified" ${s.is_verified ? 'checked' : ''} class="w-4 h-4 accent-blue-600 cursor-pointer">
+            <label for="editStoreVerified" class="text-xs font-bold text-blue-900 cursor-pointer">Marcar como Tienda Verificada (Badge ✓)</label>
+          </div>
+        </div>
+
+        <div class="flex gap-2 pt-4 mt-4 border-t">
+          <button id="cancelEditStoreBtn" class="flex-1 bg-gray-200 text-gray-700 font-semibold text-sm py-2 rounded-lg">Cancelar</button>
+          <button id="saveEditStoreBtn" class="flex-1 bg-emerald-600 text-white font-bold text-sm py-2 rounded-lg">Guardar cambios</button>
+        </div>`;
+
+      modal.classList.remove('hidden');
+
+      const closeFn = () => modal.classList.add('hidden');
+      document.getElementById('closeEditStoreModalBtn')?.addEventListener('click', closeFn);
+      document.getElementById('cancelEditStoreBtn')?.addEventListener('click', closeFn);
+
+      document.getElementById('saveEditStoreBtn')?.addEventListener('click', async () => {
+        const expDate = document.getElementById('editStorePlanExpiresAt').value;
+        const payload = {
+          name: document.getElementById('editStoreName').value.trim(),
+          whatsapp: document.getElementById('editStoreWhatsapp').value.trim(),
+          zone: document.getElementById('editStoreZone').value,
+          has_physical_store: document.getElementById('editStoreHasPhysical').checked,
+          address_details: document.getElementById('editStoreAddressDetails').value.trim(),
+          is_verified: document.getElementById('editStoreVerified').checked,
+          plan_type: document.getElementById('editStorePlanType').value,
+          plan_expires_at: expDate ? new Date(expDate).toISOString() : null
+        };
+
+        const { error } = await _supabase.from('stores').update(payload).eq('id', s.id);
+        if (error) alert(error.message);
+        else { closeFn(); await loadStores(); }
+      });
+    }
+  </script>
+</body>
+</html>

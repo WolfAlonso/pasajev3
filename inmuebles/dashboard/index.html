@@ -1,0 +1,591 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mi Panel Inmobiliario · Pasaje Inmuebles</title>
+  <meta name="theme-color" content="#4f46e5">
+  <link rel="manifest" href="../../manifest.json">
+  <link rel="icon" href="../../img/favicon.ico">
+  <link rel="apple-touch-icon" href="../../img/apple-touch-icon.png">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../../js/supabase.js?v=8"></script>
+  <script src="../../js/theme-loader.js?v=9"></script>
+  <script src="../../js/footer.js?v=4"></script>
+  <script src="../../js/inmuebles-sidebar.js?v=3"></script>
+  <script src="../../js/liquid-glass.js?v=4"></script>
+  <script src="../../js/audio-alerts.js?v=1"></script>
+  <script src="../../js/inmuebles/inmuebles-auth-guard.js?v=2"></script>
+
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background-color: #eef2ff; }
+    .glass-container {
+      background: rgba(255, 255, 255, 0.82);
+      backdrop-filter: blur(12px);
+      -webkit-backdrop-filter: blur(12px);
+      border: 1px solid rgba(226, 232, 240, 0.8);
+    }
+    .tab-btn { transition: all .15s ease; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+  <div id="inmueblesSidebar"></div>
+
+  <header class="glass-header text-white shadow-lg sticky top-0 z-40 border-b border-white/10">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <button id="sidebarToggleBtn" type="button"
+          onclick="if (window.PasajeInmueblesSidebar) window.PasajeInmueblesSidebar.toggle();"
+          class="bg-white/10 hover:bg-white/20 p-2 rounded-xl border border-white/15 text-white lg:hidden">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+        <a href="../../inmuebles/index.html" class="text-lg font-extrabold text-white">Pasaje Inmuebles · <span class="text-indigo-300">Panel</span></a>
+      </div>
+      <div class="flex items-center gap-2">
+        <span id="headerEmail" class="hidden sm:inline text-xs opacity-80 max-w-[180px] truncate"></span>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto p-4 sm:p-6 pb-16 space-y-6">
+
+    <!-- KPIs -->
+    <div class="grid grid-cols-2 sm:grid-cols-4 gap-3">
+      <div class="glass-container rounded-2xl p-4 shadow-sm border border-indigo-200/80 bg-indigo-50/20">
+        <p class="text-[11px] font-bold text-indigo-700 uppercase tracking-wider">🏠 Activas</p>
+        <p id="kpiActive" class="text-3xl font-black text-indigo-900 mt-1">0</p>
+      </div>
+      <div class="glass-container rounded-2xl p-4 shadow-sm border border-amber-200/80 bg-amber-50/20">
+        <p class="text-[11px] font-bold text-amber-700 uppercase tracking-wider">⏸️ Pausadas</p>
+        <p id="kpiPaused" class="text-3xl font-black text-amber-900 mt-1">0</p>
+      </div>
+      <div class="glass-container rounded-2xl p-4 shadow-sm border border-emerald-200/80 bg-emerald-50/20">
+        <p class="text-[11px] font-bold text-emerald-700 uppercase tracking-wider">✅ Cerradas</p>
+        <p id="kpiClosed" class="text-3xl font-black text-emerald-900 mt-1">0</p>
+      </div>
+      <div class="glass-container rounded-2xl p-4 shadow-sm border border-indigo-300/80 bg-indigo-100/30">
+        <p class="text-[11px] font-bold text-indigo-800 uppercase tracking-wider">📩 Leads nuevos</p>
+        <p id="kpiLeads" class="text-3xl font-black text-indigo-800 mt-1">0</p>
+      </div>
+    </div>
+
+    <!-- Tabs -->
+    <div class="bg-white p-1.5 rounded-2xl border border-slate-200 shadow-sm grid grid-cols-2 gap-1 text-xs font-black">
+      <button type="button" class="tab-btn active py-3 rounded-xl bg-slate-900 text-white" data-tab="listings">
+        🏠 Mis Propiedades
+      </button>
+      <button type="button" class="tab-btn py-3 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200" data-tab="leads">
+        📩 Interesados
+      </button>
+    </div>
+
+    <!-- TAB LISTINGS -->
+    <section id="tab-listings" class="space-y-4">
+      <div class="glass-container rounded-2xl p-4 shadow-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+        <div>
+          <h2 class="text-base font-black text-slate-900">Mis Propiedades Publicadas</h2>
+          <p class="text-xs text-slate-500 font-medium">Publica y administra tus inmuebles en Xela.</p>
+        </div>
+        <button id="btnOpenModal" type="button"
+          class="w-full sm:w-auto bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold text-xs px-4 py-2.5 rounded-xl transition shadow flex items-center justify-center gap-2">
+          <span>➕</span><span>Publicar Nuevo Inmueble</span>
+        </button>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200/80 overflow-hidden">
+        <div id="myListingsContainer" class="divide-y divide-slate-100">
+          <p class="p-8 text-center text-xs text-slate-500">Cargando tus propiedades...</p>
+        </div>
+      </div>
+    </section>
+
+    <!-- TAB LEADS -->
+    <section id="tab-leads" class="space-y-4 hidden">
+      <div class="glass-container rounded-2xl p-4 shadow-sm flex items-center justify-between">
+        <div>
+          <h2 class="text-base font-black text-slate-900">Bandeja de Interesados</h2>
+          <p class="text-xs text-slate-500 font-medium">Contactos que preguntaron por tus propiedades.</p>
+        </div>
+        <button id="btnRefreshLeads" class="text-xs font-bold bg-slate-100 hover:bg-slate-200 text-slate-700 px-3 py-1.5 rounded-xl">🔄</button>
+      </div>
+      <div id="leadsList" class="space-y-3">
+        <p class="text-center text-slate-400 text-sm py-6">Cargando leads...</p>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- MODAL CREACIÓN/EDICIÓN (adaptado del original) -->
+  <div id="listingModal" class="hidden fixed inset-0 bg-slate-900/60 backdrop-blur-sm z-50 flex items-center justify-center p-3 sm:p-4">
+    <div class="bg-white rounded-3xl shadow-2xl max-w-2xl w-full max-h-[92vh] overflow-y-auto border border-slate-100 p-5 sm:p-6">
+      <div class="flex items-center justify-between pb-3 mb-4 border-b border-slate-100">
+        <h3 id="modalFormTitle" class="text-lg font-black text-slate-900">🏠 Publicar Nuevo Inmueble</h3>
+        <button id="btnCloseModal" type="button" class="bg-slate-100 hover:bg-slate-200 text-slate-700 w-8 h-8 rounded-full font-bold text-xs flex items-center justify-center transition">✕</button>
+      </div>
+
+      <form id="listingForm" class="space-y-4">
+        <input type="hidden" id="listingId" value="">
+
+        <div>
+          <label class="block text-xs font-bold uppercase text-slate-700 mb-1">Título de la Propiedad *</label>
+          <input type="text" id="inputTitle" required placeholder="Ej. Apartamento amueblado de 2 habitaciones en Zona 3"
+            class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-3 gap-3">
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-700 mb-1">Modalidad *</label>
+            <select id="selectTransaction" required class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-bold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="rent">Alquiler</option>
+              <option value="sale">Venta</option>
+              <option value="usufruct">Usufructo</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-700 mb-1">Categoría *</label>
+            <select id="selectPropertyType" required class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-bold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="casa">Casa</option>
+              <option value="apartamento">Apartamento</option>
+              <option value="habitacion">Habitación Estudiantil</option>
+              <option value="local">Local Comercial</option>
+              <option value="terreno">Terreno</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-700 mb-1">Precio (Q) *</label>
+            <input type="number" id="inputPrice" required step="0.01" min="0" placeholder="Ej. 3500"
+              class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-1 sm:grid-cols-2 gap-3">
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-700 mb-1">Zona de Xela *</label>
+            <select id="selectZone" required class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-bold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+              <option value="Zona 1">Zona 1</option>
+              <option value="Zona 2">Zona 2</option>
+              <option value="Zona 3">Zona 3</option>
+              <option value="Zona 4">Zona 4</option>
+              <option value="Zona 5">Zona 5</option>
+              <option value="Zona 6">Zona 6</option>
+              <option value="Zona 7">Zona 7</option>
+              <option value="Zona 8">Zona 8</option>
+              <option value="Zona 9">Zona 9</option>
+              <option value="Zona 10">Zona 10</option>
+              <option value="Zona 11">Zona 11</option>
+              <option value="Salcajá">Salcajá</option>
+              <option value="La Esperanza">La Esperanza</option>
+              <option value="San Mateo">San Mateo</option>
+            </select>
+          </div>
+          <div>
+            <label class="block text-xs font-bold uppercase text-slate-700 mb-1">Dirección / Referencia</label>
+            <input type="text" id="inputAddress" placeholder="Ej. 4a Calle y 12 Avenida"
+              class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+          </div>
+        </div>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-2 bg-slate-50 p-3 rounded-2xl border border-slate-100">
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">🛏️ Habitaciones</label>
+            <input type="number" id="inputBedrooms" min="0" value="1" class="w-full border border-slate-200 p-2 rounded-lg text-xs font-semibold bg-white text-center">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">🚿 Baños</label>
+            <input type="number" id="inputBathrooms" min="0" value="1" class="w-full border border-slate-200 p-2 rounded-lg text-xs font-semibold bg-white text-center">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">🚗 Parqueos</label>
+            <input type="number" id="inputParking" min="0" value="1" class="w-full border border-slate-200 p-2 rounded-lg text-xs font-semibold bg-white text-center">
+          </div>
+          <div>
+            <label class="block text-[10px] font-bold uppercase text-slate-500 mb-0.5">📐 Área m²</label>
+            <input type="number" id="inputArea" min="0" value="80" class="w-full border border-slate-200 p-2 rounded-lg text-xs font-semibold bg-white text-center">
+          </div>
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase text-slate-700 mb-1">💬 Teléfono WhatsApp de Contacto</label>
+          <input type="tel" id="inputWhatsapp" placeholder="Ej. 50255551234"
+            class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-semibold bg-white outline-none focus:ring-2 focus:ring-indigo-500">
+        </div>
+
+        <div>
+          <label class="block text-xs font-bold uppercase text-slate-700 mb-1">Descripción Detallada</label>
+          <textarea id="inputDescription" rows="3" placeholder="Servicios incluidos, agua, luz, acceso a transporte..."
+            class="w-full border border-slate-200 p-2.5 rounded-xl text-xs font-medium bg-white outline-none focus:ring-2 focus:ring-indigo-500"></textarea>
+        </div>
+
+        <div class="bg-indigo-50/60 p-3.5 rounded-2xl border border-indigo-100 space-y-2">
+          <label class="block text-xs font-black uppercase text-indigo-900">📷 Fotografía del Inmueble (Multi-imagen)</label>
+          <input type="file" id="imageFilesInput" multiple accept="image/*"
+            class="w-full text-xs text-slate-600 font-semibold file:mr-2 file:py-1.5 file:px-3 file:rounded-xl file:border-0 file:text-xs file:font-bold file:bg-indigo-600 file:text-white hover:file:bg-indigo-700">
+          <div id="imagePreviewsTrack" class="flex gap-2 overflow-x-auto pt-2"></div>
+        </div>
+
+        <div class="flex items-center justify-between gap-4 pt-2">
+          <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
+            <input type="checkbox" id="checkIsActive" checked class="w-4 h-4 accent-indigo-600 rounded">
+            <span>Disponible / Publicado</span>
+          </label>
+          <label class="flex items-center gap-2 cursor-pointer text-xs font-bold text-slate-700">
+            <input type="checkbox" id="checkIsFeatured" class="w-4 h-4 accent-amber-500 rounded">
+            <span>Destacar Propiedad</span>
+          </label>
+        </div>
+
+        <div class="flex gap-2 pt-3 border-t border-slate-100">
+          <button type="button" id="btnCancelModal" class="flex-1 bg-slate-200 hover:bg-slate-300 text-slate-700 font-bold py-2.5 rounded-xl text-xs transition">Cancelar</button>
+          <button type="submit" id="btnSaveListing" class="flex-1 bg-indigo-600 hover:bg-indigo-700 text-white font-extrabold py-2.5 rounded-xl text-xs transition shadow">Guardar Propiedad</button>
+        </div>
+      </form>
+    </div>
+  </div>
+
+  <div id="pasajeFooter"></div>
+
+  <script>
+    let currentUser = null;
+    let myProperties = [];
+    let myLeads = [];
+    let uploadedImageUrls = [];
+
+    (async () => {
+      const guard = await window.PasajeInmueblesGuard.guard({ requiredRole: 'real_estate', allowAdmin: true });
+      if (!guard || !guard.session) return;
+      if (!guard.hasRole && !guard.isAdmin) return;
+
+      currentUser = guard.user;
+      document.getElementById('headerEmail').textContent = currentUser.email || '';
+
+      bindTabs();
+      bindModal();
+      await loadMyListings();
+      await loadLeads();
+
+      if (window.PasajeRealtime) {
+        PasajeRealtime.subscribeToTable('inm_dash_listings', 'real_estate_listings',
+          `user_id=eq.${currentUser.id}`, () => loadMyListings());
+        PasajeRealtime.subscribeToTable(
+  'inm_dash_leads',
+  'real_estate_leads',
+  `owner_user_id=eq.${currentUser.id}`,
+  (payload) => {
+    if (payload.eventType === 'INSERT' && window.PasajeAudio) {
+      window.PasajeAudio.playAlert('lead');
+    }
+    loadLeads();
+  }
+);
+
+    function bindTabs() {
+      document.querySelectorAll('.tab-btn').forEach(btn => {
+        btn.onclick = () => {
+          document.querySelectorAll('.tab-btn').forEach(b => {
+            b.classList.remove('active');
+            b.className = 'tab-btn py-3 rounded-xl bg-slate-100 text-slate-600 hover:bg-slate-200';
+          });
+          btn.classList.add('active');
+          btn.className = 'tab-btn active py-3 rounded-xl bg-slate-900 text-white';
+          document.querySelectorAll('[id^="tab-"]').forEach(s => s.classList.add('hidden'));
+          document.getElementById('tab-' + btn.dataset.tab).classList.remove('hidden');
+        };
+      });
+    }
+
+    function bindModal() {
+      document.getElementById('btnOpenModal').onclick = () => openModal(null);
+      document.getElementById('btnCloseModal').onclick = closeModal;
+      document.getElementById('btnCancelModal').onclick = closeModal;
+      document.getElementById('imageFilesInput').addEventListener('change', handleFilesUpload);
+      document.getElementById('listingForm').addEventListener('submit', handleFormSubmit);
+      document.getElementById('btnRefreshLeads').onclick = () => loadLeads();
+    }
+
+    function esc(s) {
+      return String(s ?? '').replace(/&/g,'&amp;').replace(/</g,'&lt;')
+        .replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+    }
+
+    async function loadMyListings() {
+      const container = document.getElementById('myListingsContainer');
+      try {
+        const { data, error } = await _supabase
+          .from('real_estate_listings')
+          .select('*')
+          .eq('user_id', currentUser.id)
+          .order('created_at', { ascending: false });
+        if (error) throw error;
+
+        myProperties = data || [];
+        updateKPIs();
+        renderTable();
+      } catch (err) {
+        container.innerHTML = `<p class="p-6 text-center text-xs text-rose-500 font-bold">Error al cargar: ${err.message}</p>`;
+      }
+    }
+
+    function updateKPIs() {
+      const active = myProperties.filter(p => p.is_active !== false && !['rented','sold'].includes(p.status)).length;
+      const paused = myProperties.filter(p => p.is_active === false).length;
+      const closed = myProperties.filter(p => ['rented','sold'].includes(p.status)).length;
+
+      document.getElementById('kpiActive').textContent = active;
+      document.getElementById('kpiPaused').textContent = paused;
+      document.getElementById('kpiClosed').textContent = closed;
+    }
+
+    function renderTable() {
+      const container = document.getElementById('myListingsContainer');
+      if (!myProperties.length) {
+        container.innerHTML = `<p class="p-8 text-center text-xs text-slate-500 font-medium">No has publicado propiedades aún. Clic en "+ Publicar Nuevo Inmueble".</p>`;
+        return;
+      }
+
+      container.innerHTML = myProperties.map(p => {
+        const images = Array.isArray(p.image_urls) && p.image_urls.length > 0 ? p.image_urls : [window.PLACEHOLDER_IMG];
+        const formattedPrice = new Intl.NumberFormat('es-GT', { style: 'currency', currency: 'GTQ' }).format(p.price || 0);
+
+        return `
+          <div class="p-4 flex items-center justify-between gap-4 hover:bg-slate-50/80 transition flex-wrap sm:flex-nowrap">
+            <div class="flex items-center gap-3 min-w-0">
+              <img src="${images[0]}" class="w-16 h-16 rounded-xl object-cover bg-slate-100 flex-shrink-0 border border-slate-200" alt="">
+              <div class="min-w-0">
+                <div class="flex items-center gap-2 flex-wrap">
+                  <h4 class="font-extrabold text-slate-900 text-sm truncate">${esc(p.title)}</h4>
+                  <span class="text-[10px] ${p.is_active ? 'bg-emerald-100 text-emerald-800' : 'bg-slate-200 text-slate-600'} font-bold px-2 py-0.5 rounded-full">
+                    ${p.is_active ? 'Activo' : 'Oculto'}
+                  </span>
+                  ${p.is_featured ? '<span class="text-[10px] bg-amber-100 text-amber-800 font-black px-2 py-0.5 rounded-full">⭐</span>' : ''}
+                </div>
+                <p class="text-xs font-bold text-indigo-700 mt-0.5">${formattedPrice} · <span class="text-slate-500 uppercase font-medium">${p.transaction_type} (${p.property_type})</span></p>
+                <p class="text-[11px] text-slate-400 mt-0.5">📍 ${esc(p.zone)} · 🛏️ ${p.bedrooms} · 🚿 ${p.bathrooms}</p>
+              </div>
+            </div>
+            <div class="flex items-center gap-2 flex-shrink-0">
+              <button data-action="edit" data-id="${p.id}" class="text-xs bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-3 py-1.5 rounded-xl transition">✏️</button>
+              <button data-action="toggle" data-id="${p.id}" data-state="${p.is_active ? '1' : '0'}" class="text-xs ${p.is_active ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700'} font-bold px-3 py-1.5 rounded-xl transition">
+                ${p.is_active ? '⏸️' : '▶️'}
+              </button>
+              <button data-action="delete" data-id="${p.id}" class="text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-3 py-1.5 rounded-xl transition">🗑️</button>
+            </div>
+          </div>
+        `;
+      }).join('');
+
+      container.querySelectorAll('[data-action]').forEach(btn => {
+        btn.onclick = () => handleAction(btn.dataset.action, btn.dataset.id, btn.dataset.state);
+      });
+    }
+
+    async function handleAction(action, id, state) {
+      if (action === 'edit') {
+        openModal(id);
+        return;
+      }
+      if (action === 'toggle') {
+        const newState = state !== '1';
+        await _supabase.from('real_estate_listings').update({ is_active: newState }).eq('id', id);
+        await loadMyListings();
+        return;
+      }
+      if (action === 'delete') {
+        if (!confirm('¿Eliminar esta propiedad?')) return;
+        await _supabase.from('real_estate_listings').delete().eq('id', id);
+        await loadMyListings();
+      }
+    }
+
+    function openModal(id) {
+      const modal = document.getElementById('listingModal');
+      const form = document.getElementById('listingForm');
+      form.reset();
+      uploadedImageUrls = [];
+
+      if (id) {
+        const item = myProperties.find(x => String(x.id) === String(id));
+        if (item) {
+          document.getElementById('modalFormTitle').textContent = '✏️ Editar Inmueble';
+          document.getElementById('listingId').value = item.id;
+          document.getElementById('inputTitle').value = item.title || '';
+          document.getElementById('selectTransaction').value = item.transaction_type || 'rent';
+          document.getElementById('selectPropertyType').value = item.property_type || 'casa';
+          document.getElementById('inputPrice').value = item.price || '';
+          document.getElementById('selectZone').value = item.zone || 'Zona 1';
+          document.getElementById('inputAddress').value = item.address || '';
+          document.getElementById('inputBedrooms').value = item.bedrooms ?? 1;
+          document.getElementById('inputBathrooms').value = item.bathrooms ?? 1;
+          document.getElementById('inputParking').value = item.parking_spaces ?? 1;
+          document.getElementById('inputArea').value = item.area_sqm ?? 80;
+          document.getElementById('inputWhatsapp').value = item.contact_whatsapp || '';
+          document.getElementById('inputDescription').value = item.description || '';
+          document.getElementById('checkIsActive').checked = item.is_active !== false;
+          document.getElementById('checkIsFeatured').checked = !!item.is_featured;
+          uploadedImageUrls = Array.isArray(item.image_urls) ? [...item.image_urls] : [];
+        }
+      } else {
+        document.getElementById('modalFormTitle').textContent = '🏠 Publicar Nuevo Inmueble';
+        document.getElementById('listingId').value = '';
+      }
+
+      renderImagePreviews();
+      modal.classList.remove('hidden');
+      document.body.style.overflow = 'hidden';
+    }
+
+    function closeModal() {
+      document.getElementById('listingModal').classList.add('hidden');
+      document.body.style.overflow = '';
+    }
+
+    async function handleFilesUpload(e) {
+      const files = Array.from(e.target.files);
+      if (!files.length) return;
+      for (const file of files) {
+        try {
+          const url = await uploadImage(file, 'products', currentUser.id);
+          if (url) uploadedImageUrls.push(url);
+        } catch (err) {
+          alert('Error al subir imagen: ' + err.message);
+        }
+      }
+      renderImagePreviews();
+    }
+
+    function renderImagePreviews() {
+      const track = document.getElementById('imagePreviewsTrack');
+      track.innerHTML = uploadedImageUrls.map((url, idx) => `
+        <div class="relative w-16 h-16 rounded-xl overflow-hidden bg-slate-200 flex-shrink-0 border border-slate-300">
+          <img src="${url}" class="w-full h-full object-cover" alt="">
+          <button type="button" data-remove="${idx}" class="absolute top-0.5 right-0.5 bg-rose-600 text-white w-4 h-4 rounded-full text-[10px] font-bold flex items-center justify-center">✕</button>
+        </div>
+      `).join('');
+      track.querySelectorAll('[data-remove]').forEach(btn => {
+        btn.onclick = () => {
+          uploadedImageUrls.splice(parseInt(btn.dataset.remove, 10), 1);
+          renderImagePreviews();
+        };
+      });
+    }
+
+    async function handleFormSubmit(e) {
+      e.preventDefault();
+      const saveBtn = document.getElementById('btnSaveListing');
+      saveBtn.disabled = true; saveBtn.textContent = 'Guardando...';
+
+      try {
+        const id = document.getElementById('listingId').value;
+        const payload = {
+          user_id: currentUser.id,
+          title: document.getElementById('inputTitle').value.trim(),
+          transaction_type: document.getElementById('selectTransaction').value,
+          property_type: document.getElementById('selectPropertyType').value,
+          price: parseFloat(document.getElementById('inputPrice').value) || 0,
+          zone: document.getElementById('selectZone').value,
+          address: document.getElementById('inputAddress').value.trim(),
+          bedrooms: parseInt(document.getElementById('inputBedrooms').value) || 0,
+          bathrooms: parseInt(document.getElementById('inputBathrooms').value) || 0,
+          parking_spaces: parseInt(document.getElementById('inputParking').value) || 0,
+          area_sqm: parseFloat(document.getElementById('inputArea').value) || 0,
+          contact_whatsapp: document.getElementById('inputWhatsapp').value.trim(),
+          description: document.getElementById('inputDescription').value.trim(),
+          image_urls: uploadedImageUrls,
+          is_active: document.getElementById('checkIsActive').checked,
+          is_featured: document.getElementById('checkIsFeatured').checked
+        };
+
+        let error;
+        if (id) {
+          const res = await _supabase.from('real_estate_listings').update(payload).eq('id', id);
+          error = res.error;
+        } else {
+          const res = await _supabase.from('real_estate_listings').insert([payload]);
+          error = res.error;
+        }
+        if (error) throw error;
+
+        closeModal();
+        await loadMyListings();
+      } catch (err) {
+        alert('Error al guardar: ' + err.message);
+      } finally {
+        saveBtn.disabled = false; saveBtn.textContent = 'Guardar Propiedad';
+      }
+    }
+
+    // ============================================================
+    // LEADS
+    // ============================================================
+    async function loadLeads() {
+      const listEl = document.getElementById('leadsList');
+      const { data } = await _supabase.from('real_estate_leads')
+        .select('*, listing:real_estate_listings(title, zone)')
+        .eq('owner_user_id', currentUser.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      myLeads = data || [];
+      const news = myLeads.filter(l => l.status === 'new').length;
+      document.getElementById('kpiLeads').textContent = news;
+
+      if (!myLeads.length) {
+        listEl.innerHTML = `<p class="text-center text-slate-400 text-sm py-6">Sin leads por ahora</p>`;
+        return;
+      }
+
+      const statusCls = {
+        new: 'bg-indigo-100 text-indigo-800',
+        contacted: 'bg-amber-100 text-amber-800',
+        visited: 'bg-blue-100 text-blue-800',
+        closed: 'bg-emerald-100 text-emerald-800',
+        discarded: 'bg-slate-100 text-slate-600'
+      };
+      const statusLbl = {
+        new: '🆕 Nuevo',
+        contacted: '📞 Contactado',
+        visited: '👁️ Visitó',
+        closed: '✅ Cerrado',
+        discarded: '🗑️ Descartado'
+      };
+
+      listEl.innerHTML = myLeads.map(l => {
+        const cls = statusCls[l.status] || statusCls.new;
+        const lbl = statusLbl[l.status] || l.status;
+        const phone = String(l.customer_phone || '').replace(/\D/g,'');
+        return `
+          <article class="bg-white rounded-2xl border border-slate-200 p-4 space-y-3 shadow-sm">
+            <div class="flex justify-between items-start">
+              <div class="min-w-0">
+                <p class="font-black text-sm text-slate-900">${esc(l.customer_name || 'Interesado')}</p>
+                <p class="text-[11px] text-slate-500">📱 ${esc(l.customer_phone || '—')}</p>
+                ${l.listing?.title ? `<p class="text-[10px] text-indigo-600 mt-1">🏠 ${esc(l.listing.title)} · ${esc(l.listing.zone)}</p>` : ''}
+              </div>
+              <span class="text-[10px] font-black px-2 py-1 rounded-full uppercase ${cls} flex-shrink-0">${lbl}</span>
+            </div>
+            ${l.message ? `<p class="text-xs text-slate-600 italic bg-slate-50 rounded-xl p-2.5 border border-slate-100">"${esc(l.message)}"</p>` : ''}
+            <div class="grid grid-cols-3 gap-2">
+              ${phone ? `<a href="https://wa.me/${phone}" target="_blank" class="text-center bg-[#25D366] hover:bg-[#128C7E] text-white font-extrabold py-2 rounded-xl text-[11px]">📱 WhatsApp</a>` : '<div></div>'}
+              <button data-lead="contacted" data-id="${l.id}" class="bg-amber-50 hover:bg-amber-100 text-amber-800 font-bold py-2 rounded-xl text-[11px]">📞 Contactado</button>
+              <button data-lead="closed" data-id="${l.id}" class="bg-emerald-50 hover:bg-emerald-100 text-emerald-800 font-bold py-2 rounded-xl text-[11px]">✅ Cerrar</button>
+            </div>
+          </article>
+        `;
+      }).join('');
+
+      listEl.querySelectorAll('[data-lead]').forEach(btn => {
+        btn.onclick = async () => {
+          await _supabase.from('real_estate_leads').update({
+            status: btn.dataset.lead,
+            updated_at: new Date().toISOString()
+          }).eq('id', btn.dataset.id);
+          await loadLeads();
+        };
+      });
+    }
+  </script>
+</body>
+</html>

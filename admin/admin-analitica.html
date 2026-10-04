@@ -1,0 +1,870 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Analítica · Admin · Pasaje de los Altos</title>
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=4"></script>
+  <script src="../js/theme-loader.js?v=3"></script>
+  <script src="../js/admin-utils.js?v=2"></script>
+  <script src="../js/admin-sidebar.js?v=3"></script>
+  <script src="../js/liquid-glass.js?v=1"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <script>
+    (function () {
+      if (typeof window.PLACEHOLDER_IMG === 'undefined') {
+        window.PLACEHOLDER_IMG = 'img/placeholder.png';
+      }
+      if (typeof window.adminEscapeHtml === 'undefined') {
+        window.adminEscapeHtml = function (s) {
+          return String(s ?? '')
+            .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+            .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+        };
+      }
+    })();
+  </script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f1f5f9; }
+
+    .admin-card {
+      background: rgba(255,255,255,.85);
+      backdrop-filter: blur(14px) saturate(160%);
+      -webkit-backdrop-filter: blur(14px) saturate(160%);
+      border: 1px solid rgba(255,255,255,.6);
+      box-shadow: 0 6px 22px -4px rgba(15,23,42,.08);
+    }
+
+    @keyframes fadeUp {
+      from { opacity: 0; transform: translateY(6px); }
+      to   { opacity: 1; transform: translateY(0); }
+    }
+    .fade-up { animation: fadeUp .35s ease both; }
+
+    @keyframes pulse {
+      0%,100% { opacity: 1; }
+      50%     { opacity: .5; }
+    }
+    .skeleton {
+      animation: pulse 1.4s ease-in-out infinite;
+      background: linear-gradient(90deg, #e5e7eb 0%, #f3f4f6 50%, #e5e7eb 100%);
+      border-radius: 6px;
+    }
+
+    .filter-pill {
+      transition: all .15s ease;
+      border: 1px solid #e5e7eb;
+      background: #fff;
+      color: #374151;
+      font-weight: 700;
+      font-size: 11px;
+      padding: 6px 12px;
+      border-radius: 9999px;
+    }
+    .filter-pill:hover { background: #f9fafb; }
+    .filter-pill.active {
+      background: #1e3a8a;
+      color: #fff;
+      border-color: #1e3a8a;
+      box-shadow: 0 2px 8px rgba(30,58,138,.25);
+    }
+
+    .bar-col {
+      transition: opacity .15s ease, transform .15s ease;
+      cursor: pointer;
+    }
+    .bar-col:hover { opacity: .85; transform: translateY(-2px); }
+    .bar-col.selected .bar-fill {
+      box-shadow: 0 0 0 3px rgba(168,85,247,.45);
+    }
+
+    @keyframes spinOnce {
+      to { transform: rotate(360deg); }
+    }
+    .spin-once { animation: spinOnce .6s ease; }
+
+    .scroll-y-40 {
+      max-height: 380px;
+      overflow-y: auto;
+    }
+    .scroll-y-40::-webkit-scrollbar { width: 6px; }
+    .scroll-y-40::-webkit-scrollbar-thumb {
+      background: rgba(100,116,139,.35); border-radius: 9999px;
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-7xl mx-auto p-4 pb-16">
+    <div id="adminTabs"></div>
+
+    <div id="loadingState" class="admin-card rounded-2xl p-8 text-center text-sm text-gray-500">
+      Cargando analítica…
+    </div>
+
+    <div id="errorState" class="hidden admin-card rounded-2xl p-6 border-l-4 border-red-400 mb-4">
+      <p class="text-sm font-semibold text-red-700">No se pudo cargar la analítica.</p>
+      <p id="errorMsg" class="text-xs text-red-500 mt-1"></p>
+    </div>
+
+    <section id="content" class="hidden space-y-5 fade-up">
+
+      <!-- Cabecera -->
+      <div class="flex flex-wrap items-start justify-between gap-3">
+        <div>
+          <h1 class="text-2xl font-extrabold text-gray-900 leading-tight">📊 Analítica de clics</h1>
+          <p class="text-xs text-gray-500 mt-0.5">
+            Clics a WhatsApp · actualizado <span id="lastUpdated" class="font-semibold text-gray-700">—</span>
+          </p>
+        </div>
+        <div class="flex items-center gap-2">
+          <button type="button" id="exportCsvBtn"
+            class="text-xs bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm">
+            ⬇ Exportar CSV
+          </button>
+          <button type="button" id="refreshBtn"
+            class="text-xs bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold px-3.5 py-2 rounded-xl transition flex items-center gap-1.5 shadow-sm">
+            <span id="refreshIcon">⟳</span> Refrescar
+          </button>
+        </div>
+      </div>
+
+      <!-- Barra de filtros -->
+      <div class="admin-card rounded-2xl p-4 flex flex-wrap items-center gap-3">
+        <div class="flex items-center gap-2 flex-wrap">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500 mr-1">Rango</span>
+          <button type="button" data-range="7"   class="filter-pill">7 días</button>
+          <button type="button" data-range="30"  class="filter-pill active">30 días</button>
+          <button type="button" data-range="90"  class="filter-pill">90 días</button>
+          <button type="button" data-range="all" class="filter-pill">Todo</button>
+        </div>
+
+        <div class="hidden sm:block w-px h-6 bg-gray-200"></div>
+
+        <div class="flex items-center gap-2">
+          <span class="text-[10px] font-bold uppercase tracking-wider text-gray-500">Fuente</span>
+          <select id="sourceSelect"
+            class="text-xs border border-gray-200 rounded-xl px-3 py-1.5 bg-white text-gray-700 font-semibold outline-none cursor-pointer focus:ring-2 focus:ring-blue-500">
+            <option value="">Todas las fuentes</option>
+            <option value="index">Catálogo · grilla</option>
+            <option value="index-destacado">Catálogo · destacados</option>
+            <option value="index-modal">Catálogo · modal</option>
+            <option value="tienda">Tienda · grilla</option>
+            <option value="tienda-modal">Tienda · modal</option>
+          </select>
+        </div>
+
+        <button type="button" id="clearFiltersBtn"
+          class="ml-auto text-[11px] text-gray-500 hover:text-gray-900 font-semibold underline-offset-2 hover:underline">
+          Limpiar filtros
+        </button>
+      </div>
+
+      <!-- Banner de día seleccionado (oculto por defecto) -->
+      <div id="dayFilterBanner" class="hidden admin-card rounded-2xl p-3 flex items-center justify-between border-l-4 border-purple-500">
+        <div class="flex items-center gap-2 text-sm">
+          <span class="text-lg">📅</span>
+          <span class="text-gray-700">Mostrando solo el día</span>
+          <strong id="dayFilterLabel" class="text-gray-900">—</strong>
+        </div>
+        <button type="button" id="clearDayBtn"
+          class="text-xs bg-white hover:bg-gray-50 border border-gray-200 text-gray-700 font-bold px-3 py-1.5 rounded-lg">
+          ✕ Quitar
+        </button>
+      </div>
+
+      <!-- KPIs -->
+      <div class="grid grid-cols-2 lg:grid-cols-4 gap-3 lg:gap-4">
+        <div class="admin-card rounded-2xl p-4 lg:p-5 border-l-4 border-purple-500">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-purple-700">Clics totales</span>
+            <span class="text-lg">💬</span>
+          </div>
+          <p id="kpiTotal" class="text-2xl lg:text-3xl font-extrabold text-gray-900 leading-tight">
+            <span class="skeleton inline-block w-16 h-8"></span>
+          </p>
+          <p id="kpiTotalSub" class="text-[11px] text-gray-500 mt-1">En el rango seleccionado</p>
+        </div>
+
+        <div class="admin-card rounded-2xl p-4 lg:p-5 border-l-4 border-emerald-500">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-emerald-700">Clics hoy</span>
+            <span class="text-lg">⚡</span>
+          </div>
+          <p id="kpiToday" class="text-2xl lg:text-3xl font-extrabold text-gray-900 leading-tight">
+            <span class="skeleton inline-block w-16 h-8"></span>
+          </p>
+          <p id="kpiTodaySub" class="text-[11px] text-gray-500 mt-1">Desde las 00:00</p>
+        </div>
+
+        <div class="admin-card rounded-2xl p-4 lg:p-5 border-l-4 border-blue-500">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-blue-700">Tiendas activas</span>
+            <span class="text-lg">🏪</span>
+          </div>
+          <p id="kpiStores" class="text-2xl lg:text-3xl font-extrabold text-gray-900 leading-tight">
+            <span class="skeleton inline-block w-16 h-8"></span>
+          </p>
+          <p id="kpiStoresSub" class="text-[11px] text-gray-500 mt-1">Con clics en el rango</p>
+        </div>
+
+        <div class="admin-card rounded-2xl p-4 lg:p-5 border-l-4 border-amber-500">
+          <div class="flex items-center justify-between mb-1">
+            <span class="text-[10px] font-bold uppercase tracking-wider text-amber-700">Promedio por día</span>
+            <span class="text-lg">📈</span>
+          </div>
+          <p id="kpiAvg" class="text-2xl lg:text-3xl font-extrabold text-gray-900 leading-tight">
+            <span class="skeleton inline-block w-16 h-8"></span>
+          </p>
+          <p id="kpiAvgSub" class="text-[11px] text-gray-500 mt-1">Clics / día</p>
+        </div>
+      </div>
+
+      <!-- Gráfico de barras -->
+      <div class="admin-card rounded-2xl p-5">
+        <div class="flex flex-wrap items-center justify-between gap-3 mb-4">
+          <div>
+            <h3 class="text-base font-extrabold text-gray-900">Clics por día</h3>
+            <p class="text-[11px] text-gray-500 mt-0.5">Haz clic en una barra para filtrar ese día</p>
+          </div>
+          <div id="chartLegend" class="text-[11px] text-gray-500"></div>
+        </div>
+        <div id="chartWrap" class="relative">
+          <div id="chartBars" class="flex items-end gap-1 h-48 border-b border-gray-200 pb-1"></div>
+          <div id="chartLabels" class="flex justify-between mt-2 text-[10px] text-gray-400 font-semibold"></div>
+        </div>
+        <div id="chartEmpty" class="hidden text-center text-sm text-gray-400 italic py-8">
+          Sin datos en este rango.
+        </div>
+      </div>
+
+      <!-- Top tiendas + Top productos -->
+      <div class="grid grid-cols-1 lg:grid-cols-2 gap-4">
+
+        <div class="admin-card rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-extrabold text-gray-900">🏪 Top tiendas por clics</h3>
+              <p class="text-[11px] text-gray-500 mt-0.5">Quiénes reciben más pedidos</p>
+            </div>
+          </div>
+          <div id="topStores" class="scroll-y-40 space-y-2 pr-1">
+            <p class="text-sm text-gray-400 italic">Cargando…</p>
+          </div>
+        </div>
+
+        <div class="admin-card rounded-2xl p-5">
+          <div class="flex items-center justify-between mb-4">
+            <div>
+              <h3 class="text-base font-extrabold text-gray-900">🔥 Top productos por clics</h3>
+              <p class="text-[11px] text-gray-500 mt-0.5">Los más solicitados por WhatsApp</p>
+            </div>
+          </div>
+          <div id="topProducts" class="scroll-y-40 space-y-2 pr-1">
+            <p class="text-sm text-gray-400 italic">Cargando…</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- Actividad reciente -->
+      <div class="admin-card rounded-2xl p-5">
+        <div class="flex items-center justify-between mb-4">
+          <div>
+            <h3 class="text-base font-extrabold text-gray-900">🕒 Actividad reciente</h3>
+            <p class="text-[11px] text-gray-500 mt-0.5">Últimos 50 clics en el rango</p>
+          </div>
+        </div>
+        <div class="overflow-x-auto">
+          <table class="w-full text-sm">
+            <thead>
+              <tr class="text-left text-[10px] font-bold uppercase tracking-wider text-gray-500 border-b border-gray-200">
+                <th class="py-2 pr-3">Fecha</th>
+                <th class="py-2 pr-3">Tienda</th>
+                <th class="py-2 pr-3">Producto</th>
+                <th class="py-2 pr-3">Fuente</th>
+              </tr>
+            </thead>
+            <tbody id="recentBody" class="divide-y divide-gray-100">
+              <tr><td colspan="4" class="py-4 text-center text-gray-400 italic text-xs">Cargando…</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+    </section>
+  </main>
+
+  <script>
+    // ═════════════════════════════════════════════════════════════
+    // ADMIN-ANALÍTICA · Dashboard de clics WhatsApp
+    // ═════════════════════════════════════════════════════════════
+
+    const $ = (id) => document.getElementById(id);
+    const esc = window.adminEscapeHtml;
+    const TZ = 'America/Guatemala';
+    const MAX_ROWS = 2000;
+
+    const SOURCE_LABEL = {
+      'index':          'Catálogo · grilla',
+      'index-destacado':'Catálogo · destacados',
+      'index-modal':    'Catálogo · modal',
+      'tienda':         'Tienda · grilla',
+      'tienda-modal':   'Tienda · modal'
+    };
+
+    const state = {
+      range: 30,            // 7 | 30 | 90 | 'all'
+      source: '',           // '' o uno de SOURCE_LABEL
+      daySelected: null,    // 'YYYY-MM-DD' o null
+      rows: []              // últimos resultados sin filtro de día
+    };
+
+    // ─── Utilidades de fecha ────────────────────────────────────
+    function startOfToday() {
+      const d = new Date();
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    function sinceForRange(range) {
+      if (range === 'all') return null;
+      const d = new Date();
+      d.setDate(d.getDate() - Number(range));
+      d.setHours(0, 0, 0, 0);
+      return d;
+    }
+
+    function dayKey(iso) {
+      const d = new Date(iso);
+      // yyyy-mm-dd en TZ Guatemala
+      const parts = new Intl.DateTimeFormat('en-CA', {
+        timeZone: TZ, year: 'numeric', month: '2-digit', day: '2-digit'
+      }).formatToParts(d);
+      const y = parts.find(p => p.type === 'year').value;
+      const m = parts.find(p => p.type === 'month').value;
+      const day = parts.find(p => p.type === 'day').value;
+      return `${y}-${m}-${day}`;
+    }
+
+    function fmtDate(iso) {
+      return new Date(iso).toLocaleString('es-GT', {
+        day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit'
+      });
+    }
+
+    function fmtDayShort(yyyymmdd) {
+      const [y, m, d] = yyyymmdd.split('-').map(Number);
+      const dt = new Date(y, m - 1, d);
+      return dt.toLocaleDateString('es-GT', { day: '2-digit', month: 'short' });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Init
+    // ═══════════════════════════════════════════════════════════
+    (async () => {
+      try {
+        const session = await adminGuardPage();
+        if (!session) return;
+        await initAdminNav({ user: session.user });
+
+        $('loadingState').classList.add('hidden');
+        $('content').classList.remove('hidden');
+
+        bindFilters();
+        await loadAll();
+
+        setInterval(() => { loadAll(true); }, 60000);
+      } catch (err) {
+        console.error('[AdminAnalitica] init:', err);
+        $('loadingState').classList.add('hidden');
+        $('errorState').classList.remove('hidden');
+        $('errorMsg').textContent = err && err.message ? err.message : '';
+      }
+    })();
+
+    function bindFilters() {
+      // Range pills
+      document.querySelectorAll('[data-range]').forEach(btn => {
+        btn.addEventListener('click', () => {
+          document.querySelectorAll('[data-range]').forEach(b =>
+            b.classList.toggle('active', b === btn)
+          );
+          const r = btn.dataset.range;
+          state.range = r === 'all' ? 'all' : Number(r);
+          state.daySelected = null;
+          updateDayBanner();
+          loadAll();
+        });
+      });
+
+      // Source select
+      $('sourceSelect').addEventListener('change', (e) => {
+        state.source = e.target.value;
+        state.daySelected = null;
+        updateDayBanner();
+        loadAll();
+      });
+
+      // Clear filters
+      $('clearFiltersBtn').addEventListener('click', () => {
+        state.source = '';
+        state.daySelected = null;
+        $('sourceSelect').value = '';
+        document.querySelectorAll('[data-range]').forEach(b =>
+          b.classList.toggle('active', b.dataset.range === '30')
+        );
+        state.range = 30;
+        updateDayBanner();
+        loadAll();
+      });
+
+      // Clear day
+      $('clearDayBtn').addEventListener('click', () => {
+        state.daySelected = null;
+        updateDayBanner();
+        renderFromCache();
+      });
+
+      // Refresh
+      $('refreshBtn').addEventListener('click', () => {
+        const icon = $('refreshIcon');
+        icon.classList.remove('spin-once');
+        void icon.offsetWidth;
+        icon.classList.add('spin-once');
+        loadAll();
+      });
+
+      // Export
+      $('exportCsvBtn').addEventListener('click', exportCsv);
+    }
+
+    function updateDayBanner() {
+      const b = $('dayFilterBanner');
+      if (!state.daySelected) {
+        b.classList.add('hidden');
+        return;
+      }
+      b.classList.remove('hidden');
+      $('dayFilterLabel').textContent = fmtDayShort(state.daySelected);
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Carga
+    // ═══════════════════════════════════════════════════════════
+    let refreshing = false;
+    async function loadAll(silent) {
+      if (refreshing) return;
+      refreshing = true;
+      try {
+        const since = sinceForRange(state.range);
+
+        let q = _supabase
+          .from('whatsapp_clicks')
+          .select(`
+            id, source, created_at, store_id, product_id,
+            stores ( id, name, slug, logo_url ),
+            products ( id, title, image_url )
+          `)
+          .order('created_at', { ascending: false })
+          .limit(MAX_ROWS);
+
+        if (since) q = q.gte('created_at', since.toISOString());
+        if (state.source) q = q.eq('source', state.source);
+
+        const { data, error } = await q;
+
+        if (error) {
+          console.error('[AdminAnalitica] load:', error);
+          showToast('Error al cargar: ' + (error.message || 'desconocido'), 'error');
+          return;
+        }
+
+        state.rows = data || [];
+        renderFromCache();
+        setLastUpdated();
+      } catch (err) {
+        console.error('[AdminAnalitica] loadAll:', err);
+      } finally {
+        refreshing = false;
+      }
+    }
+
+    function setLastUpdated() {
+      $('lastUpdated').textContent = new Date().toLocaleTimeString('es-GT', {
+        hour: '2-digit', minute: '2-digit', second: '2-digit'
+      });
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Render maestro
+    // ═══════════════════════════════════════════════════════════
+    function renderFromCache() {
+      // Aplicar filtro de día (si hay)
+      const rows = state.daySelected
+        ? state.rows.filter(r => dayKey(r.created_at) === state.daySelected)
+        : state.rows;
+
+      renderKpis(rows);
+      renderChart(rows);
+      renderTopStores(rows);
+      renderTopProducts(rows);
+      renderRecent(rows);
+    }
+
+    // ─── KPIs ──────────────────────────────────────────────────
+    function renderKpis(rows) {
+      const total = rows.length;
+      const todayKey = dayKey(new Date().toISOString());
+      const today = rows.filter(r => dayKey(r.created_at) === todayKey).length;
+      const uniqueStores = new Set(rows.map(r => r.store_id).filter(Boolean)).size;
+
+      // Días efectivos del rango
+      let days;
+      if (state.daySelected) days = 1;
+      else if (state.range === 'all') days = computeDaysSpan(rows);
+      else days = Number(state.range);
+
+      const avg = days > 0 ? total / days : 0;
+
+      $('kpiTotal').textContent = total.toLocaleString('es-GT');
+      $('kpiToday').textContent = today.toLocaleString('es-GT');
+      $('kpiStores').textContent = uniqueStores.toLocaleString('es-GT');
+      $('kpiAvg').textContent = avg.toFixed(1);
+
+      $('kpiTotalSub').textContent = state.source
+        ? `Fuente: ${SOURCE_LABEL[state.source] || state.source}`
+        : 'En el rango seleccionado';
+    }
+
+    function computeDaysSpan(rows) {
+      if (rows.length === 0) return 1;
+      const oldest = rows.reduce((a, r) =>
+        new Date(r.created_at) < new Date(a.created_at) ? r : a
+      , rows[0]);
+      const diffMs = Date.now() - new Date(oldest.created_at).getTime();
+      return Math.max(1, Math.ceil(diffMs / (1000 * 60 * 60 * 24)));
+    }
+
+    // ─── Gráfico de barras ─────────────────────────────────────
+    function renderChart(rows) {
+      const wrap = $('chartWrap');
+      const empty = $('chartEmpty');
+      const bars = $('chartBars');
+      const labels = $('chartLabels');
+      const legend = $('chartLegend');
+
+      if (rows.length === 0) {
+        wrap.classList.add('hidden');
+        empty.classList.remove('hidden');
+        legend.textContent = '';
+        return;
+      }
+      wrap.classList.remove('hidden');
+      empty.classList.add('hidden');
+
+      // Determinar ventana de días
+      let from, to;
+      if (state.daySelected) {
+        from = to = state.daySelected;
+      } else if (state.range === 'all') {
+        const dates = rows.map(r => dayKey(r.created_at)).sort();
+        from = dates[0];
+        to = dates[dates.length - 1];
+      } else {
+        const end = startOfToday();
+        const start = new Date(end);
+        start.setDate(start.getDate() - (Number(state.range) - 1));
+        from = dayKey(start.toISOString());
+        to = dayKey(end.toISOString());
+      }
+
+      // Contar por día
+      const counts = new Map();
+      rows.forEach(r => {
+        const k = dayKey(r.created_at);
+        counts.set(k, (counts.get(k) || 0) + 1);
+      });
+
+      // Rellenar días vacíos
+      const days = [];
+      if (from === to) {
+        days.push({ key: from, count: counts.get(from) || 0 });
+      } else {
+        const [fy, fm, fd] = from.split('-').map(Number);
+        const [ty, tm, td] = to.split('-').map(Number);
+        const cursor = new Date(fy, fm - 1, fd);
+        const end = new Date(ty, tm - 1, td);
+        while (cursor <= end) {
+          const k = `${cursor.getFullYear()}-${String(cursor.getMonth() + 1).padStart(2, '0')}-${String(cursor.getDate()).padStart(2, '0')}`;
+          days.push({ key: k, count: counts.get(k) || 0 });
+          cursor.setDate(cursor.getDate() + 1);
+        }
+      }
+
+      const max = Math.max(...days.map(d => d.count), 1);
+      const total = days.reduce((a, d) => a + d.count, 0);
+
+      // Renderizar barras
+      bars.innerHTML = days.map(d => {
+        const h = Math.max(2, (d.count / max) * 100);
+        const selected = state.daySelected === d.key ? 'selected' : '';
+        const color = d.count === 0
+          ? 'bg-gray-100'
+          : (d.count === max ? 'bg-gradient-to-t from-purple-600 to-purple-400' : 'bg-gradient-to-t from-purple-500/70 to-purple-300');
+        return `
+          <div class="bar-col flex-1 min-w-[6px] ${selected}" data-day="${d.key}" title="${fmtDayShort(d.key)}: ${d.count} clic${d.count === 1 ? '' : 's'}">
+            <div class="bar-fill ${color} rounded-t-sm" style="height:${h}%; min-height:3px;"></div>
+          </div>
+        `;
+      }).join('');
+
+      // Etiquetas (máx 7 para no saturar)
+      const step = Math.max(1, Math.ceil(days.length / 7));
+      labels.innerHTML = days
+        .map((d, i) => i % step === 0 ? `<span class="flex-1 text-center">${fmtDayShort(d.key)}</span>` : '')
+        .filter(Boolean)
+        .join('');
+
+      legend.textContent = `${days.length} día${days.length === 1 ? '' : 's'} · ${total} clic${total === 1 ? '' : 's'}`;
+
+      // Bind clics
+      bars.querySelectorAll('[data-day]').forEach(el => {
+        el.addEventListener('click', () => {
+          const k = el.dataset.day;
+          state.daySelected = (state.daySelected === k) ? null : k;
+          updateDayBanner();
+          renderFromCache();
+        });
+      });
+    }
+
+    // ─── Top tiendas ───────────────────────────────────────────
+    function renderTopStores(rows) {
+      const container = $('topStores');
+      if (rows.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 italic">Sin clics en el rango.</p>';
+        return;
+      }
+
+      const map = new Map();
+      rows.forEach(r => {
+        const sid = r.store_id || 'unknown';
+        if (!map.has(sid)) {
+          map.set(sid, {
+            id: sid,
+            name: r.stores?.name || 'Tienda eliminada',
+            slug: r.stores?.slug || null,
+            logo: r.stores?.logo_url || PLACEHOLDER_IMG,
+            count: 0
+          });
+        }
+        map.get(sid).count++;
+      });
+
+      const top = [...map.values()].sort((a, b) => b.count - a.count).slice(0, 10);
+      const max = top[0]?.count || 1;
+
+      container.innerHTML = top.map((s, i) => {
+        const pct = Math.round((s.count / max) * 100);
+        return `
+          <div class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition">
+            <div class="w-7 h-7 rounded-full bg-gradient-to-br from-amber-400 to-amber-600 text-white flex items-center justify-center font-extrabold text-xs flex-shrink-0">
+              ${i + 1}
+            </div>
+            <img src="${esc(s.logo)}" alt=""
+                 onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"
+                 class="w-9 h-9 rounded-full object-cover bg-white border border-gray-200 flex-shrink-0">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-bold text-gray-800 truncate">${esc(s.name)}</span>
+                <span class="text-xs font-extrabold text-purple-700 flex-shrink-0">${s.count}</span>
+              </div>
+              <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden mt-1">
+                <div class="h-full bg-gradient-to-r from-purple-400 to-purple-600 rounded-full" style="width:${pct}%"></div>
+              </div>
+            </div>
+            ${s.slug ? `
+              <a href="../tienda.html?slug=${encodeURIComponent(s.slug)}" target="_blank" rel="noopener"
+                 class="text-[10px] bg-blue-50 hover:bg-blue-100 text-blue-700 font-bold px-2 py-1 rounded-lg transition flex-shrink-0">
+                Ver
+              </a>
+            ` : ''}
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ─── Top productos ─────────────────────────────────────────
+    function renderTopProducts(rows) {
+      const container = $('topProducts');
+      const withProduct = rows.filter(r => r.product_id);
+      if (withProduct.length === 0) {
+        container.innerHTML = '<p class="text-sm text-gray-500 italic">Sin clics con producto asociado.</p>';
+        return;
+      }
+
+      const map = new Map();
+      withProduct.forEach(r => {
+        const pid = r.product_id;
+        if (!map.has(pid)) {
+          map.set(pid, {
+            id: pid,
+            title: r.products?.title || 'Producto eliminado',
+            image: r.products?.image_url || PLACEHOLDER_IMG,
+            storeName: r.stores?.name || '—',
+            count: 0
+          });
+        }
+        map.get(pid).count++;
+      });
+
+      const top = [...map.values()].sort((a, b) => b.count - a.count).slice(0, 10);
+      const max = top[0]?.count || 1;
+
+      container.innerHTML = top.map((p, i) => {
+        const pct = Math.round((p.count / max) * 100);
+        return `
+          <div class="flex items-center gap-3 p-2.5 rounded-xl hover:bg-gray-50 transition">
+            <div class="w-7 h-7 rounded-full bg-gradient-to-br from-emerald-400 to-emerald-600 text-white flex items-center justify-center font-extrabold text-xs flex-shrink-0">
+              ${i + 1}
+            </div>
+            <img src="${esc(p.image)}" alt=""
+                 onerror="this.onerror=null;this.src='${PLACEHOLDER_IMG}'"
+                 class="w-9 h-9 rounded-lg object-cover bg-white border border-gray-200 flex-shrink-0">
+            <div class="min-w-0 flex-1">
+              <div class="flex items-center justify-between gap-2">
+                <span class="text-xs font-bold text-gray-800 truncate">${esc(p.title)}</span>
+                <span class="text-xs font-extrabold text-emerald-700 flex-shrink-0">${p.count}</span>
+              </div>
+              <div class="flex items-center gap-2 mt-0.5">
+                <span class="text-[10px] text-gray-500 truncate">${esc(p.storeName)}</span>
+              </div>
+              <div class="h-1.5 bg-gray-200 rounded-full overflow-hidden mt-1">
+                <div class="h-full bg-gradient-to-r from-emerald-400 to-emerald-600 rounded-full" style="width:${pct}%"></div>
+              </div>
+            </div>
+          </div>
+        `;
+      }).join('');
+    }
+
+    // ─── Actividad reciente ────────────────────────────────────
+    function renderRecent(rows) {
+      const body = $('recentBody');
+      const list = rows.slice(0, 50);
+
+      if (list.length === 0) {
+        body.innerHTML = '<tr><td colspan="4" class="py-4 text-center text-gray-400 italic text-xs">Sin clics en el rango.</td></tr>';
+        return;
+      }
+
+      body.innerHTML = list.map(r => {
+        const storeName = r.stores?.name || '—';
+        const productTitle = r.products?.title || '—';
+        const sourceLabel = SOURCE_LABEL[r.source] || (r.source ? r.source : 'Sin fuente');
+
+        const sourceCls = r.source
+          ? (r.source.startsWith('index') ? 'bg-blue-50 text-blue-700' : 'bg-emerald-50 text-emerald-700')
+          : 'bg-gray-100 text-gray-600';
+
+        return `
+          <tr class="hover:bg-gray-50 transition">
+            <td class="py-2 pr-3 text-xs text-gray-600 whitespace-nowrap">${fmtDate(r.created_at)}</td>
+            <td class="py-2 pr-3 text-xs font-semibold text-gray-800 truncate max-w-[180px]">${esc(storeName)}</td>
+            <td class="py-2 pr-3 text-xs text-gray-700 truncate max-w-[240px]">${esc(productTitle)}</td>
+            <td class="py-2 pr-3">
+              <span class="inline-block text-[10px] font-bold px-2 py-0.5 rounded-full ${sourceCls}">
+                ${esc(sourceLabel)}
+              </span>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Exportar CSV
+    // ═══════════════════════════════════════════════════════════
+    function exportCsv() {
+      const rows = state.daySelected
+        ? state.rows.filter(r => dayKey(r.created_at) === state.daySelected)
+        : state.rows;
+
+      if (rows.length === 0) {
+        showToast('No hay datos para exportar.', 'error');
+        return;
+      }
+
+      const header = ['fecha', 'dia', 'tienda', 'producto', 'fuente', 'store_id', 'product_id'];
+      const lines = [header.join(',')];
+
+      rows.forEach(r => {
+        const date = new Date(r.created_at).toLocaleString('es-GT');
+        const day = dayKey(r.created_at);
+        const store = r.stores?.name || '';
+        const product = r.products?.title || '';
+        const source = r.source || '';
+        const line = [
+          csvCell(date),
+          csvCell(day),
+          csvCell(store),
+          csvCell(product),
+          csvCell(source),
+          csvCell(r.store_id || ''),
+          csvCell(r.product_id || '')
+        ].join(',');
+        lines.push(line);
+      });
+
+      const csv = '\uFEFF' + lines.join('\n');  // BOM para Excel
+      const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      const range = state.range === 'all' ? 'todo' : `${state.range}d`;
+      const day = state.daySelected ? `_${state.daySelected}` : '';
+      a.href = url;
+      a.download = `clics_whatsapp_${range}${day}.csv`;
+      document.body.appendChild(a);
+      a.click();
+      document.body.removeChild(a);
+      URL.revokeObjectURL(url);
+
+      showToast(`Exportados ${rows.length} clics.`, 'success');
+    }
+
+    function csvCell(v) {
+      const s = String(v ?? '');
+      if (s.includes('"') || s.includes(',') || s.includes('\n')) {
+        return `"${s.replace(/"/g, '""')}"`;
+      }
+      return s;
+    }
+
+    // ═══════════════════════════════════════════════════════════
+    // Toast
+    // ═══════════════════════════════════════════════════════════
+    function showToast(message, type) {
+      const bg = type === 'error' ? 'bg-red-600' : 'bg-emerald-600';
+      const toast = document.createElement('div');
+      toast.className = `fixed bottom-4 left-1/2 -translate-x-1/2 z-[70] ${bg} text-white text-sm font-semibold px-5 py-3 rounded-xl shadow-2xl transition-opacity duration-300 opacity-0 max-w-[90vw] text-center`;
+      toast.textContent = message;
+      document.body.appendChild(toast);
+      requestAnimationFrame(() => { toast.style.opacity = '1'; });
+      setTimeout(() => {
+        toast.style.opacity = '0';
+        setTimeout(() => toast.remove(), 300);
+      }, 2800);
+    }
+  </script>
+</body>
+</html>

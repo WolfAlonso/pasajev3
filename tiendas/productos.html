@@ -1,0 +1,1352 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title class="theme-title">Catálogo de Productos · Pasaje de los Altos</title>
+  <meta name="description" content="Catálogo completo de productos de emprendedores locales de Quetzaltenango. Filtra por categoría, tienda, precio y ordena los resultados.">
+  <meta name="theme-color" content="#1e3a8a">
+  <meta name="mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-capable" content="yes">
+  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+  <meta name="apple-mobile-web-app-title" content="Pasaje Altos">
+
+  <link rel="manifest" href="../manifest.json">
+  <link rel="apple-touch-icon" href="../img/apple-touch-icon.png">
+  <link rel="icon" href="../img/favicon.ico">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=6"></script>
+
+  <script src="../js/theme-loader.js?v=9"></script>
+  <script src="../js/cart.js?v=10"></script>
+  <script src="../js/footer.js?v=5"></script>
+  <script src="../js/liquid-glass.js?v=5"></script>
+  <script src="../js/audio-alerts.js?v=2"></script>
+  <script src="../js/services/products-service.js?v=6"></script>
+  <script src="../js/ui/product-card.js?v=7"></script>
+  <script src="../js/tiendas/tienda-sidebar.js?v=2"></script>
+
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; color: #0f172a; }
+    .no-scrollbar::-webkit-scrollbar { display: none; }
+    .no-scrollbar { -ms-overflow-style: none; scrollbar-width: none; }
+    .product-card { cursor: pointer; }
+
+    .filter-chip {
+      white-space: nowrap; font-size: 12px; font-weight: 700;
+      padding: 8px 14px; border-radius: 999px;
+      transition: all .15s ease; cursor: pointer;
+      border: 1.5px solid transparent;
+      display: inline-flex; align-items: center; gap: 6px;
+    }
+    .filter-chip-active {
+      background: linear-gradient(135deg, #4f46e5, #2563eb);
+      color: white; border-color: transparent;
+      box-shadow: 0 4px 12px rgba(79, 70, 229, 0.35);
+    }
+    .filter-chip-idle {
+      background: white; color: #475569; border-color: #e2e8f0;
+    }
+    .filter-chip-idle:hover {
+      border-color: #4f46e5; color: #4f46e5; background: #eef2ff;
+    }
+
+    input::placeholder, textarea::placeholder { color: #94a3b8; opacity: 1; }
+
+    .spinner {
+      width: 32px; height: 32px;
+      border: 3px solid #c7d2fe; border-top-color: #4f46e5;
+      border-radius: 50%; animation: spin 0.8s linear infinite;
+    }
+    @keyframes spin { to { transform: rotate(360deg); } }
+
+    /* ---- Banner Carousel ---- */
+    .banner-slide {
+      position: absolute; inset: 0;
+      opacity: 0; pointer-events: none;
+      transition: opacity 0.7s ease-in-out;
+    }
+    .banner-slide.is-active {
+      opacity: 1; pointer-events: auto;
+    }
+    .banner-dot {
+      width: 10px; height: 10px;
+      border-radius: 999px;
+      background: rgba(255,255,255,0.5);
+      cursor: pointer;
+      transition: all 0.3s ease;
+    }
+    .banner-dot.is-active {
+      width: 28px; background: #fff;
+    }
+    .banner-fallback {
+      background: linear-gradient(135deg, #4f46e5 0%, #2563eb 50%, #0ea5e9 100%);
+    }
+
+    /* ---- Category Drawer ---- */
+    .cat-row {
+      display: flex; align-items: center; gap: 0.75rem;
+      width: 100%; text-align: left;
+      padding: 0.75rem 0.875rem;
+      border-radius: 0.875rem;
+      font-size: 0.875rem; font-weight: 600;
+      color: #1e293b; background: transparent;
+      border: 0; cursor: pointer;
+      transition: all 0.15s ease;
+    }
+    .cat-row:hover {
+      background: rgba(79, 70, 229, 0.10);
+      color: #4f46e5;
+      transform: translateX(2px);
+    }
+    .cat-row.is-active {
+      background: rgba(79, 70, 229, 0.15);
+      color: #4f46e5;
+      font-weight: 800;
+      border-left: 4px solid #4f46e5;
+      padding-left: 0.625rem;
+    }
+    .cat-row-all {
+      background: linear-gradient(135deg, rgba(79,70,229,0.08), rgba(37,99,235,0.08));
+      border: 1px solid rgba(79,70,229,0.15);
+      margin-bottom: 6px;
+    }
+    .cat-row-all.is-active {
+      background: linear-gradient(135deg, #4f46e5, #2563eb);
+      color: #fff;
+      border-color: transparent;
+    }
+    .cat-row-all.is-active:hover { color: #fff; }
+    .cat-row-child {
+      font-size: 0.8125rem;
+      padding-left: 2.25rem;
+      font-weight: 500;
+    }
+    .cat-toggle-btn {
+      display: flex; align-items: center; justify-content: center;
+      width: 2.25rem; border-radius: 0.875rem;
+      background: rgba(148, 163, 184, 0.12);
+      color: #64748b; border: 0; cursor: pointer;
+      transition: background 0.15s ease;
+    }
+    .cat-toggle-btn:hover {
+      background: rgba(79, 70, 229, 0.15);
+      color: #4f46e5;
+    }
+    .cat-toggle-btn.is-open .cat-chevron {
+      transform: rotate(180deg);
+    }
+    .cat-chevron { transition: transform 0.25s ease; }
+    .cat-children {
+      overflow: hidden;
+      animation: catExpand 0.25s ease-out;
+    }
+    @keyframes catExpand {
+      from { max-height: 0; opacity: 0; }
+      to   { max-height: 800px; opacity: 1; }
+    }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen flex flex-col text-slate-800">
+
+  <div id="tiendaSidebar"></div>
+
+  <header class="glass-header text-white shadow-lg sticky top-0 z-40 border-b border-white/10 theme-header">
+    <div class="max-w-7xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
+      <div class="flex items-center gap-3 min-w-0">
+        <button id="sidebarToggleBtn" type="button"
+          class="bg-white/10 hover:bg-white/20 p-2 rounded-xl transition flex items-center justify-center border border-white/15 text-white lg:hidden"
+          title="Menú" aria-label="Abrir menú">
+          <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round">
+            <line x1="3" y1="6"  x2="21" y2="6"></line>
+            <line x1="3" y1="12" x2="21" y2="12"></line>
+            <line x1="3" y1="18" x2="21" y2="18"></line>
+          </svg>
+        </button>
+
+        <a href="../index.html" class="flex items-center gap-2 text-lg sm:text-xl font-extrabold tracking-tight min-w-0">
+          <img class="theme-logo hidden w-8 h-8 rounded-full object-cover bg-white/10 border border-white/20" src="" alt="logo">
+          <span class="theme-title truncate text-white">Pasaje de los <span class="text-emerald-400">Altos</span></span>
+        </a>
+      </div>
+
+      <div class="flex items-center gap-2">
+        <button type="button" id="openCategoryDrawerBtnHeader"
+          class="hidden sm:flex bg-white/10 hover:bg-white/20 text-white font-bold text-xs px-3 py-2 rounded-xl border border-white/15 items-center gap-1.5 transition" title="Explorar categorías">
+          <span>📂</span>
+          <span>Categorías</span>
+        </button>
+
+        <button type="button" onclick="if(window.PasajeCart) window.PasajeCart.openDrawer();"
+          class="relative bg-white/10 hover:bg-white/20 p-2 rounded-xl transition border border-white/15 text-white flex items-center justify-center" title="Carrito">
+          🛒
+          <span class="cart-count-badge hidden absolute -top-1 -right-1 bg-emerald-500 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow">0</span>
+        </button>
+
+        <a href="favoritos.html"
+          class="relative bg-white/10 hover:bg-white/20 p-2 rounded-xl transition border border-white/15 text-white" title="Mis favoritos">
+          <svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M20.84 4.61a5.5 5.5 0 0 0-7.78 0L12 5.67l-1.06-1.06a5.5 5.5 0 0 0-7.78 7.78l1.06 1.06L12 21.23l7.78-7.78 1.06-1.06a5.5 5.5 0 0 0 0-7.78z"/></svg>
+          <span id="favCount" class="hidden absolute -top-1 -right-1 bg-rose-500 text-white text-[10px] font-extrabold w-5 h-5 rounded-full flex items-center justify-center shadow">0</span>
+        </a>
+
+        <a href="../registro.html"
+          class="bg-emerald-500 hover:bg-emerald-600 text-white px-3.5 sm:px-4 py-2 rounded-xl font-bold text-xs sm:text-sm transition shadow">
+          + Vender
+        </a>
+      </div>
+    </div>
+  </header>
+
+  <main class="max-w-7xl mx-auto px-4 py-6 w-full flex-1">
+
+    <!-- HERO + CAROUSEL -->
+    <section class="mb-6 glass-container rounded-3xl p-4 sm:p-6 relative overflow-hidden">
+
+      <!-- CAROUSEL DE BANNERS PUBLICITARIOS -->
+      <div id="adCarousel" class="relative w-full aspect-[21/9] sm:aspect-[24/8] md:aspect-[3/1] rounded-2xl overflow-hidden bg-slate-900 shadow-xl mb-5">
+        <div class="absolute inset-0 flex items-center justify-center bg-gradient-to-br from-indigo-600 to-blue-600 text-white">
+          <div class="text-center px-6">
+            <div class="spinner mx-auto mb-3" style="border-color: rgba(255,255,255,0.3); border-top-color: #fff;"></div>
+            <p class="text-xs font-semibold text-white/90">Cargando promociones...</p>
+          </div>
+        </div>
+
+        <button type="button" id="bannerPrevBtn" aria-label="Anterior"
+          class="hidden absolute left-3 top-1/2 -translate-y-1/2 z-20 bg-white/80 hover:bg-white text-slate-900 w-10 h-10 rounded-full shadow-lg backdrop-blur flex items-center justify-center font-extrabold text-xl opacity-0 group-hover:opacity-100 transition duration-300 hover:scale-110 active:scale-95">
+          ‹
+        </button>
+        <button type="button" id="bannerNextBtn" aria-label="Siguiente"
+          class="hidden absolute right-3 top-1/2 -translate-y-1/2 z-20 bg-white/80 hover:bg-white text-slate-900 w-10 h-10 rounded-full shadow-lg backdrop-blur flex items-center justify-center font-extrabold text-xl opacity-0 group-hover:opacity-100 transition duration-300 hover:scale-110 active:scale-95">
+          ›
+        </button>
+
+        <div id="bannerDots" class="hidden absolute bottom-3 left-1/2 -translate-x-1/2 z-20 flex items-center gap-2 px-3 py-1.5 rounded-full bg-black/40 backdrop-blur border border-white/20"></div>
+      </div>
+
+      <!-- BLOQUE INFORMATIVO DEL HERO -->
+      <div class="relative z-10">
+        <span class="inline-flex items-center gap-1.5 text-[11px] font-bold bg-emerald-100 text-emerald-800 px-3 py-1 rounded-full uppercase tracking-wide mb-3">
+          <span class="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse"></span>
+          Catálogo en vivo
+        </span>
+        <h1 class="text-2xl sm:text-3xl md:text-4xl font-black tracking-tight text-slate-900 mb-1">
+          Encuentra lo que buscas
+        </h1>
+        <p class="text-sm sm:text-base text-slate-600 font-medium max-w-2xl">
+          Explora productos de emprendedores locales de Quetzaltenango. Filtra por categoría, tienda, precio u ordena los resultados a tu gusto.
+        </p>
+
+        <div class="grid grid-cols-2 sm:grid-cols-4 gap-3 mt-5 max-w-2xl">
+          <div class="bg-white/70 backdrop-blur rounded-2xl p-3 border border-white/60 shadow-sm">
+            <div class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Productos</div>
+            <div id="statProducts" class="text-2xl font-black text-indigo-600">—</div>
+          </div>
+          <div class="bg-white/70 backdrop-blur rounded-2xl p-3 border border-white/60 shadow-sm">
+            <div class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Tiendas</div>
+            <div id="statStores" class="text-2xl font-black text-emerald-600">—</div>
+          </div>
+          <div class="bg-white/70 backdrop-blur rounded-2xl p-3 border border-white/60 shadow-sm">
+            <div class="text-[10px] font-black text-slate-500 uppercase tracking-wider">Ofertas</div>
+            <div id="statOffers" class="text-2xl font-black text-rose-600">—</div>
+          </div>
+          <button type="button" id="openCategoryDrawerBtn"
+            class="col-span-1 bg-gradient-to-br from-indigo-600 to-blue-600 hover:from-indigo-700 hover:to-blue-700 text-white rounded-2xl p-3 shadow-md transition text-left flex flex-col justify-between min-h-[76px] group">
+            <span class="text-xl group-hover:scale-110 transition-transform">📂</span>
+            <div>
+              <div class="text-[10px] font-black uppercase tracking-wider opacity-80">Explorar</div>
+              <div class="text-sm font-black">Categorías</div>
+            </div>
+          </button>
+        </div>
+      </div>
+    </section>
+
+    <!-- FILTROS -->
+    <section class="mb-6 glass-container rounded-3xl p-5 sm:p-6 relative z-30">
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3">
+        <div class="lg:col-span-2 relative">
+          <div class="absolute inset-y-0 left-0 pl-3.5 flex items-center pointer-events-none text-slate-400 z-10">
+            <svg class="h-5 w-5" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+            </svg>
+          </div>
+          <input id="searchInput" type="text" placeholder="Buscar producto por nombre o descripción..." autocomplete="off"
+            class="w-full pl-10 pr-10 py-3 border border-slate-200 rounded-2xl focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 outline-none text-sm font-semibold text-slate-800 bg-white shadow-sm transition">
+          <button id="clearSearchBtn" type="button"
+            class="hidden absolute inset-y-0 right-0 pr-3 flex items-center text-slate-400 hover:text-slate-600 transition z-10" title="Limpiar búsqueda">
+            <svg class="w-4 h-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+              <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+            </svg>
+          </button>
+        </div>
+
+        <select id="sortSelect"
+          class="border border-slate-200 rounded-2xl px-3 py-3 bg-white text-sm font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer shadow-sm">
+          <option value="recent">🕒 Más recientes</option>
+          <option value="popular">❤️ Más populares</option>
+          <option value="price-asc">💲 Menor precio</option>
+          <option value="price-desc">💰 Mayor precio</option>
+        </select>
+      </div>
+
+      <div class="grid grid-cols-1 lg:grid-cols-3 gap-3 mt-3">
+        <div>
+          <label class="block text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1.5">🏪 Tienda</label>
+          <select id="storeSelect"
+            class="w-full border border-slate-200 rounded-2xl px-3 py-2.5 bg-white text-xs font-bold text-slate-700 focus:ring-2 focus:ring-emerald-500 outline-none cursor-pointer shadow-sm">
+            <option value="">Todas las tiendas</option>
+          </select>
+        </div>
+
+        <div class="lg:col-span-2">
+          <label class="block text-[11px] font-black text-slate-600 uppercase tracking-wider mb-1.5">💵 Rango de Precio (Q)</label>
+          <div class="flex items-center gap-2">
+            <input id="minPriceInput" type="number" min="0" step="1" placeholder="Mín"
+              class="w-full border border-slate-200 rounded-2xl px-3 py-2.5 bg-white text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm">
+            <span class="text-slate-400 font-bold text-sm">—</span>
+            <input id="maxPriceInput" type="number" min="0" step="1" placeholder="Máx"
+              class="w-full border border-slate-200 rounded-2xl px-3 py-2.5 bg-white text-xs font-semibold text-slate-800 outline-none focus:ring-2 focus:ring-emerald-500 shadow-sm">
+            <button id="clearPriceBtn" type="button" title="Limpiar rango"
+              class="hidden text-xs bg-slate-100 hover:bg-slate-200 text-slate-600 font-bold px-3 py-2.5 rounded-2xl transition flex-shrink-0">✕</button>
+          </div>
+        </div>
+      </div>
+
+      <div class="mt-4 pt-4 border-t border-slate-200/60">
+        <div class="flex items-center justify-between mb-2">
+          <label class="text-[11px] font-black text-slate-600 uppercase tracking-wider">📂 Categorías</label>
+          <button type="button" id="openCategoryDrawerBtnInline"
+            class="text-[11px] font-bold text-indigo-600 hover:underline flex items-center gap-1">
+            <span>Ver todas</span>
+            <span>→</span>
+          </button>
+        </div>
+        <div id="categoryChips" class="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
+          <button type="button" data-category-slug="todas" class="filter-chip filter-chip-active">✨ Todas</button>
+        </div>
+      </div>
+
+      <div class="mt-4 pt-4 border-t border-slate-200/60 flex flex-wrap items-center justify-between gap-3">
+        <div class="text-xs text-slate-600 font-semibold">
+          Mostrando <span id="resultCount" class="font-black text-slate-900">0</span> productos
+        </div>
+        <button type="button" id="clearAllFiltersBtn"
+          class="hidden text-xs bg-rose-50 hover:bg-rose-100 text-rose-700 font-bold px-3 py-2 rounded-xl transition border border-rose-200 flex items-center gap-1.5">
+          🗑️ Limpiar todos los filtros
+        </button>
+      </div>
+    </section>
+
+    <!-- GRID DE PRODUCTOS -->
+    <section>
+      <div id="productsGrid" class="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+        <div class="col-span-full text-center py-12">
+          <div class="spinner mx-auto mb-3"></div>
+          <p class="text-xs text-slate-500 font-semibold">Cargando catálogo local...</p>
+        </div>
+      </div>
+
+      <div id="emptyState" class="hidden bg-white rounded-3xl p-12 text-center border border-slate-200/80 shadow-sm mt-4">
+        <p class="text-4xl mb-3">🔍</p>
+        <h3 class="text-base font-extrabold text-slate-800 mb-1">No encontramos productos</h3>
+        <p class="text-sm text-slate-500 max-w-md mx-auto">Intenta ajustar los filtros o limpiar la búsqueda.</p>
+        <button type="button" id="clearFiltersFromEmptyBtn"
+          class="mt-4 bg-indigo-600 hover:bg-indigo-700 text-white font-bold text-xs px-4 py-2.5 rounded-xl transition shadow-sm">
+          🗑️ Limpiar filtros
+        </button>
+      </div>
+
+      <div id="loadingMore" class="hidden text-center py-8">
+        <div class="spinner mx-auto mb-2"></div>
+        <p class="text-xs text-slate-500 font-semibold">Cargando más...</p>
+      </div>
+
+      <div class="text-center mt-6">
+        <button type="button" id="loadMoreBtn"
+          class="hidden bg-white hover:bg-slate-50 text-slate-800 font-extrabold text-sm px-6 py-3 rounded-2xl border border-slate-200 shadow-sm transition">
+          ⬇️ Cargar más productos
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <div id="pasajeFooter"></div>
+
+  <!-- CATEGORY DRAWER -->
+  <div id="categoryDrawerOverlay"
+       class="hidden fixed inset-0 z-[9998] bg-slate-900/60 backdrop-blur-sm opacity-0 transition-opacity duration-300"></div>
+
+  <aside id="categoryDrawer"
+         role="dialog" aria-modal="true" aria-labelledby="categoryDrawerTitle"
+         class="fixed inset-y-0 left-0 z-[9999] w-[20rem] max-w-[88vw] flex flex-col
+                bg-white/95 backdrop-blur-2xl shadow-2xl
+                transform -translate-x-full transition-transform duration-300 ease-out">
+
+    <div class="flex items-center justify-between px-5 py-4 border-b border-slate-200/70 flex-shrink-0 bg-gradient-to-r from-indigo-500/10 to-blue-500/10">
+      <div class="flex items-center gap-2.5 min-w-0">
+        <div class="w-9 h-9 rounded-2xl bg-gradient-to-tr from-indigo-600 to-blue-500 flex items-center justify-center text-white text-lg shadow-md flex-shrink-0">📂</div>
+        <div class="leading-tight min-w-0">
+          <h2 id="categoryDrawerTitle" class="font-extrabold text-sm text-slate-900 truncate">Explorar Categorías</h2>
+          <p class="text-[10px] font-bold text-indigo-600 truncate">Encuentra lo que necesitas</p>
+        </div>
+      </div>
+      <button type="button" id="closeCategoryDrawerBtn"
+        class="w-8 h-8 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 flex items-center justify-center font-black text-xs transition shadow-sm flex-shrink-0"
+        aria-label="Cerrar menú de categorías">
+        ✕
+      </button>
+    </div>
+
+    <div class="px-4 pt-3 pb-2 flex-shrink-0">
+      <div class="relative">
+        <div class="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none text-slate-400">
+          <svg class="h-4 w-4" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+          </svg>
+        </div>
+        <input id="categoryDrawerSearch" type="text" placeholder="Filtrar categorías..."
+          class="w-full pl-9 pr-3 py-2 text-xs font-semibold bg-slate-100 border border-slate-200 rounded-xl outline-none focus:ring-2 focus:ring-indigo-500">
+      </div>
+    </div>
+
+    <div class="flex-1 overflow-y-auto px-3 py-2 no-scrollbar" id="categoryTreeList">
+      <div class="text-center py-6">
+        <div class="spinner mx-auto mb-2"></div>
+        <p class="text-xs text-slate-500 font-semibold">Cargando categorías...</p>
+      </div>
+    </div>
+
+    <div class="px-4 py-3 border-t border-slate-200/70 flex-shrink-0 bg-white/60">
+      <button type="button" id="clearCategoryFromDrawerBtn"
+        class="w-full bg-slate-100 hover:bg-slate-200 text-slate-700 font-extrabold text-xs py-2.5 rounded-xl transition flex items-center justify-center gap-1.5">
+        <span>🔄</span>
+        <span>Ver todas las categorías</span>
+      </button>
+    </div>
+  </aside>
+
+  <script>
+    (function () {
+      'use strict';
+
+      const PER_PAGE = 24;
+
+      const state = {
+        searchTerm: '',
+        categorySlug: 'todas',
+        storeId: '',
+        minPrice: null,
+        maxPrice: null,
+        sortBy: 'recent',
+        page: 0,
+        allProducts: [],
+        filteredProducts: [],
+        hasMore: true,
+        loading: false,
+        initialized: false
+      };
+
+      const grid = document.getElementById('productsGrid');
+      const emptyState = document.getElementById('emptyState');
+      const loadMoreBtn = document.getElementById('loadMoreBtn');
+      const loadingMore = document.getElementById('loadingMore');
+      const resultCount = document.getElementById('resultCount');
+      const clearAllBtn = document.getElementById('clearAllFiltersBtn');
+      const searchInput = document.getElementById('searchInput');
+      const clearSearchBtn = document.getElementById('clearSearchBtn');
+      const sortSelect = document.getElementById('sortSelect');
+      const storeSelect = document.getElementById('storeSelect');
+      const minPriceInput = document.getElementById('minPriceInput');
+      const maxPriceInput = document.getElementById('maxPriceInput');
+      const clearPriceBtn = document.getElementById('clearPriceBtn');
+      const categoryChips = document.getElementById('categoryChips');
+      const favCountEl = document.getElementById('favCount');
+
+      const adCarousel     = document.getElementById('adCarousel');
+      const bannerPrevBtn  = document.getElementById('bannerPrevBtn');
+      const bannerNextBtn  = document.getElementById('bannerNextBtn');
+      const bannerDots     = document.getElementById('bannerDots');
+
+      const categoryDrawer         = document.getElementById('categoryDrawer');
+      const categoryDrawerOverlay  = document.getElementById('categoryDrawerOverlay');
+      const categoryTreeList       = document.getElementById('categoryTreeList');
+      const categoryDrawerSearch   = document.getElementById('categoryDrawerSearch');
+
+      function getClient() {
+        return window._supabase ||
+          (typeof window.initSupabaseClient === 'function' ? window.initSupabaseClient() : null);
+      }
+
+      function debounce(fn, delay = 300) {
+        let t;
+        return function (...args) {
+          clearTimeout(t);
+          t = setTimeout(() => fn.apply(this, args), delay);
+        };
+      }
+
+      function esc(str) {
+        return String(str ?? '')
+          .replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')
+          .replace(/"/g, '&quot;').replace(/'/g, '&#39;');
+      }
+
+      function updateFavCount() {
+        if (!favCountEl || !window.Favorites) return;
+        const n = window.Favorites.count();
+        if (n === 0) favCountEl.classList.add('hidden');
+        else { favCountEl.textContent = n; favCountEl.classList.remove('hidden'); }
+      }
+
+      function updateClearAllVisibility() {
+        const hasAny = !!(
+          state.searchTerm ||
+          (state.categorySlug && state.categorySlug !== 'todas') ||
+          state.storeId ||
+          (state.minPrice !== null && state.minPrice !== '') ||
+          (state.maxPrice !== null && state.maxPrice !== '') ||
+          (state.sortBy && state.sortBy !== 'recent')
+        );
+        if (clearAllBtn) clearAllBtn.classList.toggle('hidden', !hasAny);
+      }
+
+      // ==========================================================
+      // STATS
+      // ==========================================================
+      async function loadStats() {
+        const client = getClient();
+        if (!client) return;
+
+        try {
+          const nowIso = new Date().toISOString();
+
+          const [prodRes, storeRes, offerRes] = await Promise.all([
+            client.from('products').select('id', { count: 'exact', head: true }).eq('is_active', true),
+            client.from('stores').select('id', { count: 'exact', head: true }).eq('is_active', true).eq('is_suspended', false),
+            client.from('products').select('id', { count: 'exact', head: true })
+              .eq('is_active', true).eq('is_on_sale', true)
+              .or(`sale_expires_at.gt.${nowIso},sale_expires_at.is.null`)
+          ]);
+
+          const pEl = document.getElementById('statProducts');
+          const sEl = document.getElementById('statStores');
+          const oEl = document.getElementById('statOffers');
+          if (pEl) pEl.textContent = (prodRes.count || 0).toLocaleString('es-GT');
+          if (sEl) sEl.textContent = (storeRes.count || 0).toLocaleString('es-GT');
+          if (oEl) oEl.textContent = (offerRes.count || 0).toLocaleString('es-GT');
+        } catch (e) {
+          console.warn('[Productos] Error cargando stats:', e);
+        }
+      }
+
+      // ==========================================================
+      // BANNER CAROUSEL
+      // ==========================================================
+      let bannerSlides = [];
+      let bannerIndex = 0;
+      let bannerTimer = null;
+      let bannerHovered = false;
+      let bannerTouchStartX = 0;
+
+      async function loadAdBanners() {
+        const client = getClient();
+        if (!client) { renderBannerFallback(); return; }
+
+        try {
+          // 1) Banners específicos de /tiendas/
+          const { data, error } = await client
+            .from('banners')
+            .select('id, title, subtitle, image_url, link_type, link_value, sort_order, is_active, target_module, placement')
+            .eq('is_active', true)
+            .eq('target_module', 'tiendas')
+            .eq('placement', 'hero')
+            .order('sort_order', { ascending: true });
+
+          if (error) throw error;
+
+          if (data && data.length > 0) {
+            renderBannerCarousel(data);
+            trackBannerImpressions(data);
+            return;
+          }
+
+          // 2) Fallback: banners genéricos (index o null)
+          const { data: genericData, error: err2 } = await client
+            .from('banners')
+            .select('id, title, subtitle, image_url, link_type, link_value, sort_order, is_active, target_module, placement')
+            .eq('is_active', true)
+            .or('target_module.is.null,target_module.eq.index')
+            .eq('placement', 'hero')
+            .order('sort_order', { ascending: true })
+            .limit(5);
+
+          if (err2) throw err2;
+
+          if (genericData && genericData.length > 0) {
+            renderBannerCarousel(genericData);
+            trackBannerImpressions(genericData);
+            return;
+          }
+
+          renderBannerFallback();
+        } catch (e) {
+          console.warn('[Productos] Error cargando banners:', e);
+          renderBannerFallback();
+        }
+      }
+
+      function renderBannerFallback() {
+        if (!adCarousel) return;
+        adCarousel.innerHTML = `
+          <div class="banner-fallback absolute inset-0 flex items-center justify-between p-5 sm:p-8 text-white">
+            <div class="min-w-0 flex-1">
+              <span class="inline-flex items-center gap-1.5 text-[10px] font-black bg-white/20 px-2.5 py-1 rounded-full uppercase tracking-wider mb-2">
+                <span>💎</span><span>Espacio Publicitario</span>
+              </span>
+              <h3 class="text-xl sm:text-2xl md:text-3xl font-black leading-tight mb-1">
+                🚀 Anúnciate aquí
+              </h3>
+              <p class="text-xs sm:text-sm text-white/90 max-w-lg leading-snug">
+                Llega a más clientes en Xela. Tu marca en el corazón del catálogo local.
+              </p>
+              <a href="../contacto.html"
+                 class="inline-flex items-center gap-1.5 mt-3 bg-white text-indigo-700 hover:bg-indigo-50 font-extrabold text-xs px-4 py-2 rounded-xl shadow-lg transition">
+                <span>📩</span><span>Más información</span>
+              </a>
+            </div>
+            <div class="hidden sm:block text-white/20 text-8xl md:text-9xl font-black select-none pointer-events-none pl-4">📢</div>
+          </div>
+        `;
+        if (bannerPrevBtn) bannerPrevBtn.classList.add('hidden');
+        if (bannerNextBtn) bannerNextBtn.classList.add('hidden');
+        if (bannerDots) bannerDots.classList.add('hidden');
+      }
+
+      function renderBannerCarousel(banners) {
+        if (!adCarousel) return;
+
+        bannerSlides = banners;
+        bannerIndex = 0;
+
+        const slidesHtml = banners.map((b, idx) => {
+          const hasText = !!(b.title || b.subtitle);
+          return `
+            <div class="banner-slide ${idx === 0 ? 'is-active' : ''}"
+                 data-banner-idx="${idx}"
+                 data-banner-id="${esc(b.id)}"
+                 data-link-type="${esc(b.link_type || 'external')}"
+                 data-link-value="${esc(b.link_value || '')}">
+              <img src="${esc(b.image_url)}" alt="${esc(b.title || 'Banner')}"
+                   class="w-full h-full object-cover"
+                   onerror="this.onerror=null;this.src='${window.PLACEHOLDER_IMG || ''}'">
+              ${hasText ? `
+                <div class="absolute inset-0 bg-gradient-to-t from-slate-950/85 via-slate-950/20 to-transparent flex flex-col justify-end p-4 sm:p-6 md:p-8 text-white pointer-events-none">
+                  ${b.title ? `<h3 class="text-base sm:text-2xl md:text-3xl font-black tracking-tight drop-shadow-md leading-tight">${esc(b.title)}</h3>` : ''}
+                  ${b.subtitle ? `<p class="text-xs sm:text-sm font-medium text-slate-100 mt-1 max-w-xl drop-shadow">${esc(b.subtitle)}</p>` : ''}
+                  ${b.link_value ? `
+                    <span class="mt-2 inline-flex items-center gap-1 text-[11px] sm:text-xs font-bold bg-white/15 backdrop-blur px-2.5 py-1 rounded-full self-start border border-white/20">
+                      <span>Ver más</span><span>→</span>
+                    </span>` : ''}
+                </div>
+              ` : ''}
+            </div>
+          `;
+        }).join('');
+
+        adCarousel.innerHTML = slidesHtml;
+
+        if (bannerDots) {
+          bannerDots.innerHTML = banners.map((_, idx) => `
+            <button type="button" class="banner-dot ${idx === 0 ? 'is-active' : ''}"
+                    data-banner-dot="${idx}"
+                    aria-label="Ir al banner ${idx + 1}"></button>
+          `).join('');
+          bannerDots.classList.remove('hidden');
+        }
+
+        if (bannerPrevBtn && banners.length > 1) bannerPrevBtn.classList.remove('hidden');
+        if (bannerNextBtn && banners.length > 1) bannerNextBtn.classList.remove('hidden');
+
+        bindBannerEvents();
+        startBannerAutoplay();
+      }
+
+      function bindBannerEvents() {
+        if (!adCarousel) return;
+
+        bannerPrevBtn?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          showBannerSlide(bannerIndex - 1);
+          restartBannerAutoplay();
+        });
+        bannerNextBtn?.addEventListener('click', (e) => {
+          e.stopPropagation();
+          showBannerSlide(bannerIndex + 1);
+          restartBannerAutoplay();
+        });
+
+        bannerDots?.addEventListener('click', (e) => {
+          const dot = e.target.closest('[data-banner-dot]');
+          if (!dot) return;
+          const idx = parseInt(dot.dataset.bannerDot, 10);
+          showBannerSlide(idx);
+          restartBannerAutoplay();
+        });
+
+        adCarousel.addEventListener('mouseenter', () => { bannerHovered = true; });
+        adCarousel.addEventListener('mouseleave', () => { bannerHovered = false; });
+
+        adCarousel.addEventListener('touchstart', (e) => {
+          bannerHovered = true;
+          bannerTouchStartX = e.changedTouches[0].screenX;
+        }, { passive: true });
+
+        adCarousel.addEventListener('touchend', (e) => {
+          bannerHovered = false;
+          const dx = e.changedTouches[0].screenX - bannerTouchStartX;
+          if (Math.abs(dx) > 40) {
+            showBannerSlide(dx < 0 ? bannerIndex + 1 : bannerIndex - 1);
+            restartBannerAutoplay();
+          }
+        }, { passive: true });
+
+        // Click en slide → tracking + redirección
+        adCarousel.addEventListener('click', async (e) => {
+          const slide = e.target.closest('.banner-slide');
+          if (!slide) return;
+
+          const bannerId  = slide.dataset.bannerId;
+          const linkType  = slide.dataset.linkType || 'external';
+          const linkValue = slide.dataset.linkValue || '';
+
+          if (bannerId) await trackBannerClick(bannerId);
+
+          if (!linkValue) return;
+
+          switch (linkType) {
+            case 'category':
+              state.categorySlug = linkValue;
+              selectCategoryChip(linkValue);
+              updateClearAllVisibility();
+              loadProducts({ reset: true });
+              document.getElementById('productsGrid')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+              break;
+
+            case 'store':
+              window.location.href = `tienda.html?slug=${encodeURIComponent(linkValue)}`;
+              break;
+
+            case 'product':
+              if (window.__pasajeProductsCache && window.__pasajeProductsCache[String(linkValue)]) {
+                if (window.ProductCardUI && typeof window.ProductCardUI.openOrderModal === 'function') {
+                  window.ProductCardUI.openOrderModal(window.__pasajeProductsCache[String(linkValue)]);
+                }
+              } else {
+                window.location.href = `productos.html?p=${encodeURIComponent(linkValue)}`;
+              }
+              break;
+
+            case 'external':
+            default:
+              if (linkValue) {
+                const url = linkValue.startsWith('http') ? linkValue : `https://${linkValue}`;
+                window.open(url, '_blank', 'noopener,noreferrer');
+              }
+              break;
+          }
+        });
+      }
+
+      function showBannerSlide(idx) {
+        if (bannerSlides.length === 0) return;
+        bannerIndex = ((idx % bannerSlides.length) + bannerSlides.length) % bannerSlides.length;
+
+        adCarousel.querySelectorAll('.banner-slide').forEach((s, i) => {
+          s.classList.toggle('is-active', i === bannerIndex);
+        });
+
+        bannerDots?.querySelectorAll('.banner-dot').forEach((d, i) => {
+          d.classList.toggle('is-active', i === bannerIndex);
+        });
+      }
+
+      function startBannerAutoplay() {
+        stopBannerAutoplay();
+        if (bannerSlides.length <= 1) return;
+        bannerTimer = setInterval(() => {
+          if (!bannerHovered) showBannerSlide(bannerIndex + 1);
+        }, 5000);
+      }
+
+      function stopBannerAutoplay() {
+        if (bannerTimer) { clearInterval(bannerTimer); bannerTimer = null; }
+      }
+
+      function restartBannerAutoplay() {
+        stopBannerAutoplay();
+        startBannerAutoplay();
+      }
+
+      async function trackBannerImpressions(banners) {
+        const client = getClient();
+        if (!client || !banners || banners.length === 0) return;
+        for (const b of banners) {
+          try {
+            await client.rpc('increment_banner_impression', { banner_id: b.id });
+          } catch (e) { /* silencioso */ }
+        }
+      }
+
+      async function trackBannerClick(bannerId) {
+        const client = getClient();
+        if (!client || !bannerId) return;
+        try {
+          await client.rpc('increment_banner_click', { banner_id: bannerId });
+        } catch (e) { /* silencioso */ }
+      }
+
+      // ==========================================================
+      // CATEGORÍAS
+      // ==========================================================
+      let categoriesFlat = [];
+      let categoriesTree = [];
+
+      async function loadCategories() {
+        const client = getClient();
+        if (!client) return;
+
+        try {
+          const { data, error } = await client
+            .from('categories')
+            .select('id, name, slug, icon, sort_order, parent_id')
+            .eq('is_active', true)
+            .order('sort_order', { ascending: true });
+
+          if (error) throw error;
+
+          categoriesFlat = data || [];
+
+          const chipsHtml = categoriesFlat
+            .filter(c => c.parent_id === null || c.parent_id === undefined)
+            .map(c => `
+              <button type="button" data-category-slug="${esc(c.slug)}" class="filter-chip filter-chip-idle">
+                <span>${esc(c.icon || '📦')}</span>
+                <span>${esc(c.name)}</span>
+              </button>
+            `).join('');
+
+          categoryChips.innerHTML = `
+            <button type="button" data-category-slug="todas" class="filter-chip ${state.categorySlug === 'todas' ? 'filter-chip-active' : 'filter-chip-idle'}">✨ Todas</button>
+            ${chipsHtml}
+          `;
+
+          bindCategoryChips();
+
+          buildCategoryTree();
+          renderCategoryTree();
+        } catch (err) {
+          console.warn('[Productos] Error cargando categorías:', err);
+          if (categoryTreeList) {
+            categoryTreeList.innerHTML = `
+              <div class="text-center py-8">
+                <p class="text-2xl mb-2">⚠️</p>
+                <p class="text-xs text-rose-500 font-semibold">No se pudieron cargar las categorías.</p>
+              </div>`;
+          }
+        }
+      }
+
+      function bindCategoryChips() {
+        categoryChips.querySelectorAll('[data-category-slug]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const slug = btn.dataset.categorySlug;
+            state.categorySlug = slug || 'todas';
+            categoryChips.querySelectorAll('[data-category-slug]').forEach(b => {
+              b.classList.remove('filter-chip-active');
+              b.classList.add('filter-chip-idle');
+            });
+            btn.classList.remove('filter-chip-idle');
+            btn.classList.add('filter-chip-active');
+            updateClearAllVisibility();
+            loadProducts({ reset: true });
+          });
+        });
+      }
+
+      function selectCategoryChip(slug) {
+        const target = categoryChips.querySelector(`[data-category-slug="${slug}"]`);
+        if (!target) return;
+        categoryChips.querySelectorAll('[data-category-slug]').forEach(b => {
+          b.classList.remove('filter-chip-active');
+          b.classList.add('filter-chip-idle');
+        });
+        target.classList.remove('filter-chip-idle');
+        target.classList.add('filter-chip-active');
+      }
+
+      // ==========================================================
+      // CATEGORY DRAWER
+      // ==========================================================
+      function buildCategoryTree() {
+        const roots = [];
+        const byParent = {};
+
+        categoriesFlat.forEach(c => {
+          const p = (c.parent_id === null || c.parent_id === undefined) ? '__root__' : String(c.parent_id);
+          if (!byParent[p]) byParent[p] = [];
+          byParent[p].push(c);
+        });
+
+        (byParent['__root__'] || []).forEach(r => {
+          roots.push({
+            ...r,
+            children: byParent[String(r.id)] || []
+          });
+        });
+
+        categoriesTree = roots;
+      }
+
+      function renderCategoryTree() {
+        if (!categoryTreeList) return;
+
+        if (categoriesTree.length === 0) {
+          categoryTreeList.innerHTML = `
+            <p class="text-xs text-slate-400 italic text-center py-6">No hay categorías disponibles.</p>`;
+          return;
+        }
+
+        const activeSlug = state.categorySlug;
+
+        const allRow = `
+          <button type="button" data-cat-slug="todas"
+            class="cat-row cat-row-all ${activeSlug === 'todas' ? 'is-active' : ''}">
+            <span class="text-lg">✨</span>
+            <span class="flex-1">Todas las categorías</span>
+          </button>
+        `;
+
+        const treeHtml = categoriesTree.map(cat => {
+          const hasChildren = cat.children && cat.children.length > 0;
+          const isActive = activeSlug === cat.slug;
+
+          const childrenHtml = hasChildren ? `
+            <div class="cat-children hidden" data-children-of="${cat.id}">
+              ${cat.children.map(ch => {
+                const chActive = activeSlug === ch.slug;
+                return `
+                  <button type="button" data-cat-slug="${esc(ch.slug)}"
+                    class="cat-row cat-row-child ${chActive ? 'is-active' : ''}">
+                    <span class="text-base">${esc(ch.icon || '·')}</span>
+                    <span class="flex-1">${esc(ch.name)}</span>
+                  </button>
+                `;
+              }).join('')}
+            </div>
+          ` : '';
+
+          return `
+            <div class="mb-1" data-cat-wrap="${cat.id}">
+              <div class="flex items-stretch gap-1">
+                <button type="button" data-cat-slug="${esc(cat.slug)}"
+                  class="cat-row flex-1 ${isActive ? 'is-active' : ''}">
+                  <span class="text-lg">${esc(cat.icon || '📦')}</span>
+                  <span class="flex-1 font-bold">${esc(cat.name)}</span>
+                </button>
+                ${hasChildren ? `
+                  <button type="button" data-toggle-children="${cat.id}"
+                    class="cat-toggle-btn" aria-label="Ver subcategorías">
+                    <svg class="cat-chevron w-4 h-4" fill="none" stroke="currentColor" stroke-width="2.5" viewBox="0 0 24 24">
+                      <polyline points="6 9 12 15 18 9"/>
+                    </svg>
+                  </button>
+                ` : ''}
+              </div>
+              ${childrenHtml}
+            </div>
+          `;
+        }).join('');
+
+        categoryTreeList.innerHTML = allRow + treeHtml;
+        bindCategoryTreeEvents();
+      }
+
+      function bindCategoryTreeEvents() {
+        categoryTreeList.querySelectorAll('[data-cat-slug]').forEach(btn => {
+          btn.addEventListener('click', () => {
+            const slug = btn.dataset.catSlug || 'todas';
+            state.categorySlug = slug;
+            selectCategoryChip(slug);
+            updateClearAllVisibility();
+            loadProducts({ reset: true });
+            closeCategoryDrawer();
+          });
+        });
+
+        categoryTreeList.querySelectorAll('[data-toggle-children]').forEach(btn => {
+          btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            const catId = btn.dataset.toggleChildren;
+            const childrenWrap = categoryTreeList.querySelector(`[data-children-of="${catId}"]`);
+            if (!childrenWrap) return;
+            const isHidden = childrenWrap.classList.contains('hidden');
+            childrenWrap.classList.toggle('hidden', !isHidden);
+            btn.classList.toggle('is-open', isHidden);
+          });
+        });
+      }
+
+      function openCategoryDrawer() {
+        if (!categoryDrawer || !categoryDrawerOverlay) return;
+        categoryDrawerOverlay.classList.remove('hidden');
+        void categoryDrawerOverlay.offsetWidth;
+        categoryDrawerOverlay.classList.add('opacity-100');
+        categoryDrawer.classList.remove('-translate-x-full');
+        categoryDrawer.classList.add('translate-x-0');
+        document.body.style.overflow = 'hidden';
+
+        if (categoriesTree.length === 0 && categoriesFlat.length > 0) {
+          buildCategoryTree();
+          renderCategoryTree();
+        }
+      }
+
+      function closeCategoryDrawer() {
+        if (!categoryDrawer || !categoryDrawerOverlay) return;
+        categoryDrawer.classList.add('-translate-x-full');
+        categoryDrawer.classList.remove('translate-x-0');
+        categoryDrawerOverlay.classList.remove('opacity-100');
+        setTimeout(() => {
+          categoryDrawerOverlay.classList.add('hidden');
+          document.body.style.overflow = '';
+        }, 300);
+      }
+
+      function bindCategoryDrawerEvents() {
+        document.getElementById('openCategoryDrawerBtn')?.addEventListener('click', openCategoryDrawer);
+        document.getElementById('openCategoryDrawerBtnHeader')?.addEventListener('click', openCategoryDrawer);
+        document.getElementById('openCategoryDrawerBtnInline')?.addEventListener('click', openCategoryDrawer);
+        document.getElementById('closeCategoryDrawerBtn')?.addEventListener('click', closeCategoryDrawer);
+        categoryDrawerOverlay?.addEventListener('click', closeCategoryDrawer);
+
+        document.addEventListener('keydown', (e) => {
+          if (e.key === 'Escape' && !categoryDrawer.classList.contains('-translate-x-full')) {
+            closeCategoryDrawer();
+          }
+        });
+
+        document.getElementById('clearCategoryFromDrawerBtn')?.addEventListener('click', () => {
+          state.categorySlug = 'todas';
+          selectCategoryChip('todas');
+          updateClearAllVisibility();
+          loadProducts({ reset: true });
+          closeCategoryDrawer();
+        });
+
+        const debouncedFilter = debounce((term) => {
+          const q = term.trim().toLowerCase();
+          categoryTreeList.querySelectorAll('[data-cat-wrap]').forEach(wrap => {
+            const text = wrap.textContent.toLowerCase();
+            wrap.style.display = !q || text.includes(q) ? '' : 'none';
+          });
+        }, 200);
+
+        categoryDrawerSearch?.addEventListener('input', (e) => debouncedFilter(e.target.value));
+      }
+
+      // ==========================================================
+      // TIENDAS
+      // ==========================================================
+      async function loadStores() {
+        const client = getClient();
+        if (!client) return;
+
+        try {
+          const { data, error } = await client
+            .from('stores')
+            .select('id, name, slug')
+            .eq('is_active', true)
+            .eq('is_suspended', false)
+            .order('name', { ascending: true });
+
+          if (error) throw error;
+
+          storeSelect.innerHTML = '<option value="">Todas las tiendas</option>' + (data || []).map(s => `
+            <option value="${esc(s.id)}">${esc(s.name)}</option>
+          `).join('');
+        } catch (err) {
+          console.warn('[Productos] Error cargando tiendas:', err);
+        }
+      }
+
+      // ==========================================================
+      // CARGA DE PRODUCTOS
+      // ==========================================================
+      function showLoadingMore(visible) {
+        if (loadingMore) loadingMore.classList.toggle('hidden', !visible);
+      }
+
+      async function loadProducts({ reset = false } = {}) {
+        if (state.loading) return;
+        if (reset) {
+          state.page = 0;
+          state.allProducts = [];
+          state.hasMore = true;
+        }
+        if (!state.hasMore && !reset) return;
+
+        state.loading = true;
+        if (!reset) showLoadingMore(true);
+
+        try {
+          const res = await window.ProductsService.getProducts({
+            page: state.page,
+            limit: PER_PAGE,
+            categorySlug: state.categorySlug,
+            searchTerm: state.searchTerm,
+            sortBy: state.sortBy,
+            minPrice: state.minPrice,
+            maxPrice: state.maxPrice
+          });
+
+          if (reset) state.allProducts = res.products.slice();
+          else state.allProducts = state.allProducts.concat(res.products);
+
+          state.hasMore = res.hasMore;
+          state.page = state.page + 1;
+
+          applyStoreFilterAndRender();
+        } catch (err) {
+          console.error('[Productos] Error cargando productos:', err);
+          if (state.allProducts.length === 0) {
+            grid.innerHTML = `
+              <div class="col-span-full text-center py-12">
+                <p class="text-3xl mb-2">⚠️</p>
+                <p class="text-xs text-rose-500 font-semibold">Error al cargar productos. Revisa tu conexión.</p>
+              </div>`;
+          }
+        } finally {
+          state.loading = false;
+          showLoadingMore(false);
+        }
+      }
+
+      function applyStoreFilterAndRender() {
+        let filtered = state.allProducts;
+        if (state.storeId) {
+          filtered = filtered.filter(p => String(p.store_id) === String(state.storeId));
+        }
+        state.filteredProducts = filtered;
+        renderGrid(filtered);
+        updateResultCount();
+        updateClearAllVisibility();
+      }
+
+      function renderGrid(products) {
+        window.__pasajeProductsCache = window.__pasajeProductsCache || {};
+
+        if (!products || products.length === 0) {
+          grid.innerHTML = '';
+          grid.classList.add('hidden');
+          emptyState.classList.remove('hidden');
+          loadMoreBtn.classList.add('hidden');
+          return;
+        }
+
+        emptyState.classList.add('hidden');
+        grid.classList.remove('hidden');
+
+        products.forEach(p => {
+          window.__pasajeProductsCache[String(p.id)] = p;
+        });
+
+        grid.innerHTML = products.map(p => {
+          try {
+            return window.ProductCardUI.render(p);
+          } catch (e) {
+            console.warn('[Productos] Error render card:', e);
+            return '';
+          }
+        }).join('');
+
+        if (window.ProductCardUI && typeof window.ProductCardUI.bindAllCards === 'function') {
+          window.ProductCardUI.bindAllCards(grid);
+        }
+
+        loadMoreBtn.classList.toggle('hidden', !state.hasMore);
+      }
+
+      function updateResultCount() {
+        if (resultCount) resultCount.textContent = String(state.filteredProducts.length);
+      }
+
+      // ==========================================================
+      // EVENTOS GENERALES
+      // ==========================================================
+      function bindListeners() {
+        const sidebarToggle = document.getElementById('sidebarToggleBtn');
+        if (sidebarToggle) {
+          sidebarToggle.addEventListener('click', () => {
+            if (window.PasajeTiendaSidebar && typeof window.PasajeTiendaSidebar.toggle === 'function') {
+              window.PasajeTiendaSidebar.toggle();
+            } else if (typeof window.toggleTiendaSidebar === 'function') {
+              window.toggleTiendaSidebar();
+            }
+          });
+        }
+
+        const debouncedSearch = debounce((val) => {
+          state.searchTerm = val.trim();
+          loadProducts({ reset: true });
+        }, 250);
+
+        searchInput?.addEventListener('input', (e) => {
+          const val = e.target.value;
+          if (val) clearSearchBtn.classList.remove('hidden');
+          else clearSearchBtn.classList.add('hidden');
+          debouncedSearch(val);
+        });
+
+        searchInput?.addEventListener('keydown', (e) => {
+          if (e.key === 'Enter') {
+            e.preventDefault();
+            clearSearchBtn.classList.toggle('hidden', !searchInput.value);
+            loadProducts({ reset: true });
+          }
+        });
+
+        clearSearchBtn?.addEventListener('click', () => {
+          searchInput.value = '';
+          state.searchTerm = '';
+          clearSearchBtn.classList.add('hidden');
+          loadProducts({ reset: true });
+        });
+
+        sortSelect?.addEventListener('change', (e) => {
+          state.sortBy = e.target.value || 'recent';
+          loadProducts({ reset: true });
+        });
+
+        storeSelect?.addEventListener('change', (e) => {
+          state.storeId = e.target.value || '';
+          applyStoreFilterAndRender();
+        });
+
+        const debouncedPrice = debounce(() => {
+          const minVal = minPriceInput.value.trim();
+          const maxVal = maxPriceInput.value.trim();
+          state.minPrice = minVal === '' ? null : parseFloat(minVal);
+          state.maxPrice = maxVal === '' ? null : parseFloat(maxVal);
+          clearPriceBtn.classList.toggle('hidden', !state.minPrice && !state.maxPrice);
+          loadProducts({ reset: true });
+        }, 350);
+
+        minPriceInput?.addEventListener('input', debouncedPrice);
+        maxPriceInput?.addEventListener('input', debouncedPrice);
+
+        clearPriceBtn?.addEventListener('click', () => {
+          minPriceInput.value = '';
+          maxPriceInput.value = '';
+          state.minPrice = null;
+          state.maxPrice = null;
+          clearPriceBtn.classList.add('hidden');
+          loadProducts({ reset: true });
+        });
+
+        loadMoreBtn?.addEventListener('click', () => {
+          loadProducts({ reset: false });
+        });
+
+        const clearAllHandler = () => {
+          state.searchTerm = '';
+          state.categorySlug = 'todas';
+          state.storeId = '';
+          state.minPrice = null;
+          state.maxPrice = null;
+          state.sortBy = 'recent';
+
+          if (searchInput) searchInput.value = '';
+          if (clearSearchBtn) clearSearchBtn.classList.add('hidden');
+          if (storeSelect) storeSelect.value = '';
+          if (minPriceInput) minPriceInput.value = '';
+          if (maxPriceInput) maxPriceInput.value = '';
+          if (clearPriceBtn) clearPriceBtn.classList.add('hidden');
+          if (sortSelect) sortSelect.value = 'recent';
+
+          selectCategoryChip('todas');
+          updateClearAllVisibility();
+
+          if (categoriesTree.length > 0) renderCategoryTree();
+
+          loadProducts({ reset: true });
+        };
+
+        clearAllBtn?.addEventListener('click', clearAllHandler);
+        document.getElementById('clearFiltersFromEmptyBtn')?.addEventListener('click', clearAllHandler);
+      }
+
+      // ==========================================================
+      // URL PARAMS
+      // ==========================================================
+      function readURLParams() {
+        try {
+          const params = new URLSearchParams(window.location.search);
+          const cat = params.get('cat');
+          if (cat) state.categorySlug = cat;
+          return {
+            openCategories: params.get('openCategories') === 'true'
+          };
+        } catch (e) {
+          return { openCategories: false };
+        }
+      }
+
+      // ==========================================================
+      // INIT
+      // ==========================================================
+      async function init() {
+        if (state.initialized) return;
+        state.initialized = true;
+
+        const urlParams = readURLParams();
+        bindListeners();
+        bindCategoryDrawerEvents();
+        updateFavCount();
+
+        await Promise.all([
+          loadStats(),
+          loadCategories(),
+          loadStores(),
+          loadAdBanners()
+        ]);
+
+        if (state.categorySlug && state.categorySlug !== 'todas') {
+          selectCategoryChip(state.categorySlug);
+        }
+
+        await loadProducts({ reset: true });
+        updateClearAllVisibility();
+
+        if (urlParams.openCategories) {
+          setTimeout(() => openCategoryDrawer(), 250);
+        }
+      }
+
+      if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', init);
+      } else {
+        init();
+      }
+    })();
+  </script>
+
+</body>
+</html>

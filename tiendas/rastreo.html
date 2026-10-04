@@ -1,0 +1,285 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Rastreo de Pedido · Pasaje de los Altos</title>
+  <meta name="theme-color" content="#1e3a8a">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=4"></script>
+  <script src="../js/theme-loader.js?v=9"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }</style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800 flex flex-col justify-between">
+
+  <header class="bg-slate-900 text-white shadow-lg sticky top-0 z-40 border-b border-white/10">
+    <div class="max-w-4xl mx-auto px-4 py-3.5 flex justify-between items-center">
+      <a href="../index.html" class="flex items-center gap-2 font-extrabold text-base sm:text-lg">
+        <span>🏔️</span>
+        <span>Pasaje de los <span class="text-emerald-400">Altos</span></span>
+      </a>
+      <a href="../index.html" class="text-xs bg-white/10 hover:bg-white/20 px-3 py-1.5 rounded-xl font-bold transition">← Volver al Catálogo</a>
+    </div>
+  </header>
+
+  <main class="max-w-2xl mx-auto p-4 sm:p-6 w-full flex-1 my-auto">
+    <div class="bg-white rounded-3xl shadow-xl border border-slate-200/80 p-6 sm:p-8 space-y-6">
+      
+      <div class="text-center space-y-1">
+        <span class="text-xs font-black uppercase tracking-widest text-emerald-600 bg-emerald-50 px-3 py-1 rounded-full">Seguimiento en Vivo</span>
+        <h1 class="text-2xl font-black text-slate-900 mt-2">Rastreo de Pedido</h1>
+        <p class="text-xs text-slate-500">Consulta el estado actual de tu compra en tiempo real.</p>
+      </div>
+
+      <!-- Buscador por ID -->
+      <div id="searchContainer" class="space-y-3 pt-2">
+        <div class="flex gap-2">
+          <input type="text" id="orderIdInput" placeholder="Ingresa el ID o UUID de tu pedido..."
+            class="flex-1 border border-slate-300 p-3 rounded-2xl text-xs font-semibold focus:ring-2 focus:ring-emerald-500 outline-none bg-slate-50">
+          <button id="searchOrderBtn" class="bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs px-5 py-3 rounded-2xl transition shadow">
+            🔍 Buscar
+          </button>
+        </div>
+      </div>
+
+      <!-- Resultado del Pedido -->
+      <div id="orderResultContainer" class="hidden space-y-6 pt-4 border-t border-slate-100">
+        
+        <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-2 bg-slate-50 p-4 rounded-2xl border border-slate-200/60">
+          <div>
+            <p class="text-[10px] font-bold text-slate-400 uppercase">ID de Pedido</p>
+            <p id="resOrderId" class="text-xs font-mono font-bold text-slate-700 break-all">—</p>
+          </div>
+          <div class="text-left sm:text-right">
+            <p class="text-[10px] font-bold text-slate-400 uppercase">Última Actualización</p>
+            <p id="resOrderUpdated" class="text-xs font-bold text-emerald-600">—</p>
+          </div>
+        </div>
+
+        <!-- BADGE PIN DE CONFIRMACIÓN DEL CLIENTE -->
+        <div id="customerPinBadge" class="hidden p-4 bg-amber-50 border-2 border-amber-400 rounded-2xl text-center space-y-1 shadow-sm">
+          <p class="text-[11px] font-black uppercase tracking-wider text-amber-900">🔑 Tu PIN de Recepción de Seguridad</p>
+          <p id="resCustomerPin" class="text-3xl font-black font-mono text-slate-900 tracking-widest">0000</p>
+          <p class="text-[11px] text-amber-800 font-medium">Muestra este código de 4 dígitos al repartidor para recibir tu pedido.</p>
+        </div>
+
+        <!-- Banner especial para pedidos Cancelados o Rechazados -->
+        <div id="cancelledBanner" class="hidden p-4 bg-rose-50 border border-rose-200 rounded-2xl text-center space-y-1">
+          <p id="cancelledTitle" class="text-sm font-black text-rose-800">🔴 Pedido Cancelado</p>
+          <p id="cancelledDesc" class="text-xs text-rose-600 font-semibold">Este pedido ha sido cancelado o rechazado. Comunícate con la tienda si tienes dudas.</p>
+        </div>
+
+        <!-- STEPPER UI (LÍNEA DE TIEMPO GRÁFICA) -->
+        <div id="stepperContainer" class="space-y-3">
+          <h3 class="text-xs font-black text-slate-700 uppercase tracking-wider">Estado del Envío</h3>
+          
+          <div class="relative pl-6 space-y-6 before:absolute before:left-2.5 before:top-2 before:bottom-2 before:w-0.5 before:bg-slate-200">
+            
+            <div id="step-sent" class="relative flex items-center gap-3 opacity-40 transition-all">
+              <div class="absolute -left-6 w-5 h-5 rounded-full bg-slate-300 border-2 border-white flex items-center justify-center text-[10px] font-bold text-white step-icon">1</div>
+              <div>
+                <p class="text-xs font-extrabold text-slate-900">🟡 Pedido Recibido</p>
+                <p class="text-[11px] text-slate-500">La tienda ha recibido tu solicitud de compra.</p>
+              </div>
+            </div>
+
+            <div id="step-confirmed" class="relative flex items-center gap-3 opacity-40 transition-all">
+              <div class="absolute -left-6 w-5 h-5 rounded-full bg-slate-300 border-2 border-white flex items-center justify-center text-[10px] font-bold text-white step-icon">2</div>
+              <div>
+                <p class="text-xs font-extrabold text-slate-900">🔵 Confirmado</p>
+                <p class="text-[11px] text-slate-500">La tienda ha confirmado las existencias de tu compra.</p>
+              </div>
+            </div>
+
+            <div id="step-preparing" class="relative flex items-center gap-3 opacity-40 transition-all">
+              <div class="absolute -left-6 w-5 h-5 rounded-full bg-slate-300 border-2 border-white flex items-center justify-center text-[10px] font-bold text-white step-icon">3</div>
+              <div>
+                <p class="text-xs font-extrabold text-slate-900">🟠 En Preparación</p>
+                <p class="text-[11px] text-slate-500">Tu pedido está siendo empacado y preparado.</p>
+              </div>
+            </div>
+
+            <div id="step-on_the_way" class="relative flex items-center gap-3 opacity-40 transition-all">
+              <div class="absolute -left-6 w-5 h-5 rounded-full bg-slate-300 border-2 border-white flex items-center justify-center text-[10px] font-bold text-white step-icon">4</div>
+              <div>
+                <p class="text-xs font-extrabold text-slate-900">🛵 En Camino / Listo para Entregar</p>
+                <p class="text-[11px] text-slate-500">Tu pedido va en ruta hacia tu dirección o está listo en tienda.</p>
+              </div>
+            </div>
+
+            <div id="step-completed" class="relative flex items-center gap-3 opacity-40 transition-all">
+              <div class="absolute -left-6 w-5 h-5 rounded-full bg-slate-300 border-2 border-white flex items-center justify-center text-[10px] font-bold text-white step-icon">5</div>
+              <div>
+                <p class="text-xs font-extrabold text-slate-900">🟢 Entregado con Éxito</p>
+                <p class="text-[11px] text-slate-500">El pedido ha sido completado y entregado.</p>
+              </div>
+            </div>
+
+          </div>
+        </div>
+
+        <!-- DETALLES DE PRODUCTOS Y TOTAL -->
+        <div class="border rounded-2xl overflow-hidden divide-y divide-slate-100">
+          <div class="bg-slate-50 px-4 py-2.5">
+            <h4 class="text-xs font-black text-slate-700 uppercase">Resumen de Compra</h4>
+          </div>
+          <div id="resItemsList" class="p-4 space-y-3"></div>
+          <div class="bg-emerald-50/60 p-4 flex justify-between items-center">
+            <span class="text-xs font-bold text-emerald-900">Total Pagado</span>
+            <span id="resOrderTotal" class="text-lg font-black text-emerald-700">Q 0.00</span>
+          </div>
+        </div>
+
+      </div>
+
+      <div id="errorContainer" class="hidden p-4 bg-rose-50 border border-rose-200 rounded-2xl text-center text-xs font-bold text-rose-700">
+        No se encontró ningún pedido con ese ID. Verifica el enlace o código ingresado.
+      </div>
+
+    </div>
+  </main>
+
+  <footer class="bg-white border-t border-slate-200 py-6 text-center text-xs text-slate-500">
+    Pasaje de los Altos · Quetzaltenango, Guatemala
+  </footer>
+
+  <script>
+    (async () => {
+      const urlParams = new URLSearchParams(window.location.search);
+      const orderId = urlParams.get('id');
+
+      if (orderId) {
+        document.getElementById('orderIdInput').value = orderId;
+        await fetchAndRenderOrder(orderId);
+      }
+
+      document.getElementById('searchOrderBtn').addEventListener('click', async () => {
+        const val = document.getElementById('orderIdInput').value.trim();
+        if (val) {
+          window.history.replaceState({}, '', `?id=${val}`);
+          await fetchAndRenderOrder(val);
+        }
+      });
+    })();
+
+    async function fetchAndRenderOrder(id) {
+      const resContainer = document.getElementById('orderResultContainer');
+      const errContainer = document.getElementById('errorContainer');
+      const pinBadge = document.getElementById('customerPinBadge');
+      
+      resContainer.classList.add('hidden');
+      errContainer.classList.add('hidden');
+      if (pinBadge) pinBadge.classList.add('hidden');
+
+      const client = window._supabase || (typeof _supabase !== 'undefined' ? _supabase : null);
+      if (!client) return;
+
+      const { data, error } = await client
+        .from('cart_orders')
+        .select('*')
+        .eq('id', id)
+        .single();
+
+      if (error || !data) {
+        errContainer.classList.remove('hidden');
+        return;
+      }
+
+      document.getElementById('resOrderId').textContent = data.id;
+      
+      const updatedDate = data.status_updated_at ? new Date(data.status_updated_at) : new Date(data.created_at);
+      document.getElementById('resOrderUpdated').textContent = updatedDate.toLocaleString('es-GT', { dateStyle: 'short', timeStyle: 'short' });
+      document.getElementById('resOrderTotal').textContent = `Q ${parseFloat(data.total || 0).toFixed(2)}`;
+
+      const items = Array.isArray(data.items) ? data.items : [];
+      document.getElementById('resItemsList').innerHTML = items.map(it => `
+        <div class="flex justify-between items-center text-xs">
+          <div>
+            <span class="font-extrabold text-slate-800">${it.quantity}x</span> 
+            <span class="font-semibold text-slate-700">${escapeHtml(it.title || 'Producto')}</span>
+            ${it.selectedVariant ? `<span class="text-[10px] text-slate-400"> (${escapeHtml(it.selectedVariant)})</span>` : ''}
+          </div>
+          <span class="font-bold text-slate-900">Q ${((parseFloat(it.price) || 0) * (parseInt(it.quantity) || 1)).toFixed(2)}</span>
+        </div>
+      `).join('');
+
+      // Buscar si tiene PIN de entrega asignado
+      const { data: delReq } = await client
+        .from('delivery_requests')
+        .select('delivery_pin, status')
+        .eq('order_id', id)
+        .order('created_at', { ascending: false })
+        .limit(1)
+        .maybeSingle();
+
+      if (pinBadge && delReq && delReq.delivery_pin && !['cancelled', 'rejected'].includes((data.status || '').toLowerCase())) {
+        document.getElementById('resCustomerPin').textContent = delReq.delivery_pin;
+        pinBadge.classList.remove('hidden');
+      }
+
+      updateStepper(data.status);
+      resContainer.classList.remove('hidden');
+    }
+
+    function updateStepper(status) {
+      const normalized = (status || 'sent').toLowerCase();
+      const stepperContainer = document.getElementById('stepperContainer');
+      const cancelledBanner = document.getElementById('cancelledBanner');
+
+      if (normalized === 'cancelled' || normalized === 'rejected') {
+        stepperContainer.classList.add('hidden');
+        cancelledBanner.classList.remove('hidden');
+        
+        if (normalized === 'rejected') {
+          document.getElementById('cancelledTitle').textContent = '❌ Pedido Rechazado';
+          document.getElementById('cancelledDesc').textContent = 'La tienda no pudo procesar tu pedido debido a falta de disponibilidad o inventario.';
+        } else {
+          document.getElementById('cancelledTitle').textContent = '🔴 Pedido Cancelado';
+          document.getElementById('cancelledDesc').textContent = 'El pedido fue cancelado a solicitud del cliente.';
+        }
+        return;
+      }
+
+      stepperContainer.classList.remove('hidden');
+      cancelledBanner.classList.add('hidden');
+
+      const steps = ['sent', 'confirmed', 'preparing', 'on_the_way', 'completed'];
+      let activeIndex = 0;
+
+      if (normalized === 'sent' || normalized === 'pending') activeIndex = 0;
+      else if (normalized === 'confirmed') activeIndex = 1;
+      else if (normalized === 'preparing' || normalized === 'contacted') activeIndex = 2;
+      else if (normalized === 'on_the_way' || normalized === 'in_transit' || normalized === 'ready') activeIndex = 3;
+      else if (normalized === 'completed' || normalized === 'delivered') activeIndex = 4;
+
+      steps.forEach((step, idx) => {
+        const el = document.getElementById(`step-${step}`);
+        if (!el) return;
+        const icon = el.querySelector('.step-icon');
+        
+        if (idx <= activeIndex) {
+          el.style.opacity = '1';
+          if (icon) {
+            icon.style.backgroundColor = '#10b981';
+            icon.textContent = '✓';
+          }
+        } else {
+          el.style.opacity = '0.4';
+          if (icon) {
+            icon.style.backgroundColor = '#cbd5e1';
+            icon.textContent = idx + 1;
+          }
+        }
+      });
+    }
+
+    function escapeHtml(str) {
+      return String(str ?? '').replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
+    }
+  </script>
+</body>
+</html>

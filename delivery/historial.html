@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Historial · Pasaje Express</title>
+  <meta name="theme-color" content="#0d9488">
+  <link rel="manifest" href="../manifest.json">
+  <link rel="icon" href="../img/favicon.ico">
+
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <script src="../js/supabase.js?v=8"></script>
+  <script src="../js/theme-loader.js?v=9"></script>
+  <script src="../js/footer.js?v=4"></script>
+  <script src="../js/express-sidebar.js?v=3"></script>
+  <script src="../js/liquid-glass.js?v=4"></script>
+
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+
+  <style>
+    body { font-family: 'Inter', system-ui, sans-serif; background-color: #f0fdf4; }
+  </style>
+</head>
+<body class="min-h-screen flex flex-col text-slate-800">
+
+  <div id="expressSidebar"></div>
+
+  <header class="glass-header text-white shadow-lg sticky top-0 z-40 border-b border-white/10">
+    <div class="max-w-6xl mx-auto px-4 py-3 flex justify-between items-center gap-3">
+      <button id="sidebarToggleBtn" type="button"
+        onclick="if (window.PasajeExpressSidebar) window.PasajeExpressSidebar.toggle();"
+        class="bg-white/10 hover:bg-white/20 p-2 rounded-xl border border-white/15 text-white lg:hidden">
+        <svg xmlns="http://www.w3.org/2000/svg" width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+      </button>
+      <a href="../index.html" class="text-lg font-extrabold text-white">Pasaje de los <span class="text-emerald-400">Altos</span></a>
+      <div class="w-10"></div>
+    </div>
+  </header>
+
+  <main class="max-w-3xl mx-auto p-4 w-full flex-1 space-y-5">
+
+    <div class="bg-white rounded-3xl shadow-sm border border-slate-200/80 p-5">
+      <h1 class="text-xl font-black text-slate-900">📜 Mis Encargos</h1>
+      <p class="text-xs text-slate-500 mt-0.5">Historial completo de tus mandaditos y viajes</p>
+    </div>
+
+    <div class="grid grid-cols-3 gap-3">
+      <div class="bg-white rounded-2xl border border-slate-200/80 p-3 text-center">
+        <p class="text-[10px] font-black text-slate-500 uppercase">Total</p>
+        <p id="statTotal" class="text-2xl font-black text-slate-800 mt-1">0</p>
+      </div>
+      <div class="bg-emerald-50 rounded-2xl border border-emerald-200 p-3 text-center">
+        <p class="text-[10px] font-black text-emerald-700 uppercase">Completados</p>
+        <p id="statCompleted" class="text-2xl font-black text-emerald-700 mt-1">0</p>
+      </div>
+      <div class="bg-teal-50 rounded-2xl border border-teal-200 p-3 text-center">
+        <p class="text-[10px] font-black text-teal-700 uppercase">Invertido</p>
+        <p id="statSpent" class="text-xl font-black text-teal-700 mt-1">Q0</p>
+      </div>
+    </div>
+
+    <div id="historyList" class="space-y-3">
+      <p class="text-center text-slate-400 py-8 text-sm">Cargando historial...</p>
+    </div>
+  </main>
+
+  <div id="pasajeFooter"></div>
+
+  <script>
+    (async () => {
+      const c = window._supabase || (typeof initSupabaseClient === 'function' ? initSupabaseClient() : null);
+      if (!c) return;
+
+      const { data: { session } } = await c.auth.getSession();
+      if (!session) {
+        window.location.href = '../login.html?redirect=delivery/historial.html';
+        return;
+      }
+
+      const listEl = document.getElementById('historyList');
+      const { data, error } = await c
+        .from('delivery_requests')
+        .select(`
+          *,
+          driver:delivery_drivers!delivery_requests_driver_id_fkey(full_name, vehicle_type, rating_avg)
+        `)
+        .eq('customer_user_id', session.user.id)
+        .order('created_at', { ascending: false })
+        .limit(50);
+
+      if (error) {
+        listEl.innerHTML = `<p class="text-center text-rose-500 text-sm py-6">Error: ${error.message}</p>`;
+        return;
+      }
+
+      const list = data || [];
+      const total = list.length;
+      const completed = list.filter(r => ['delivered','completed'].includes(r.status)).length;
+      const spent = list.filter(r => ['delivered','completed'].includes(r.status))
+        .reduce((s, r) => s + parseFloat(r.final_fee || r.suggested_fee || 0), 0);
+
+      document.getElementById('statTotal').textContent = total;
+      document.getElementById('statCompleted').textContent = completed;
+      document.getElementById('statSpent').textContent = `Q${spent.toFixed(0)}`;
+
+      if (!list.length) {
+        listEl.innerHTML = `
+          <div class="bg-white rounded-3xl border border-slate-200 p-8 text-center">
+            <div class="text-4xl mb-3">📭</div>
+            <p class="font-black text-slate-700 mb-1">Aún no tienes encargos</p>
+            <p class="text-xs text-slate-500 mb-4">Tus mandaditos y viajes aparecerán aquí</p>
+            <a href="index.html" class="inline-block bg-teal-600 hover:bg-teal-700 text-white font-extrabold text-xs px-5 py-2.5 rounded-xl">➕ Crear el primero</a>
+          </div>`;
+        return;
+      }
+
+      const fmtDT = (iso) => {
+        if (!iso) return '—';
+        const d = new Date(iso);
+        return `${d.toLocaleDateString('es-GT',{day:'2-digit',month:'2-digit',year:'numeric'})} · ${d.toLocaleTimeString('es-GT',{hour:'2-digit',minute:'2-digit',hour12:true})}`;
+      };
+
+      const statusMap = {
+        'pending': 'bg-amber-100 text-amber-800 border-amber-300',
+        'accepted': 'bg-blue-100 text-blue-800 border-blue-300',
+        'in_transit': 'bg-purple-100 text-purple-800 border-purple-300',
+        'on_the_way': 'bg-purple-100 text-purple-800 border-purple-300',
+        'delivered': 'bg-emerald-100 text-emerald-800 border-emerald-300',
+        'completed': 'bg-emerald-100 text-emerald-800 border-emerald-300',
+        'cancelled': 'bg-rose-100 text-rose-800 border-rose-300',
+        'cancelled_pending_review': 'bg-amber-100 text-amber-900 border-amber-300',
+        'rejected': 'bg-rose-100 text-rose-800 border-rose-300'
+      };
+      const labelMap = {
+        'pending': '⏳ Pendiente',
+        'accepted': '✅ Aceptado',
+        'in_transit': '🛵 En tránsito',
+        'on_the_way': '🛵 En camino',
+        'delivered': '🎉 Entregado',
+        'completed': '🎉 Completado',
+        'cancelled': '❌ Cancelado',
+        'cancelled_pending_review': '⚠️ En revisión',
+        'rejected': '❌ Rechazado'
+      };
+
+      listEl.innerHTML = list.map(r => {
+        const sc = statusMap[r.status] || 'bg-slate-100 text-slate-700 border-slate-200';
+        const label = labelMap[r.status] || r.status;
+        const fee = parseFloat(r.final_fee || r.suggested_fee || 0).toFixed(2);
+        const isActive = ['pending','counter_offered','accepted','in_transit','on_the_way'].includes(r.status);
+        return `
+          <article class="bg-white rounded-2xl border border-slate-200/80 shadow-sm p-4 space-y-3">
+            <div class="flex justify-between items-start border-b pb-3">
+              <div class="min-w-0">
+                <span class="text-[10px] font-mono text-slate-400">#${(r.id||'').slice(0,8).toUpperCase()}</span>
+                <p class="font-black text-xs text-slate-900 mt-0.5 truncate">📍 ${r.origin_address || 'Origen'}</p>
+                <p class="font-black text-xs text-slate-900 truncate">🎯 ${r.destination_address || 'Destino'}</p>
+                <p class="text-[10px] text-slate-500 mt-1">${fmtDT(r.created_at)}</p>
+              </div>
+              <span class="text-[10px] font-black px-2 py-1 rounded-full border uppercase flex-shrink-0 ${sc}">${label}</span>
+            </div>
+            <div class="flex justify-between items-center text-xs">
+              <span class="font-bold text-slate-500">${r.driver?.full_name ? 'Piloto: ' + r.driver.full_name : 'Sin piloto'}</span>
+              <span class="font-black text-teal-600">${'Q' + fee}</span>
+            </div>
+            ${isActive ? `<a href="radar.html?id=${r.id}" class="block w-full text-center bg-teal-50 hover:bg-teal-100 text-teal-700 font-extrabold py-2 rounded-xl text-xs border border-teal-200">📡 Ver en radar</a>` : ''}
+          </article>
+        `;
+      }).join('');
+    })();
+  </script>
+</body>
+</html>

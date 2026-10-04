@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Flota · Mapa en vivo</title>
+  <meta name="theme-color" content="#0f172a">
+  <link rel="manifest" href="../../manifest.json">
+  <link rel="icon" href="../../img/favicon.ico">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
+  <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
+  <script src="../../js/supabase.js?v=8"></script>
+  <script src="../../js/theme-loader.js?v=9"></script>
+  <script src="../../js/admin-utils.js?v=8"></script>
+  <script src="../../js/admin-delivery-sidebar.js?v=2"></script>
+  <script src="../../js/liquid-glass.js?v=4"></script>
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet">
+  <style>
+    body { font-family: 'Inter', sans-serif; background-color: #f8fafc; }
+    #adminFleetMap { height: 600px; border-radius: 16px; z-index: 1; }
+    .leaflet-container { font-family: 'Inter', sans-serif; border-radius: 16px; }
+  </style>
+</head>
+<body class="bg-slate-100 min-h-screen text-slate-800">
+
+  <div id="adminHeader"></div>
+
+  <main class="max-w-7xl mx-auto p-4 pb-16">
+    <div id="adminTabs"></div>
+
+    <div id="loadingState" class="rounded-2xl p-8 text-center text-sm text-slate-500 bg-white shadow-sm">
+      Cargando mapa de flota...
+    </div>
+
+    <section id="content" class="hidden space-y-4">
+      <div class="bg-white rounded-2xl p-5 shadow-sm border border-slate-200 flex items-center justify-between flex-wrap gap-3">
+        <div>
+          <h1 class="text-xl font-black text-slate-900">🗺️ Mapa de Flota en Vivo</h1>
+          <p class="text-xs text-slate-500 mt-1">Pilotos disponibles, viajes en curso y rastreo GPS</p>
+        </div>
+        <div class="flex items-center gap-2 text-xs">
+          <span class="flex items-center gap-1.5 bg-emerald-50 border border-emerald-200 px-3 py-1.5 rounded-full">
+            <span class="w-2.5 h-2.5 rounded-full bg-emerald-500"></span><span class="font-black text-emerald-800"><span id="cntDrivers">0</span> disponibles</span>
+          </span>
+          <span class="flex items-center gap-1.5 bg-amber-50 border border-amber-200 px-3 py-1.5 rounded-full">
+            <span class="w-2.5 h-2.5 rounded-full bg-amber-500"></span><span class="font-black text-amber-800"><span id="cntRides">0</span> en curso</span>
+          </span>
+        </div>
+      </div>
+
+      <div class="bg-white rounded-2xl shadow-sm border border-slate-200 overflow-hidden">
+        <div id="adminFleetMap"></div>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    let fleetMap = null;
+    let markersLayer = null;
+    let pollTimer = null;
+    let channel = null;
+
+    (async () => {
+      const session = await adminGuardPage();
+      if (!session) return;
+      await initAdminDeliveryNav({ user: session.user });
+      document.getElementById('loadingState').classList.add('hidden');
+      document.getElementById('content').classList.remove('hidden');
+
+      fleetMap = L.map('adminFleetMap', { zoomControl: true })
+        .setView([14.8347, -91.5186], 13);
+
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap', maxZoom: 19
+      }).addTo(fleetMap);
+
+      markersLayer = L.layerGroup().addTo(fleetMap);
+
+      await refreshMap();
+      pollTimer = setInterval(refreshMap, 8000);
+
+      if (window.PasajeRealtime) {
+        const debounced = PasajeRealtime.debounce(refreshMap, 1500);
+        PasajeRealtime.subscribeToTable('admin_fleet_drivers', 'delivery_drivers', null, debounced);
+        PasajeRealtime.subscribeToTable('admin_fleet_requests', 'delivery_requests', null, debounced);
+      }
+    })();
+
+    function driverIcon(color, emoji) {
+      return L.divIcon({
+        className: '',
+        html: `<div style="width:36px;height:36px;background:${color};border-radius:50%;display:flex;align-items:center;justify-content:center;color:#fff;font-size:15px;border:3px solid #fff;box-shadow:0 3px 10px rgba(0,0,0,0.35)">${emoji}</div>`,
+        iconSize: [36, 36], iconAnchor: [18, 18]
+      });
+    }
+
+    async function refreshMap() {
+      const c = window._supabase;
+      if (!c || !fleetMap) return;
+
+      markersLayer.clearLayers();
+
+      // Pilotos disponibles (aproximado: centro de Xela + jitter si no hay driver_lat)
+      const { data: drivers } = await c.from('delivery_drivers')
+        .select('id, full_name, vehicle_type, license_plate, rating_avg')
+        .eq('is_available', true)
+        .limit(50);
+
+      // Viajes activos con GPS
+      const { data: rides } = await c.from('delivery_requests')
+        .select('id, origin_lat, origin_lng, destination_lat, destination_lng, driver_lat, driver_lng, customer_lat, customer_lng, status, origin_address, destination_address, driver:delivery_drivers!delivery_requests_driver_id_fkey(full_name)')
+        .is('store_id', null)
+        .in('status', ['accepted','in_transit','on_the_way'])
+        .limit(30);
+
+      document.getElementById('cntDrivers').textContent = (drivers || []).length;
+      document.getElementById('cntRides').textContent = (rides || []).length;
+
+      const bounds = [];
+
+      // Marcadores de pilotos disponibles (sin GPS real, los ponemos cerca del centro)
+      (drivers || []).forEach((d, idx) => {
+        const lat = 14.8347 + (Math.random() - 0.5) * 0.04;
+        const lng = -91.5186 + (Math.random() - 0.5) * 0.04;
+        const m = L.marker([lat, lng], {
+          icon: driverIcon('#10b981', '🛵')
+        }).addTo(markersLayer);
+        m.bindPopup(`<b>🛵 ${d.full_name || 'Piloto'}</b><br>${d.vehicle_type || 'Moto'} · ${d.license_plate || '—'}<br>⭐ ${parseFloat(d.rating_avg || 5).toFixed(1)}`);
+        bounds.push([lat, lng]);
+      });
+
+      // Rutas activas
+      (rides || []).forEach(r => {
+        if (r.origin_lat && r.origin_lng) {
+          L.marker([parseFloat(r.origin_lat), parseFloat(r.origin_lng)], { icon: driverIcon('#0d9488', '📍') })
+            .addTo(markersLayer).bindPopup('Origen: ' + (r.origin_address || ''));
+        }
+        if (r.destination_lat && r.destination_lng) {
+          L.marker([parseFloat(r.destination_lat), parseFloat(r.destination_lng)], { icon: driverIcon('#dc2626', '🎯') })
+            .addTo(markersLayer).bindPopup('Destino: ' + (r.destination_address || ''));
+        }
+        if (r.origin_lat && r.destination_lat && r.origin_lng && r.destination_lng) {
+          L.polyline([
+            [parseFloat(r.origin_lat), parseFloat(r.origin_lng)],
+            [parseFloat(r.destination_lat), parseFloat(r.destination_lng)]
+          ], { color: '#14b8a6', weight: 3, dashArray: '8, 8', opacity: 0.7 }).addTo(markersLayer);
+        }
+        // Piloto GPS
+        if (r.driver_lat && r.driver_lng) {
+          L.marker([parseFloat(r.driver_lat), parseFloat(r.driver_lng)], { icon: driverIcon('#7c3aed', '🛵') })
+            .addTo(markersLayer)
+            .bindPopup(`<b>🛵 ${r.driver?.full_name || 'Piloto en ruta'}</b><br>${r.status}`);
+        }
+        // Cliente GPS
+        if (r.customer_lat && r.customer_lng) {
+          L.marker([parseFloat(r.customer_lat), parseFloat(r.customer_lng)], { icon: driverIcon('#0891b2', '🙋') })
+            .addTo(markersLayer).bindPopup('Cliente');
+        }
+      });
+
+      if (bounds.length >= 2) {
+        fleetMap.fitBounds(bounds, { padding: [50, 50], maxZoom: 15 });
+      }
+    }
+  </script>
+</body>
+</html>
